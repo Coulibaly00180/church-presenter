@@ -28,5 +28,17 @@ contextBridge.exposeInMainWorld("cp", {
 
   devtools: {
     open: (target: "REGIE" | "PROJECTION") => ipcRenderer.invoke("devtools:open", target)
-  }
+  },
+
+  songs: {
+    list: (q?: string) => ipcRenderer.invoke("songs:list", q),
+    get: (id: string) => ipcRenderer.invoke("songs:get", id),
+    create: (payload: { title: string; artist?: string; album?: string }) =>
+      ipcRenderer.invoke("songs:create", payload),
+    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) =>
+      ipcRenderer.invoke("songs:updateMeta", payload),
+    replaceBlocks: (payload: { songId: string; blocks: any[] }) =>
+      ipcRenderer.invoke("songs:replaceBlocks", payload),
+    delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
+  },
 });

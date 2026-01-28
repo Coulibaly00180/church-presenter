@@ -10,9 +10,9 @@
     "preview": "electron-vite preview"
   },
   "dependencies": {
-    "@prisma/client": "^7.3.0",
+    "@prisma/client": "^6.19.2",
     "better-sqlite3": "^12.6.2",
-    "prisma": "^7.3.0",
+    "prisma": "^6.19.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.0"
@@ -24,6 +24,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "electron": "^40.0.0",
+    "electron-rebuild": "^3.2.9",
     "electron-vite": "^5.0.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"

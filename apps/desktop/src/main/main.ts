@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen } from "electron";
 import { join } from "path";
+import { registerSongsIpc } from "./ipc/songs";
 
 type ProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 
@@ -150,6 +151,12 @@ function closeProjectionWindow() {
 }
 
 app.whenReady().then(() => {
+  try {
+    registerSongsIpc();
+  } catch (e) {
+    console.error("registerSongsIpc failed", e);
+  }
+
   createRegieWindow();
 
   app.on("activate", () => {
