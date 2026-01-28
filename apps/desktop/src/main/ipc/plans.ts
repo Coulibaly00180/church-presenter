@@ -1,8 +1,7 @@
 import { ipcMain } from "electron";
 import { getPrisma } from "../db";
 
-function normalizeDateToMidnightIso(dateIso: string) {
-  // Attend "YYYY-MM-DD" ou ISO ; on normalise à 00:00:00
+function normalizeDateToMidnight(dateIso: string) {
   const d = new Date(dateIso);
   d.setHours(0, 0, 0, 0);
   return d;
@@ -28,7 +27,7 @@ export function registerPlansIpc() {
 
   ipcMain.handle("plans:create", async (_evt, payload: { dateIso: string; title?: string }) => {
     const prisma = getPrisma();
-    const date = normalizeDateToMidnightIso(payload.dateIso);
+    const date = normalizeDateToMidnight(payload.dateIso);
 
     return prisma.servicePlan.create({
       data: { date, title: payload.title ?? "Culte" },
@@ -79,16 +78,13 @@ export function registerPlansIpc() {
     const prisma = getPrisma();
     await prisma.serviceItem.delete({ where: { id: payload.itemId } });
 
-    // renumérote
     const items = await prisma.serviceItem.findMany({
       where: { planId: payload.planId },
       orderBy: { order: "asc" },
     });
 
     await prisma.$transaction(
-      items.map((it, idx) =>
-        prisma.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } })
-      )
+      items.map((it, idx) => prisma.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } }))
     );
 
     return { ok: true };
@@ -97,9 +93,7 @@ export function registerPlansIpc() {
   ipcMain.handle("plans:reorder", async (_evt, payload: { planId: string; orderedItemIds: string[] }) => {
     const prisma = getPrisma();
     await prisma.$transaction(
-      payload.orderedItemIds.map((id, idx) =>
-        prisma.serviceItem.update({ where: { id }, data: { order: idx + 1 } })
-      )
+      payload.orderedItemIds.map((id, idx) => prisma.serviceItem.update({ where: { id }, data: { order: idx + 1 } }))
     );
     return { ok: true };
   });
