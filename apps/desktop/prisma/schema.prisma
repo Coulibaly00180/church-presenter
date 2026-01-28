@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Song {
+  id        String      @id @default(cuid())
+  title     String
+  artist    String?
+  album     String?
+  language  String?
+  tags      String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  blocks    SongBlock[]
+}
+
+model SongBlock {
+  id        String   @id @default(cuid())
+  songId    String
+  order     Int
+  type      String
+  title     String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@index([songId, order])
+}

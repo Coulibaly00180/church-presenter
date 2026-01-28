@@ -1,0 +1,14 @@
+{
+  "name": "church-presenter",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @cp/desktop",
+    "build": "npm run build -w @cp/desktop",
+    "lint": "npm run lint -ws --if-present"
+  }
+}
