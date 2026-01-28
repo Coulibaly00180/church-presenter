@@ -1,23 +1,31 @@
 import React, { useEffect, useState } from "react";
 
-type ProjectionContent = { title?: string; body?: string; mode?: "BLACK" | "WHITE" | "NORMAL" };
-
 export function ProjectionPage() {
-  const [content, setContent] = useState<ProjectionContent>({ title: "", body: "", mode: "NORMAL" });
+  const [state, setState] = useState<any>(null);
   const [animKey, setAnimKey] = useState(0);
 
   useEffect(() => {
-    const off = window.cp.projection.onContent((p: ProjectionContent) => {
-      setContent(p);
-      setAnimKey((k) => k + 1); // déclenche la transition
-    });
+    if (!window.cp?.projection) {
+      console.error("window.cp.projection not available (preload not loaded?)");
+      return;
+    }
+    window.cp.projection.getState().then(setState);
+    const off = window.cp.projection.onState(setState);
     return () => off();
   }, []);
 
-  const mode = content.mode ?? "NORMAL";
+  // Déclenche une transition douce à chaque changement de "current"
+  useEffect(() => {
+    // incrémente dès que le contenu change
+    setAnimKey((k) => k + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.current?.kind, state?.current?.title, state?.current?.body]);
+
+  const mode = state?.mode ?? "NORMAL";
+  const current = state?.current ?? { kind: "EMPTY" };
 
   const bg = mode === "BLACK" ? "#000" : mode === "WHITE" ? "#fff" : "#000";
-  const fg = mode === "BLACK" ? "#fff" : mode === "WHITE" ? "#000" : "#fff";
+  const fg = mode === "WHITE" ? "#000" : "#fff";
 
   return (
     <div
@@ -29,34 +37,62 @@ export function ProjectionPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        userSelect: "none",
+        cursor: "none",
+        fontFamily: "system-ui",
         padding: 64,
         boxSizing: "border-box",
       }}
+      onContextMenu={(e) => e.preventDefault()}
     >
-      <div
-        key={animKey}
-        style={{
-          maxWidth: 1600,
-          width: "100%",
-          transition: "opacity 120ms ease, transform 120ms ease",
-          opacity: 1,
-          transform: "translateY(0px)",
-          animation: "cpFadeIn 120ms ease",
-        }}
-      >
-        <div style={{ fontSize: 44, fontWeight: 800, marginBottom: 24, opacity: 0.9 }}>
-          {content.title}
+      {mode !== "NORMAL" ? null : (
+        <div
+          key={animKey}
+          style={{
+            width: "100%",
+            textAlign: "center",
+            animation: "cpFadeIn 120ms ease",
+          }}
+        >
+          {current.kind === "TEXT" ? (
+            <>
+              {current.title ? (
+                <div style={{ fontSize: 64, fontWeight: 700, marginBottom: 28 }}>{current.title}</div>
+              ) : null}
+              <div style={{ fontSize: 48, lineHeight: 1.25, whiteSpace: "pre-wrap" }}>
+                {current.body}
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 56, opacity: 0.75 }}>Prêt</div>
+          )}
         </div>
-        <div style={{ fontSize: 64, lineHeight: 1.18, fontWeight: 900, whiteSpace: "pre-wrap" }}>
-          {content.body}
+      )}
+
+      {mode === "NORMAL" && state?.lowerThirdEnabled ? (
+        <div
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: "24px 48px",
+            background: "rgba(0,0,0,0.55)",
+            color: "#fff",
+            fontSize: 42,
+            lineHeight: 1.2,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {current.kind === "TEXT" ? current.body : ""}
         </div>
-      </div>
+      ) : null}
 
       <style>
         {`
           @keyframes cpFadeIn {
             from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0px); }
+            to   { opacity: 1; transform: translateY(0px); }
           }
         `}
       </style>
