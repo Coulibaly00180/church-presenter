@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, screen } from "electron";
 import { join } from "path";
 import { registerSongsIpc } from "./ipc/songs";
+import { registerPlansIpc } from "./ipc/plans";
 
 type ProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 
@@ -157,8 +158,18 @@ app.whenReady().then(() => {
     console.error("registerSongsIpc failed", e);
   }
 
-  createRegieWindow();
+  try {
+    registerPlansIpc();
+  } catch (e) {
+    console.error("registerPlansIpc failed", e);
+  }
 
+  try {
+    createRegieWindow();
+  } catch (e) {
+    console.error("createRegieWindow failed", e);
+  }
+  
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createRegieWindow();
   });

@@ -41,4 +41,14 @@ contextBridge.exposeInMainWorld("cp", {
       ipcRenderer.invoke("songs:replaceBlocks", payload),
     delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
   },
+
+  plans: {
+  list: () => ipcRenderer.invoke("plans:list"),
+  get: (planId: string) => ipcRenderer.invoke("plans:get", planId),
+  create: (payload: { dateIso: string; title?: string }) => ipcRenderer.invoke("plans:create", payload),
+  delete: (planId: string) => ipcRenderer.invoke("plans:delete", planId),
+  addItem: (payload: any) => ipcRenderer.invoke("plans:addItem", payload),
+  removeItem: (payload: { planId: string; itemId: string }) => ipcRenderer.invoke("plans:removeItem", payload),
+  reorder: (payload: { planId: string; orderedItemIds: string[] }) => ipcRenderer.invoke("plans:reorder", payload),
+},
 });

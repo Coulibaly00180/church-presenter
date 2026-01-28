@@ -34,3 +34,31 @@ model SongBlock {
 
   @@index([songId, order])
 }
+
+model ServicePlan {
+  id        String      @id @default(cuid())
+  date      DateTime    @unique
+  title     String?     // ex: "Culte du dimanche"
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  items     ServiceItem[]
+}
+
+model ServiceItem {
+  id        String      @id @default(cuid())
+  planId    String
+  order     Int
+  kind      String      // "SONG_BLOCK" | "ANNOUNCEMENT_TEXT" | "ANNOUNCEMENT_IMAGE" | "VERSE_MANUAL"
+  refId     String?     // ex: songId pour SONG_BLOCK
+  refSubId  String?     // ex: blockId pour SONG_BLOCK
+  title     String?
+  content   String?     // texte annonce / verset / etc
+  mediaPath String?     // chemin local image (MVP)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  plan      ServicePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId, order])
+}
