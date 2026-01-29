@@ -228,3 +228,9 @@ ipcMain.handle("projection:setMode", (_evt, mode: ProjectionMode) => {
   broadcastState();
   return state;
 });
+
+// IPC - projection remote control (from Projection window click/keys)
+ipcMain.on("projection:control", (_evt, action: "NEXT" | "PREV") => {
+  // Relay to régie (the controller). The régie decides how to advance.
+  regieWin?.webContents.send("projection:control", action);
+});

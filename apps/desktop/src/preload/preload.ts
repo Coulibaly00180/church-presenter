@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+type ControlAction = "NEXT" | "PREV";
+
 contextBridge.exposeInMainWorld("cp", {
   projection: {
     getState: () => ipcRenderer.invoke("projection:getState"),
@@ -8,11 +10,20 @@ contextBridge.exposeInMainWorld("cp", {
       ipcRenderer.invoke("projection:setContentText", payload),
     setMode: (mode: "NORMAL" | "BLACK" | "WHITE") =>
       ipcRenderer.invoke("projection:setMode", mode),
+
+    // projection window can ask the regie to go NEXT/PREV (click/keys)
+    emitControl: (action: ControlAction) => ipcRenderer.send("projection:control", action),
+    onControl: (cb: (action: ControlAction) => void) => {
+      const handler = (_: any, action: ControlAction) => cb(action);
+      ipcRenderer.on("projection:control", handler);
+      return () => ipcRenderer.removeListener("projection:control", handler);
+    },
+
     onState: (cb: (state: any) => void) => {
       const handler = (_: any, state: any) => cb(state);
       ipcRenderer.on("projection:state", handler);
       return () => ipcRenderer.removeListener("projection:state", handler);
-    }
+    },
   },
 
   projectionWindow: {
@@ -23,11 +34,11 @@ contextBridge.exposeInMainWorld("cp", {
       const handler = (_: any, payload: { isOpen: boolean }) => cb(payload);
       ipcRenderer.on("projection:window", handler);
       return () => ipcRenderer.removeListener("projection:window", handler);
-    }
+    },
   },
 
   devtools: {
-    open: (target: "REGIE" | "PROJECTION") => ipcRenderer.invoke("devtools:open", target)
+    open: (target: "REGIE" | "PROJECTION") => ipcRenderer.invoke("devtools:open", target),
   },
 
   songs: {
@@ -43,12 +54,15 @@ contextBridge.exposeInMainWorld("cp", {
   },
 
   plans: {
-  list: () => ipcRenderer.invoke("plans:list"),
-  get: (planId: string) => ipcRenderer.invoke("plans:get", planId),
-  create: (payload: { dateIso: string; title?: string }) => ipcRenderer.invoke("plans:create", payload),
-  delete: (planId: string) => ipcRenderer.invoke("plans:delete", planId),
-  addItem: (payload: any) => ipcRenderer.invoke("plans:addItem", payload),
-  removeItem: (payload: { planId: string; itemId: string }) => ipcRenderer.invoke("plans:removeItem", payload),
-  reorder: (payload: { planId: string; orderedItemIds: string[] }) => ipcRenderer.invoke("plans:reorder", payload),
-},
+    list: () => ipcRenderer.invoke("plans:list"),
+    get: (planId: string) => ipcRenderer.invoke("plans:get", planId),
+    create: (payload: { dateIso: string; title?: string }) =>
+      ipcRenderer.invoke("plans:create", payload),
+    delete: (planId: string) => ipcRenderer.invoke("plans:delete", planId),
+    addItem: (payload: any) => ipcRenderer.invoke("plans:addItem", payload),
+    removeItem: (payload: { planId: string; itemId: string }) =>
+      ipcRenderer.invoke("plans:removeItem", payload),
+    reorder: (payload: { planId: string; orderedItemIds: string[] }) =>
+      ipcRenderer.invoke("plans:reorder", payload),
+  },
 });

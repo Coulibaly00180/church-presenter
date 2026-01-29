@@ -146,6 +146,29 @@ export function RegiePage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [canUse, projOpen, song, blockCursor]);
 
+
+  // remote control from projection window (click left/right or ArrowLeft/Right)
+  useEffect(() => {
+    if (!canUse) return;
+    if (!window.cp?.projection?.onControl) return;
+
+    const off = window.cp.projection.onControl((action: "NEXT" | "PREV") => {
+      if (!projOpen || !song) return;
+      const blocks = song.blocks ?? [];
+      if (blocks.length === 0) return;
+
+      if (action === "NEXT") {
+        const next = clamp((blockCursor < 0 ? -1 : blockCursor) + 1, 0, blocks.length - 1);
+        void projectBlockByIndex(next);
+      } else {
+        const prev = clamp((blockCursor < 0 ? 0 : blockCursor) - 1, 0, blocks.length - 1);
+        void projectBlockByIndex(prev);
+      }
+    });
+
+    return () => off();
+  }, [canUse, projOpen, song, blockCursor]);
+
   const status = useMemo(() => {
     const mode = projState?.mode ?? "NORMAL";
     return `Mode=${mode} | Projection=${projOpen ? "OPEN" : "CLOSED"}`;
