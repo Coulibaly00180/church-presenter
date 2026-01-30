@@ -1,24 +1,36 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+
+type SongListItem = { id: string; title: string; artist?: string | null; album?: string | null };
+type SongBlock = { id: string; order: number; type: string; title?: string | null; content: string };
+type Song = { id: string; title: string; artist?: string | null; album?: string | null; blocks: SongBlock[] };
 
 type PlanListItem = { id: string; date: string; title?: string | null; updatedAt: string };
 type PlanItem = {
   id: string;
   order: number;
-  kind: string;
+  kind: string; // SONG_BLOCK | ANNOUNCEMENT_TEXT | VERSE_MANUAL | ...
+  refId?: string | null; // songId
+  refSubId?: string | null; // blockId
   title?: string | null;
   content?: string | null;
-  refId?: string | null;
-  refSubId?: string | null;
   mediaPath?: string | null;
 };
 type Plan = { id: string; date: string; title?: string | null; items: PlanItem[] };
-
-type SongListItem = { id: string; title: string; artist?: string | null; album?: string | null; updatedAt?: string };
-type SongBlock = { id: string; order: number; type: string; title?: string | null; content: string };
-type Song = { id: string; title: string; artist?: string | null; album?: string | null; blocks: SongBlock[] };
 
 function isoToYmd(iso: string) {
   const d = new Date(iso);
@@ -37,30 +49,32 @@ function isTypingTarget(el: EventTarget | null) {
 
 function SortableRow(props: {
   item: PlanItem;
-  isActive: boolean;
+  isSelected: boolean;
+  onSelect: () => void;
   onProject: () => void;
   onRemove: () => void;
-  onClick: () => void;
 }) {
-  const { item, isActive, onProject, onRemove, onClick } = props;
+  const { item, isSelected, onSelect, onProject, onRemove } = props;
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    border: isActive ? "2px solid #111" : "1px solid #ddd",
+    border: isSelected ? "2px solid #111" : "1px solid #ddd",
     borderRadius: 10,
     padding: 10,
     background: isDragging ? "#f0f0f0" : "white",
     display: "flex",
     alignItems: "center",
     gap: 10,
-    cursor: "pointer",
+    cursor: "default",
   };
 
   return (
-    <div ref={setNodeRef} style={style} onClick={onClick}>
+    <div ref={setNodeRef} style={style} onClick={onSelect}>
       <div
         {...attributes}
         {...listeners}
@@ -74,17 +88,21 @@ function SortableRow(props: {
           borderRadius: 8,
           background: "#fafafa",
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect();
+        }}
       >
         ☰
       </div>
 
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 800 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           #{item.order} — {item.title || item.kind}
         </div>
-        <div style={{ opacity: 0.75, fontSize: 13 }}>
+        <div style={{ opacity: 0.75, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {item.kind}
+          {item.kind === "SONG_BLOCK" && item.refId ? ` • song:${item.refId}` : ""}
           {item.content ? ` • ${item.content.slice(0, 80)}${item.content.length > 80 ? "…" : ""}` : ""}
         </div>
       </div>
@@ -112,8 +130,11 @@ function SortableRow(props: {
 }
 
 export function PlanPage() {
-  const cp: any = (window as any).cp;
-  const canUse = !!cp?.plans && !!cp?.projection && !!cp?.projectionWindow;
+  const canUse =
+    !!window.cp?.plans &&
+    !!window.cp?.projection &&
+    !!window.cp?.projectionWindow &&
+    !!window.cp?.songs;
 
   const [projOpen, setProjOpen] = useState(false);
 
@@ -121,59 +142,57 @@ export function PlanPage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
 
+  // Live cursor for plan traversal
   const [cursor, setCursor] = useState<number>(-1);
+  const [liveMode, setLiveMode] = useState<boolean>(() => {
+    const v = localStorage.getItem("cp.plan.liveMode");
+    return v ? v === "1" : true;
+  });
 
   const [newDate, setNewDate] = useState<string>(() => isoToYmd(new Date().toISOString()));
   const [newTitle, setNewTitle] = useState<string>("Culte");
 
+  // Add item form
   const [addKind, setAddKind] = useState<string>("ANNOUNCEMENT_TEXT");
   const [addTitle, setAddTitle] = useState<string>("Annonce");
   const [addContent, setAddContent] = useState<string>("");
 
-  // SONG_BLOCK add UI
+  // SongBlock picker
   const [songs, setSongs] = useState<SongListItem[]>([]);
-  const [songSearch, setSongSearch] = useState<string>("");
-  const [selectedSongId, setSelectedSongId] = useState<string>("");
-  const [selectedSong, setSelectedSong] = useState<Song | null>(null);
-  const [selectedBlockId, setSelectedBlockId] = useState<string>("");
+  const [songQuery, setSongQuery] = useState("");
+  const [pickedSongId, setPickedSongId] = useState<string>("");
+  const [pickedSong, setPickedSong] = useState<Song | null>(null);
+  const [pickedBlockId, setPickedBlockId] = useState<string>("");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   async function refreshPlans() {
-    const list = await cp.plans.list();
+    const list = await window.cp.plans.list();
     setPlans(list);
   }
 
   async function loadPlan(id: string) {
-    const p = await cp.plans.get(id);
+    const p = await window.cp.plans.get(id);
     setPlan(p);
     setSelectedPlanId(id);
-    setCursor(-1);
+
+    // restore cursor for this plan
+    const key = `cp.plan.cursor.${id}`;
+    const saved = localStorage.getItem(key);
+    const idx = saved ? Number(saved) : -1;
+    setCursor(Number.isFinite(idx) ? idx : -1);
   }
 
   async function refreshSongs(q?: string) {
-    if (!cp?.songs?.list) return;
-    const list = await cp.songs.list(q ?? "");
-    setSongs(list ?? []);
-  }
-
-  async function loadSong(songId: string) {
-    if (!songId) {
-      setSelectedSong(null);
-      setSelectedBlockId("");
-      return;
-    }
-    const s = await cp.songs.get(songId);
-    setSelectedSong(s);
-    const firstBlock = s?.blocks?.[0]?.id ?? "";
-    setSelectedBlockId(firstBlock);
+    const list = await window.cp.songs.list(q ?? "");
+    setSongs(list);
   }
 
   useEffect(() => {
     if (!canUse) return;
 
-    cp.projectionWindow.isOpen().then((r: any) => setProjOpen(!!r?.isOpen));
-    const offWin = cp.projectionWindow.onWindowState((p: any) => setProjOpen(!!p.isOpen));
+    window.cp.projectionWindow.isOpen().then((r: any) => setProjOpen(!!r?.isOpen));
+    const offWin = window.cp.projectionWindow.onWindowState((p: any) => setProjOpen(!!p.isOpen));
 
     refreshPlans();
     refreshSongs("");
@@ -183,23 +202,118 @@ export function PlanPage() {
   }, []);
 
   useEffect(() => {
-    if (!canUse) return;
-    if (addKind !== "SONG_BLOCK") return;
-
-    // keep songs list fresh with search
-    refreshSongs(songSearch);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [songSearch, addKind]);
-
-  useEffect(() => {
-    if (!canUse) return;
-    if (addKind !== "SONG_BLOCK") return;
-
-    loadSong(selectedSongId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedSongId, addKind]);
+    localStorage.setItem("cp.plan.liveMode", liveMode ? "1" : "0");
+  }, [liveMode]);
 
   const orderedIds = useMemo(() => (plan?.items ?? []).map((i) => i.id), [plan]);
+
+  async function projectServiceItem(item: PlanItem) {
+    if (!projOpen) return alert("Ouvre la projection d’abord.");
+
+    if (item.kind === "SONG_BLOCK") {
+      if (!item.refId || !item.refSubId) {
+        return alert("Item SONG_BLOCK incomplet (refId/refSubId manquants).");
+      }
+      const song: Song = await window.cp.songs.get(item.refId);
+      const block = song?.blocks?.find((b) => b.id === item.refSubId);
+      if (!block) return alert("Bloc introuvable pour ce chant.");
+
+      await window.cp.projection.setContentText({
+        title: `${song.title}${block.title ? ` — ${block.title}` : ""}`,
+        body: block.content,
+      });
+      return;
+    }
+
+    // Text-like items (ANNOUNCEMENT_TEXT, VERSE_MANUAL, etc.)
+    await window.cp.projection.setContentText({
+      title: item.title || item.kind,
+      body: item.content || "",
+    });
+  }
+
+  function persistCursor(next: number) {
+    if (!plan) return;
+    localStorage.setItem(`cp.plan.cursor.${plan.id}`, String(next));
+  }
+
+  async function projectItemByIndex(i: number) {
+    if (!plan) return;
+    const item = plan.items[i];
+    if (!item) return;
+
+    setCursor(i);
+    persistCursor(i);
+    await projectServiceItem(item);
+  }
+
+  async function goNext() {
+    if (!plan) return;
+    const next = Math.min((cursor < 0 ? -1 : cursor) + 1, plan.items.length - 1);
+    if (next < 0) return;
+    await projectItemByIndex(next);
+  }
+
+  async function goPrev() {
+    if (!plan) return;
+    const prev = Math.max((cursor < 0 ? 0 : cursor) - 1, 0);
+    await projectItemByIndex(prev);
+  }
+
+  // Keyboard nav (plan live)
+  useEffect(() => {
+    async function onKeyDown(e: KeyboardEvent) {
+      if (!plan) return;
+      if (!projOpen) return;
+      if (!liveMode) return;
+      if (isTypingTarget(e.target)) return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+        e.preventDefault();
+        await goNext();
+      }
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        await goPrev();
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const idx = cursor >= 0 ? cursor : 0;
+        await projectItemByIndex(idx);
+      }
+      if (e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        await window.cp.projection.setMode("BLACK");
+      }
+      if (e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        await window.cp.projection.setMode("WHITE");
+      }
+      if (e.key.toLowerCase() === "r") {
+        e.preventDefault();
+        await window.cp.projection.setMode("NORMAL");
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [plan, projOpen, liveMode, cursor]);
+
+  // Projection control events (click left/right on projection)
+  useEffect(() => {
+    if (!window.cp?.projection?.onControl) return;
+
+    const off = window.cp.projection.onControl(async (action: "NEXT" | "PREV") => {
+      if (!plan) return;
+      if (!projOpen) return;
+      if (!liveMode) return;
+
+      if (action === "NEXT") await goNext();
+      if (action === "PREV") await goPrev();
+    });
+
+    return () => off();
+  }, [plan, projOpen, liveMode, cursor]);
 
   async function onDragEnd(event: DragEndEvent) {
     if (!plan) return;
@@ -215,89 +329,23 @@ export function PlanPage() {
     }));
 
     setPlan({ ...plan, items: newItems });
-    await cp.plans.reorder({ planId: plan.id, orderedItemIds: newItems.map((x: any) => x.id) });
+
+    await window.cp.plans.reorder({ planId: plan.id, orderedItemIds: newItems.map((x) => x.id) });
+
+    // keep cursor pointing to same item id after reorder
+    const currentId = plan.items[cursor]?.id;
+    const nextCursor = currentId ? newItems.findIndex((x) => x.id === currentId) : cursor;
+    setCursor(nextCursor);
+    persistCursor(nextCursor);
+
     await loadPlan(plan.id);
   }
-
-  async function projectPlanItemByIndex(i: number) {
-    if (!plan) return;
-    if (!projOpen) return;
-
-    const item = plan.items[i];
-    if (!item) return;
-
-    // mark cursor first (UX)
-    setCursor(i);
-
-    if (item.kind === "SONG_BLOCK") {
-      const songId = item.refId;
-      const blockId = item.refSubId;
-      if (!songId || !blockId) {
-        await cp.projection.setContentText({
-          title: item.title || "Song block",
-          body: "(Référence manquante)",
-        });
-        return;
-      }
-
-      const s: Song = await cp.songs.get(songId);
-      const block = (s?.blocks ?? []).find((b) => b.id === blockId) ?? s?.blocks?.[0];
-
-      const title = `${s.title}${block?.title ? ` — ${block.title}` : ""}`;
-      const body = block?.content ?? "";
-      await cp.projection.setContentText({ title, body });
-      return;
-    }
-
-    // Default: text content
-    const title = item.title || item.kind;
-    const body = item.content || "";
-    await cp.projection.setContentText({ title, body });
-  }
-
-  // Keyboard navigation inside plan (regie-focused, projection is passive)
-  useEffect(() => {
-    if (!plan) return;
-
-    function onKeyDown(e: KeyboardEvent) {
-      if (!projOpen) return;
-      if (isTypingTarget(e.target)) return;
-
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        const next = Math.min((cursor < 0 ? -1 : cursor) + 1, plan.items.length - 1);
-        projectPlanItemByIndex(next);
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        const prev = Math.max((cursor < 0 ? 0 : cursor) - 1, 0);
-        projectPlanItemByIndex(prev);
-      }
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const idx = cursor >= 0 ? cursor : 0;
-        projectPlanItemByIndex(idx);
-      }
-      if (e.key.toLowerCase() === "b") {
-        cp.projection.setMode("BLACK");
-      }
-      if (e.key.toLowerCase() === "w") {
-        cp.projection.setMode("WHITE");
-      }
-      if (e.key.toLowerCase() === "r") {
-        cp.projection.setMode("NORMAL");
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [plan, projOpen, cursor]);
 
   if (!canUse) {
     return (
       <div style={{ fontFamily: "system-ui", padding: 16 }}>
         <h1 style={{ margin: 0 }}>Plan</h1>
-        <p style={{ color: "crimson" }}>Preload non chargé (window.cp.plans indisponible).</p>
+        <p style={{ color: "crimson" }}>Preload non chargé (window.cp.* indisponible).</p>
       </div>
     );
   }
@@ -307,14 +355,21 @@ export function PlanPage() {
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
         <div>
           <h1 style={{ margin: 0 }}>Plan</h1>
-          <div style={{ opacity: 0.7 }}>Projection: {projOpen ? "OPEN" : "CLOSED"}</div>
+          <div style={{ opacity: 0.7 }}>
+            Projection: {projOpen ? "OPEN" : "CLOSED"} • Live: {liveMode ? "ON" : "OFF"}
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", border: "1px solid #ddd", borderRadius: 10 }}>
+            <input type="checkbox" checked={liveMode} onChange={(e) => setLiveMode(e.target.checked)} />
+            Plan Live (NEXT/PREV)
+          </label>
+
           {!projOpen ? (
             <button
               onClick={async () => {
-                const r = await cp.projectionWindow.open();
+                const r = await window.cp.projectionWindow.open();
                 setProjOpen(!!r?.isOpen);
               }}
               style={{ padding: "10px 14px" }}
@@ -324,7 +379,7 @@ export function PlanPage() {
           ) : (
             <button
               onClick={async () => {
-                const r = await cp.projectionWindow.close();
+                const r = await window.cp.projectionWindow.close();
                 setProjOpen(!!r?.isOpen);
               }}
               style={{ padding: "10px 14px" }}
@@ -332,14 +387,15 @@ export function PlanPage() {
               Fermer Projection
             </button>
           )}
-          <button onClick={() => cp.devtools?.open?.("REGIE")} style={{ padding: "10px 14px" }}>
+
+          <button onClick={() => window.cp.devtools?.open?.("REGIE")} style={{ padding: "10px 14px" }}>
             DevTools Régie
           </button>
         </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 12 }}>
-        {/* LEFT: list + create */}
+        {/* LEFT */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
           <div style={{ fontWeight: 800, marginBottom: 8 }}>Créer un plan</div>
           <div style={{ display: "grid", gap: 8 }}>
@@ -353,7 +409,7 @@ export function PlanPage() {
             </label>
             <button
               onClick={async () => {
-                const created = await cp.plans.create({ dateIso: newDate, title: newTitle.trim() || "Culte" });
+                const created = await window.cp.plans.create({ dateIso: newDate, title: newTitle.trim() || "Culte" });
                 await refreshPlans();
                 await loadPlan(created.id);
               }}
@@ -387,7 +443,7 @@ export function PlanPage() {
           </div>
         </div>
 
-        {/* RIGHT: plan detail */}
+        {/* RIGHT */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
           {!plan ? (
             <div style={{ opacity: 0.75 }}>Sélectionne un plan à gauche.</div>
@@ -397,23 +453,35 @@ export function PlanPage() {
                 <div>
                   <div style={{ fontWeight: 900, fontSize: 18 }}>{plan.title || "Culte"}</div>
                   <div style={{ opacity: 0.75 }}>{isoToYmd(plan.date)}</div>
-                  <div style={{ opacity: 0.6, fontSize: 12, marginTop: 4 }}>
-                    Raccourcis: ↑/↓ suivant/précédent • Enter projeter • B/W/R noir/blanc/normal
-                  </div>
                 </div>
 
-                <button
-                  onClick={async () => {
-                    if (!confirm("Supprimer ce plan ?")) return;
-                    await cp.plans.delete(plan.id);
-                    setPlan(null);
-                    setSelectedPlanId(null);
-                    await refreshPlans();
-                  }}
-                  style={{ padding: "10px 14px" }}
-                >
-                  Supprimer Plan
-                </button>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={async () => {
+                      if (!projOpen) return alert("Ouvre la projection d’abord.");
+                      await window.cp.projection.setMode("NORMAL");
+                      const idx = cursor >= 0 ? cursor : 0;
+                      await projectItemByIndex(idx);
+                    }}
+                    style={{ padding: "10px 14px" }}
+                  >
+                    Reprendre
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Supprimer ce plan ?")) return;
+                      await window.cp.plans.delete(plan.id);
+                      setPlan(null);
+                      setSelectedPlanId(null);
+                      setCursor(-1);
+                      await refreshPlans();
+                    }}
+                    style={{ padding: "10px 14px" }}
+                  >
+                    Supprimer Plan
+                  </button>
+                </div>
               </div>
 
               <hr style={{ margin: "14px 0" }} />
@@ -427,16 +495,12 @@ export function PlanPage() {
                     <div style={{ fontWeight: 600 }}>Type</div>
                     <select
                       value={addKind}
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const v = e.target.value;
                         setAddKind(v);
-                        // reset add form on kind change
-                        setAddTitle(v === "SONG_BLOCK" ? "Chant" : "Annonce");
-                        setAddContent("");
-                        setSongSearch("");
-                        setSelectedSongId("");
-                        setSelectedSong(null);
-                        setSelectedBlockId("");
+                        if (v === "SONG_BLOCK") {
+                          await refreshSongs(songQuery);
+                        }
                       }}
                       style={{ width: "100%", padding: 10 }}
                     >
@@ -453,105 +517,112 @@ export function PlanPage() {
                 </div>
 
                 {addKind === "SONG_BLOCK" ? (
-                  <>
+                  <div style={{ display: "grid", gap: 8, border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontWeight: 700 }}>Choisir un chant + bloc</div>
+
                     <label>
                       <div style={{ fontWeight: 600 }}>Recherche chant</div>
                       <input
-                        value={songSearch}
-                        onChange={(e) => setSongSearch(e.target.value)}
-                        placeholder="Tape pour filtrer…"
+                        value={songQuery}
+                        onChange={async (e) => {
+                          const q = e.target.value;
+                          setSongQuery(q);
+                          await refreshSongs(q);
+                        }}
+                        placeholder="Tape un titre / artiste…"
                         style={{ width: "100%", padding: 10 }}
                       />
                     </label>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                      <label>
-                        <div style={{ fontWeight: 600 }}>Chant</div>
-                        <select
-                          value={selectedSongId}
-                          onChange={(e) => setSelectedSongId(e.target.value)}
-                          style={{ width: "100%", padding: 10 }}
-                        >
-                          <option value="">— sélectionner —</option>
-                          {songs.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.title}
-                              {s.artist ? ` — ${s.artist}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      <label>
-                        <div style={{ fontWeight: 600 }}>Bloc</div>
-                        <select
-                          value={selectedBlockId}
-                          onChange={(e) => setSelectedBlockId(e.target.value)}
-                          disabled={!selectedSong}
-                          style={{ width: "100%", padding: 10 }}
-                        >
-                          {!selectedSong ? (
-                            <option value="">—</option>
-                          ) : (
-                            (selectedSong.blocks ?? []).map((b) => (
-                              <option key={b.id} value={b.id}>
-                                {b.order}. {b.title || b.type}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                      </label>
-                    </div>
-
-                    <button
-                      onClick={async () => {
-                        if (!selectedSong || !selectedBlockId) return alert("Sélectionne un chant et un bloc.");
-                        const block = selectedSong.blocks.find((b) => b.id === selectedBlockId);
-                        const itemTitle = `${selectedSong.title}${block?.title ? ` — ${block.title}` : ""}`;
-
-                        await cp.plans.addItem({
-                          planId: plan.id,
-                          kind: "SONG_BLOCK",
-                          title: itemTitle,
-                          refId: selectedSong.id,
-                          refSubId: selectedBlockId,
-                        });
-                        await loadPlan(plan.id);
-                      }}
-                      style={{ padding: "10px 14px", width: 220 }}
-                    >
-                      + Ajouter
-                    </button>
-                  </>
-                ) : (
-                  <>
                     <label>
-                      <div style={{ fontWeight: 600 }}>Contenu</div>
-                      <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} style={{ width: "100%", padding: 10 }} />
+                      <div style={{ fontWeight: 600 }}>Chant</div>
+                      <select
+                        value={pickedSongId}
+                        onChange={async (e) => {
+                          const id = e.target.value;
+                          setPickedSongId(id);
+                          setPickedBlockId("");
+                          if (!id) {
+                            setPickedSong(null);
+                            return;
+                          }
+                          const s = await window.cp.songs.get(id);
+                          setPickedSong(s);
+                        }}
+                        style={{ width: "100%", padding: 10 }}
+                      >
+                        <option value="">— sélectionner —</option>
+                        {songs.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.title}
+                            {s.artist ? ` — ${s.artist}` : ""}
+                          </option>
+                        ))}
+                      </select>
                     </label>
 
-                    <button
-                      onClick={async () => {
-                        await cp.plans.addItem({
-                          planId: plan.id,
-                          kind: addKind,
-                          title: addTitle.trim() || undefined,
-                          content: addContent || undefined,
-                        });
-                        await loadPlan(plan.id);
-                      }}
-                      style={{ padding: "10px 14px", width: 220 }}
-                    >
-                      + Ajouter
-                    </button>
-                  </>
+                    <label>
+                      <div style={{ fontWeight: 600 }}>Bloc</div>
+                      <select
+                        value={pickedBlockId}
+                        onChange={(e) => setPickedBlockId(e.target.value)}
+                        style={{ width: "100%", padding: 10 }}
+                        disabled={!pickedSong}
+                      >
+                        <option value="">— sélectionner —</option>
+                        {(pickedSong?.blocks ?? []).map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.order}. {b.title || b.type}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                ) : (
+                  <label>
+                    <div style={{ fontWeight: 600 }}>Contenu</div>
+                    <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} style={{ width: "100%", padding: 10 }} />
+                  </label>
                 )}
+
+                <button
+                  onClick={async () => {
+                    if (!plan) return;
+
+                    if (addKind === "SONG_BLOCK") {
+                      if (!pickedSongId || !pickedBlockId) return alert("Choisis un chant ET un bloc.");
+                      const songTitle = songs.find((s) => s.id === pickedSongId)?.title ?? "Chant";
+                      const blockTitle = (pickedSong?.blocks ?? []).find((b) => b.id === pickedBlockId)?.title ?? "Bloc";
+                      await window.cp.plans.addItem({
+                        planId: plan.id,
+                        kind: "SONG_BLOCK",
+                        title: addTitle.trim() || `${songTitle} — ${blockTitle}`,
+                        refId: pickedSongId,
+                        refSubId: pickedBlockId,
+                      });
+                    } else {
+                      await window.cp.plans.addItem({
+                        planId: plan.id,
+                        kind: addKind,
+                        title: addTitle.trim() || undefined,
+                        content: addContent || undefined,
+                      });
+                    }
+
+                    await loadPlan(plan.id);
+                  }}
+                  style={{ padding: "10px 14px", width: 220 }}
+                >
+                  + Ajouter
+                </button>
               </div>
 
               <hr style={{ margin: "14px 0" }} />
 
               {/* DnD list */}
-              <div style={{ fontWeight: 800, marginBottom: 8 }}>Ordre (clic = sélection)</div>
+              <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                Ordre (clic = sélectionner, Enter = projeter, ↑/↓ = naviguer)
+              </div>
 
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
@@ -560,11 +631,16 @@ export function PlanPage() {
                       <SortableRow
                         key={it.id}
                         item={it}
-                        isActive={idx === cursor}
-                        onClick={() => setCursor(idx)}
-                        onProject={async () => projectPlanItemByIndex(idx)}
+                        isSelected={idx === cursor}
+                        onSelect={() => {
+                          setCursor(idx);
+                          persistCursor(idx);
+                        }}
+                        onProject={async () => {
+                          await projectItemByIndex(idx);
+                        }}
                         onRemove={async () => {
-                          await cp.plans.removeItem({ planId: plan.id, itemId: it.id });
+                          await window.cp.plans.removeItem({ planId: plan.id, itemId: it.id });
                           await loadPlan(plan.id);
                         }}
                       />
@@ -572,6 +648,10 @@ export function PlanPage() {
                   </div>
                 </SortableContext>
               </DndContext>
+
+              <div style={{ marginTop: 12, opacity: 0.7, fontSize: 13 }}>
+                Raccourcis : ↑/↓ ou ←/→ (NEXT/PREV), Enter (projeter), B/W/R (noir/blanc/normal).
+              </div>
             </>
           )}
         </div>
