@@ -15,6 +15,40 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+type ScreenKey = "A" | "B" | "C";
+
+
+async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string) {
+  // Always ensure A exists when needed
+  const screens = await window.cp.screens.list();
+  const meta = screens.find((s) => s.key === target);
+
+  // If target is not open, open it (A via legacy, others via screens)
+  if (target === "A") {
+    await window.cp.projectionWindow.open();
+  } else if (!meta?.isOpen) {
+    await window.cp.screens.open(target);
+  }
+
+  // If B/C are mirroring A, projecting to B/C should actually update A (so mirror follows)
+  if (target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A") {
+    await projectTextToTarget(target,  title, body });
+    return;
+  }
+
+  // Normal cases
+  if (target === "A") {
+    await projectTextToTarget(target,  title, body });
+    return;
+  }
+
+  const res: any = await window.cp.screens.setContentText(target, { title, body });
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    // safety fallback: update A
+    await projectTextToTarget(target,  title, body });
+  }
+}
+
 type SongListItem = { id: string; title: string; artist?: string | null; album?: string | null };
 type SongBlock = { id: string; order: number; type: string; title?: string | null; content: string };
 type Song = { id: string; title: string; artist?: string | null; album?: string | null; blocks: SongBlock[] };
@@ -288,7 +322,7 @@ const [isFetchingVerse, setIsFetchingVerse] = useState(false);
       const block = song?.blocks?.find((b) => b.id === item.refSubId);
       if (!block) return alert("Bloc introuvable pour ce chant.");
 
-      await window.cp.projection.setContentText({
+      await projectTextToTarget(target, 
         title: `${song.title}${block.title ? ` — ${block.title}` : ""}`,
         body: block.content,
       });
@@ -296,7 +330,7 @@ const [isFetchingVerse, setIsFetchingVerse] = useState(false);
     }
 
     // Text-like items (ANNOUNCEMENT_TEXT, VERSE_MANUAL, etc.)
-    await window.cp.projection.setContentText({
+    await projectTextToTarget(target, 
       title: item.title || item.kind,
       body: item.content || "",
     });
@@ -415,6 +449,14 @@ const [isFetchingVerse, setIsFetchingVerse] = useState(false);
     return (
       <div style={{ fontFamily: "system-ui", padding: 16 }}>
         <h1 style={{ margin: 0 }}>Plan</h1>
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          Projeter vers
+          <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
+            <option value="A">Écran A</option>
+            <option value="B">Écran B</option>
+            <option value="C">Écran C</option>
+          </select>
+        </label>
         <p style={{ color: "crimson" }}>Preload non chargé (window.cp.* indisponible).</p>
       </div>
     );
@@ -425,6 +467,14 @@ const [isFetchingVerse, setIsFetchingVerse] = useState(false);
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
         <div>
           <h1 style={{ margin: 0 }}>Plan</h1>
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          Projeter vers
+          <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
+            <option value="A">Écran A</option>
+            <option value="B">Écran B</option>
+            <option value="C">Écran C</option>
+          </select>
+        </label>
           <div style={{ opacity: 0.7 }}>
             Projection: {projOpen ? "OPEN" : "CLOSED"} • Live: {liveMode ? "ON" : "OFF"}
           </div>

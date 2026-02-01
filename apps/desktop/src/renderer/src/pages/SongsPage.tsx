@@ -1,27 +1,373 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
 
-/**
- * Page "Chants" = bibliothèque.
- * Pour l'instant, ton CRUD chants est dans Régie (par choix MVP).
- * On laissera cette page comme entrée dédiée puis on déplacera le CRUD ici.
- */
+type ScreenKey = "A" | "B" | "C";
+
+type SongListItem = {
+  id: string;
+  title: string;
+  artist?: string;
+  album?: string;
+  updatedAt: string;
+};
+
+type SongBlock = {
+  id?: string;
+  order: number;
+  type: string;
+  title?: string;
+  content: string;
+};
+
+type SongDetail = {
+  id: string;
+  title: string;
+  artist?: string;
+  album?: string;
+  blocks: SongBlock[];
+};
+
+function splitBlocks(text: string) {
+  return text
+    .split(/\n\s*\n/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+
+async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string) {
+  // Always ensure A exists when needed
+  const screens = await window.cp.screens.list();
+  const meta = screens.find((s) => s.key === target);
+
+  // If target is not open, open it (A via legacy, others via screens)
+  if (target === "A") {
+    await window.cp.projectionWindow.open();
+  } else if (!meta?.isOpen) {
+    await window.cp.screens.open(target);
+  }
+
+  // If B/C are mirroring A, projecting to B/C should actually update A (so mirror follows)
+  if (target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A") {
+    await window.cp.projection.setContentText({ title, body });
+    return;
+  }
+
+  // Normal cases
+  if (target === "A") {
+    await window.cp.projection.setContentText({ title, body });
+    return;
+  }
+
+  const res: any = await window.cp.screens.setContentText(target, { title, body });
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    // safety fallback: update A
+    await window.cp.projection.setContentText({ title, body });
+  }
+}
+
+
 export function SongsPage() {
+  const [q, setQ] = useState("");
+  const [list, setList] = useState<SongListItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [song, setSong] = useState<SongDetail | null>(null);
+
+  const [target, setTarget] = useState<ScreenKey>("A");
+
+  // Meta form
+  const [title, setTitle] = useState("");
+  const [artist, setArtist] = useState("");
+  const [album, setAlbum] = useState("");
+
+  const [err, setErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function refresh(query?: string) {
+    const items = await window.cp.songs.list(query ?? "");
+    setList(items);
+  }
+
+  async function loadSong(id: string) {
+    const s = await window.cp.songs.get(id);
+    setSong(s);
+    setSelectedId(id);
+    setTitle(s.title ?? "");
+    setArtist(s.artist ?? "");
+    setAlbum(s.album ?? "");
+  }
+
+  useEffect(() => {
+    refresh("").catch((e) => setErr(String(e)));
+  }, []);
+
+  const filtered = useMemo(() => list, [list]);
+
+  async function onCreate() {
+    setErr(null);
+    const baseTitle = prompt("Titre du chant ? (obligatoire)")?.trim();
+    if (!baseTitle) return;
+
+    try {
+      const created = await window.cp.songs.create({ title: baseTitle });
+      await refresh(q);
+      await loadSong(created.id);
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
+  async function onDelete() {
+    if (!selectedId) return;
+    if (!confirm("Supprimer ce chant ?")) return;
+
+    try {
+      await window.cp.songs.delete(selectedId);
+      setSelectedId(null);
+      setSong(null);
+      await refresh(q);
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
+  async function onSaveMeta() {
+    if (!song) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      const updated = await window.cp.songs.updateMeta({
+        id: song.id,
+        title: title.trim() || "Sans titre",
+        artist: artist.trim() || undefined,
+        album: album.trim() || undefined,
+      });
+      setSong(updated);
+      await refresh(q);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onSaveBlocks() {
+    if (!song) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      const cleanedBlocks: SongBlock[] = (song.blocks ?? []).map((b, idx) => ({
+        order: idx + 1,
+        type: b.type || "VERSE",
+        title: b.title,
+        content: b.content ?? "",
+      }));
+
+      const updated = await window.cp.songs.replaceBlocks({ songId: song.id, blocks: cleanedBlocks });
+      setSong(updated);
+      await refresh(q);
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function addBlock(type: string) {
+    if (!song) return;
+    const nextOrder = (song.blocks?.length ?? 0) + 1;
+    const nb: SongBlock = { order: nextOrder, type, title: type === "CHORUS" ? "Refrain" : `Couplet ${nextOrder}`, content: "" };
+    setSong({ ...song, blocks: [...song.blocks, nb] });
+  }
+
+  function removeBlock(i: number) {
+    if (!song) return;
+    const blocks = [...song.blocks];
+    blocks.splice(i, 1);
+    // re-order
+    const re = blocks.map((b, idx) => ({ ...b, order: idx + 1 }));
+    setSong({ ...song, blocks: re });
+  }
+
+  async function projectBlock(i: number) {
+    if (!song) return;
+    const b = song.blocks[i];
+    await projectTextToTarget(target, song.title, b.content || "");
+  }
+
+  async function projectAllAsFlow() {
+    if (!song) return;
+    const text = song.blocks.map((b) => (b.content ?? "").trim()).filter(Boolean).join("\n\n");
+    await projectTextToTarget(target, song.title, text);
+  }
+
   return (
     <div style={{ fontFamily: "system-ui", padding: 16 }}>
-      <h1 style={{ margin: 0 }}>Chants</h1>
-      <p style={{ opacity: 0.75, marginTop: 8 }}>
-        Bibliothèque de chants (CRUD + recherche). Dans ton MVP actuel, cette partie est encore dans{" "}
-        <Link to="/regie">Régie</Link>.
-      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <h1 style={{ margin: 0, flex: 1 }}>Chants</h1>
 
-      <div style={{ border: "1px solid #e6e6e6", borderRadius: 12, padding: 12, marginTop: 12 }}>
-        <div style={{ fontWeight: 800 }}>Prochaines évolutions</div>
-        <ul style={{ marginTop: 8, lineHeight: 1.6 }}>
-          <li>Déplacer le CRUD chants ici (liste + édition + blocs).</li>
-          <li>Recherche full-text dans titres + paroles.</li>
-          <li>Import/Export JSON chants.</li>
-        </ul>
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          Projeter vers
+          <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
+            <option value="A">Écran A</option>
+            <option value="B">Écran B</option>
+            <option value="C">Écran C</option>
+          </select>
+        </label>
+
+        <button onClick={onCreate}>+ Nouveau chant</button>
+      </div>
+
+      {err ? (
+        <div style={{ background: "#fee", border: "1px solid #f99", padding: 10, borderRadius: 10, marginBottom: 12 }}>
+          <b>Erreur :</b> {err}
+        </div>
+      ) : null}
+
+      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 12, alignItems: "start" }}>
+        {/* LEFT list */}
+        <div style={{ border: "1px solid #ddd", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ padding: 10, borderBottom: "1px solid #eee" }}>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Rechercher (titre, artiste, paroles…)"
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={() => refresh(q)}>Rechercher</button>
+              <button onClick={() => { setQ(""); refresh(""); }}>Reset</button>
+            </div>
+          </div>
+
+          <div style={{ maxHeight: "70vh", overflow: "auto" }}>
+            {filtered.map((s) => (
+              <div
+                key={s.id}
+                onClick={() => loadSong(s.id)}
+                style={{
+                  padding: 10,
+                  cursor: "pointer",
+                  borderBottom: "1px solid #f1f1f1",
+                  background: s.id === selectedId ? "#eef6ff" : "transparent",
+                }}
+              >
+                <div style={{ fontWeight: 900 }}>{s.title}</div>
+                <div style={{ opacity: 0.7, fontSize: 13 }}>
+                  {(s.artist || "—")} {s.album ? `• ${s.album}` : ""}
+                </div>
+              </div>
+            ))}
+            {filtered.length === 0 ? (
+              <div style={{ padding: 10, opacity: 0.7 }}>Aucun chant.</div>
+            ) : null}
+          </div>
+        </div>
+
+        {/* RIGHT editor */}
+        <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}>
+          {!song ? (
+            <div style={{ opacity: 0.7 }}>Sélectionne un chant à gauche ou crée-en un.</div>
+          ) : (
+            <>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+                <b style={{ flex: 1 }}>Édition</b>
+                <button onClick={onSaveMeta} disabled={saving}>
+                  Sauver meta
+                </button>
+                <button onClick={onSaveBlocks} disabled={saving}>
+                  Sauver blocs
+                </button>
+                <button onClick={onDelete} disabled={saving}>
+                  Supprimer
+                </button>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  Titre
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  Artiste
+                  <input value={artist} onChange={(e) => setArtist(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  Album
+                  <input value={album} onChange={(e) => setAlbum(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
+                </label>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                <button onClick={() => addBlock("VERSE")}>+ Couplet</button>
+                <button onClick={() => addBlock("CHORUS")}>+ Refrain</button>
+                <button onClick={() => addBlock("BRIDGE")}>+ Pont</button>
+                <button onClick={projectAllAsFlow}>Projeter tout</button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {song.blocks.map((b, idx) => (
+                  <div key={idx} style={{ border: "1px solid #eee", borderRadius: 12, padding: 10 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                      <b style={{ flex: 1 }}>
+                        {b.title || b.type} <span style={{ opacity: 0.5, fontWeight: 600 }}>#{idx + 1}</span>
+                      </b>
+                      <button onClick={() => projectBlock(idx)}>Projeter</button>
+                      <button onClick={() => removeBlock(idx)}>Supprimer</button>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8, marginBottom: 8 }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        Type
+                        <select
+                          value={b.type}
+                          onChange={(e) => {
+                            const blocks = [...song.blocks];
+                            blocks[idx] = { ...blocks[idx], type: e.target.value };
+                            setSong({ ...song, blocks });
+                          }}
+                        >
+                          <option value="VERSE">VERSE</option>
+                          <option value="CHORUS">CHORUS</option>
+                          <option value="BRIDGE">BRIDGE</option>
+                          <option value="TAG">TAG</option>
+                        </select>
+                      </label>
+
+                      <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        Titre du bloc
+                        <input
+                          value={b.title ?? ""}
+                          onChange={(e) => {
+                            const blocks = [...song.blocks];
+                            blocks[idx] = { ...blocks[idx], title: e.target.value };
+                            setSong({ ...song, blocks });
+                          }}
+                          style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                        />
+                      </label>
+                    </div>
+
+                    <textarea
+                      value={b.content}
+                      onChange={(e) => {
+                        const blocks = [...song.blocks];
+                        blocks[idx] = { ...blocks[idx], content: e.target.value };
+                        setSong({ ...song, blocks });
+                      }}
+                      rows={6}
+                      style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #ddd", fontFamily: "system-ui" }}
+                      placeholder="Tape les paroles de ce bloc…"
+                    />
+                    <div style={{ marginTop: 8, opacity: 0.7, fontSize: 13 }}>
+                      Astuce : laisse une ligne vide pour séparer des sous-blocs lors de la projection (si tu veux).
+                    </div>
+                  </div>
+                ))}
+                {song.blocks.length === 0 ? <div style={{ opacity: 0.7 }}>Aucun bloc.</div> : null}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

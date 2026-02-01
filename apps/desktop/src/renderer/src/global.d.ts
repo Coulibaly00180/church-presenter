@@ -14,14 +14,14 @@ declare global {
         onState: (cb: (state: any) => void) => () => void;
       };
 
-      projectionWindow?: {
+      projectionWindow: {
         open: () => Promise<{ isOpen: boolean }>;
         close: () => Promise<{ isOpen: boolean }>;
         isOpen: () => Promise<{ isOpen: boolean }>;
         onWindowState: (cb: (payload: { isOpen: boolean }) => void) => () => void;
       };
 
-      screens?: {
+      screens: {
         list: () => Promise<Array<{ key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode }>>;
         isOpen: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
         open: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
@@ -34,12 +34,26 @@ declare global {
         onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => () => void;
       };
 
-      devtools?: {
-        open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => Promise<any>;
+      songs: {
+        list: (q?: string) => Promise<Array<{ id: string; title: string; artist?: string; album?: string; updatedAt: string }>>;
+        get: (id: string) => Promise<any>;
+        create: (payload: { title: string; artist?: string; album?: string }) => Promise<any>;
+        updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) => Promise<any>;
+        replaceBlocks: (payload: { songId: string; blocks: any[] }) => Promise<any>;
+        delete: (id: string) => Promise<{ ok: true }>;
       };
 
-      // other namespaces exist (songs/plans) but are defined elsewhere
-      [k: string]: any;
+      plans: {
+        list: () => Promise<any[]>;
+        get: (id: string) => Promise<any>;
+        createForDate: (payload: { dateIso: string; title?: string }) => Promise<any>;
+        updateMeta: (payload: { id: string; dateIso: string; title?: string }) => Promise<any>;
+        setItems: (payload: { id: string; items: any[] }) => Promise<any>;
+      };
+
+      devtools: {
+        open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => Promise<any>;
+      };
     };
   }
 }

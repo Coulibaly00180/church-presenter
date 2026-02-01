@@ -4,14 +4,15 @@ type ScreenKey = "A" | "B" | "C";
 type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
 
 contextBridge.exposeInMainWorld("cp", {
-  // Backward compatible API (A only)
+  // -----------------------
+  // Projection (legacy A)
+  // -----------------------
   projection: {
     getState: () => ipcRenderer.invoke("projection:getState"),
     setState: (patch: any) => ipcRenderer.invoke("projection:setState", patch),
     setContentText: (payload: { title?: string; body: string }) =>
       ipcRenderer.invoke("projection:setContentText", payload),
-    setMode: (mode: "NORMAL" | "BLACK" | "WHITE") =>
-      ipcRenderer.invoke("projection:setMode", mode),
+    setMode: (mode: "NORMAL" | "BLACK" | "WHITE") => ipcRenderer.invoke("projection:setMode", mode),
     onState: (cb: (state: any) => void) => {
       const handler = (_: any, payload: { key: ScreenKey; state: any }) => {
         if (payload?.key === "A") cb(payload.state);
@@ -35,19 +36,19 @@ contextBridge.exposeInMainWorld("cp", {
     },
   },
 
-  // New multi-screen API
+  // -----------------------
+  // Multi-screens A/B/C
+  // -----------------------
   screens: {
     list: () => ipcRenderer.invoke("screens:list"),
     isOpen: (key: ScreenKey) => ipcRenderer.invoke("screens:isOpen", key),
     open: (key: ScreenKey) => ipcRenderer.invoke("screens:open", key),
     close: (key: ScreenKey) => ipcRenderer.invoke("screens:close", key),
-    setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) =>
-      ipcRenderer.invoke("screens:setMirror", key, mirror),
+    setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) => ipcRenderer.invoke("screens:setMirror", key, mirror),
     getState: (key: ScreenKey) => ipcRenderer.invoke("screens:getState", key),
     setContentText: (key: ScreenKey, payload: { title?: string; body: string }) =>
       ipcRenderer.invoke("screens:setContentText", key, payload),
-    setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") =>
-      ipcRenderer.invoke("screens:setMode", key, mode),
+    setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") => ipcRenderer.invoke("screens:setMode", key, mode),
     onState: (key: ScreenKey, cb: (state: any) => void) => {
       const handler = (_: any, payload: { key: ScreenKey; state: any }) => {
         if (payload?.key === key) cb(payload.state);
@@ -64,8 +65,31 @@ contextBridge.exposeInMainWorld("cp", {
     },
   },
 
+  // -----------------------
+  // Songs (CRUD)
+  // -----------------------
+  songs: {
+    list: (q?: string) => ipcRenderer.invoke("songs:list", q ?? ""),
+    get: (id: string) => ipcRenderer.invoke("songs:get", id),
+    create: (payload: { title: string; artist?: string; album?: string }) => ipcRenderer.invoke("songs:create", payload),
+    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) =>
+      ipcRenderer.invoke("songs:updateMeta", payload),
+    replaceBlocks: (payload: { songId: string; blocks: any[] }) => ipcRenderer.invoke("songs:replaceBlocks", payload),
+    delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
+  },
+
+  // -----------------------
+  // Plans (list/create/update)
+  // -----------------------
+  plans: {
+    list: () => ipcRenderer.invoke("plans:list"),
+    get: (id: string) => ipcRenderer.invoke("plans:get", id),
+    createForDate: (payload: { dateIso: string; title?: string }) => ipcRenderer.invoke("plans:createForDate", payload),
+    updateMeta: (payload: { id: string; dateIso: string; title?: string }) => ipcRenderer.invoke("plans:updateMeta", payload),
+    setItems: (payload: { id: string; items: any[] }) => ipcRenderer.invoke("plans:setItems", payload),
+  },
+
   devtools: {
-    open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") =>
-      ipcRenderer.invoke("devtools:open", target),
+    open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => ipcRenderer.invoke("devtools:open", target),
   },
 });
