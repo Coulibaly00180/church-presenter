@@ -21,17 +21,6 @@ contextBridge.exposeInMainWorld("cp", {
     },
   },
 
-    control: (action: "NEXT" | "PREV", screen?: ScreenKey) =>
-      ipcRenderer.send("projection:control", { action, screen }),
-
-    onControl: (cb: (payload: { action: "NEXT" | "PREV"; screen?: ScreenKey }) => void) => {
-      const handler = (_: any, payload: { action: "NEXT" | "PREV"; screen?: ScreenKey }) => cb(payload);
-      ipcRenderer.on("projection:control", handler);
-      return () => ipcRenderer.removeListener("projection:control", handler);
-    },
-
-  },
-
   // Window control for A (legacy)
   projectionWindow: {
     open: () => ipcRenderer.invoke("projectionWindow:open"),
@@ -74,6 +63,20 @@ contextBridge.exposeInMainWorld("cp", {
       return () => ipcRenderer.removeListener("screens:window", handler);
     },
   },
+
+  // -----------------------
+  // Live sync between pages (Regie <-> Plan)
+  // -----------------------
+  live: {
+    set: (payload: { planId?: string | null; cursor?: number; enabled?: boolean; target?: ScreenKey }) =>
+      ipcRenderer.invoke("live:set", payload),
+    onUpdate: (cb: (payload: { planId?: string | null; cursor?: number; enabled?: boolean; target?: ScreenKey }) => void) => {
+      const handler = (_: any, payload: any) => cb(payload);
+      ipcRenderer.on("live:update", handler);
+      return () => ipcRenderer.removeListener("live:update", handler);
+    },
+  },
+
 
   devtools: {
     open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") =>

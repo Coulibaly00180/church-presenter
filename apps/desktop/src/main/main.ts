@@ -260,8 +260,9 @@ ipcMain.handle("projectionWindow:isOpen", () => {
   return { isOpen: !!projWins.A };
 });
 
-ipcMain.on("projection:control", (_evt, payload: { action: "NEXT" | "PREV"; screen?: "A" | "B" | "C" }) => {
-  regieWin?.webContents.send("projection:control", payload);
+ipcMain.handle("live:set", async (_evt, payload: { planId?: string | null; cursor?: number; enabled?: boolean; target?: "A" | "B" | "C" }) => {
+  regieWin?.webContents.send("live:update", payload);
+  return { ok: true };
 });
 
 // Devtools opening

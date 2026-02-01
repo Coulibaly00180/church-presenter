@@ -12,8 +12,6 @@ declare global {
         setContentText: (payload: { title?: string; body: string }) => Promise<any>;
         setMode: (mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
         onState: (cb: (state: any) => void) => () => void;
-        control?: (action: "NEXT" | "PREV", screen?: ScreenKey) => void;
-        onControl?: (cb: (payload: { action: "NEXT" | "PREV"; screen?: ScreenKey }) => void) => () => void;
       };
 
       projectionWindow?: {
