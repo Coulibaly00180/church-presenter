@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { lookupLSG1910 } from "../bible/lookupLSG1910";
 
 type ScreenKey = "A" | "B" | "C";
 
 type BibleApiVerse = { book_id?: string; book_name?: string; chapter: number; verse: number; text: string };
 type BibleApiResp = { reference?: string; verses?: BibleApiVerse[]; text?: string; translation_id?: string; translation_name?: string };
 
-function parseLines(verses: BibleApiVerse[]) {
+function parseLines(verses: { chapter: number; verse: number; text: string }[]) {
   return verses.map((v) => ({
     key: `${v.chapter}:${v.verse}`,
     label: `${v.chapter}:${v.verse}`,
@@ -14,14 +15,12 @@ function parseLines(verses: BibleApiVerse[]) {
 }
 
 async function ensureScreenOpen(target: ScreenKey) {
-  // A is legacy projection window, B/C are extra screens
   if (target === "A") {
     await window.cp.projectionWindow.open();
     return;
   }
-
   const screens = await window.cp.screens.list();
-  const meta = screens.find((s) => s.key === target);
+  const meta = screens.find((s: any) => s.key === target);
   if (!meta?.isOpen) {
     await window.cp.screens.open(target);
   }
@@ -30,6 +29,7 @@ async function ensureScreenOpen(target: ScreenKey) {
 async function projectText(target: ScreenKey, title: string | undefined, body: string) {
   await ensureScreenOpen(target);
 
+  // Prefer multiscreen API
   if (window.cp?.screens?.setContentText) {
     await window.cp.screens.setContentText(target, { title, body });
     return;
@@ -41,7 +41,12 @@ async function projectText(target: ScreenKey, title: string | undefined, body: s
 
 export function BiblePage() {
   const [ref, setRef] = useState("Jean 3:16-18");
-  const [translation, setTranslation] = useState("web"); // bible-api.com default WEB
+
+  // translation ids:
+  // - LSG1910 = offline dataset (mini for now)
+  // - WEB = bible-api.com (no key)
+  const [translation, setTranslation] = useState<"LSG1910" | "WEB">("LSG1910");
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [resp, setResp] = useState<BibleApiResp | null>(null);
@@ -59,7 +64,6 @@ export function BiblePage() {
         setPlans(ps || []);
         if (!planId && ps?.length) setPlanId(ps[0].id);
       } catch (e: any) {
-        // eslint-disable-next-line no-console
         console.warn("plans.list failed", e);
       }
     })();
@@ -72,16 +76,25 @@ export function BiblePage() {
     setResp(null);
 
     try {
+      if (translation === "LSG1910") {
+        const r = lookupLSG1910(ref.trim());
+        if (!r) throw new Error("Pas trouvé dans le dataset offline (mini).");
+        setResp({
+          reference: r.reference,
+          translation_id: "LSG1910",
+          translation_name: "Louis Segond 1910 (offline)",
+          verses: r.verses.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })),
+        });
+        return;
+      }
+
+      // WEB via bible-api.com
       const q = encodeURIComponent(ref.trim());
-      const url = `https://bible-api.com/${q}?translation=${encodeURIComponent(translation.trim() || "web")}`;
+      const url = `https://bible-api.com/${q}?translation=web`;
       const r = await fetch(url);
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status}`);
-      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const json = (await r.json()) as BibleApiResp;
-      if (!json.verses?.length && !json.text) {
-        throw new Error("Aucun résultat.");
-      }
+      if (!json.verses?.length && !json.text) throw new Error("Aucun résultat.");
       setResp(json);
     } catch (e: any) {
       setErr(e?.message || String(e));
@@ -100,33 +113,28 @@ export function BiblePage() {
       return;
     }
 
-    // Cache : on stocke le texte récupéré DANS l'item, comme ça pas besoin d’API en live.
-    const title = resp.reference || ref;
+    const reference = resp.reference || ref.trim();
+    const tLabel = translation === "LSG1910" ? "LSG1910" : (resp.translation_id || "WEB");
+
+    // Cache : on stocke le texte dans l’item pour être robuste en live (pas d’API nécessaire).
     const body = resp.verses?.length
       ? resp.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n")
       : (resp.text || "").trim();
 
     const item = {
-      // On reste volontairement simple : PlanPage pourra rendre ce type selon ton implémentation actuelle.
-      // Si ton Plan attend un kind spécifique (ex: "BIBLE_PASSAGE"), adapte juste ici.
       kind: "BIBLE_PASSAGE",
-      title,
-      ref: ref.trim(),
-      translation: translation.trim(),
+      reference,
+      translation: tLabel,
+      title: `${reference} (${tLabel})`,
       body,
       verses: resp.verses || [],
       createdAt: new Date().toISOString(),
     };
 
-    // Deux stratégies possibles selon ton API:
-    // - addItem(planId, item)
-    // - setItems(planId, [...])
     const api: any = window.cp.plans as any;
-
     if (api.addItem) {
       await api.addItem({ planId, item });
     } else {
-      // fallback : on charge puis setItems
       const p = await api.get(planId);
       const items = Array.isArray(p?.items) ? p.items.slice() : [];
       items.push(item);
@@ -140,12 +148,15 @@ export function BiblePage() {
       return;
     }
 
-    const title = resp.reference || ref;
+    const reference = resp.reference || ref.trim();
+    const tLabel = translation === "LSG1910" ? "LSG1910" : (resp.translation_id || "WEB");
+
     const body = resp.verses?.length
       ? resp.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n")
       : (resp.text || "").trim();
 
-    await projectText(target, title, body);
+    // ✅ On inclut la traduction dans le titre projeté (demande)
+    await projectText(target, `${reference} (${tLabel})`, body);
   }
 
   return (
@@ -154,11 +165,19 @@ export function BiblePage() {
         <div>
           <h1 style={{ margin: 0 }}>Bible</h1>
           <div style={{ opacity: 0.7, marginTop: 4 }}>
-            Cherche un passage (API) puis <b>ajoute au plan</b> (avec cache) ou <b>projette</b>.
+            Cherche un passage puis <b>ajoute au plan</b> (cache) ou <b>projette</b>.
           </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            Traduction
+            <select value={translation} onChange={(e) => setTranslation(e.target.value as any)}>
+              <option value="LSG1910">LSG 1910 (offline)</option>
+              <option value="WEB">WEB (API)</option>
+            </select>
+          </label>
+
           <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
             Projeter vers
             <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
@@ -189,12 +208,7 @@ export function BiblePage() {
             placeholder="Ex: Jean 3:16-18"
             style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", minWidth: 260, flex: "1 1 260px" }}
           />
-          <input
-            value={translation}
-            onChange={(e) => setTranslation(e.target.value)}
-            placeholder="web / kjv / ..."
-            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #ddd", width: 160 }}
-          />
+
           <button
             onClick={fetchPassage}
             disabled={loading}
@@ -220,9 +234,7 @@ export function BiblePage() {
           </button>
         </div>
 
-        {err ? (
-          <div style={{ color: "#b00020", fontWeight: 700 }}>Erreur : {err}</div>
-        ) : null}
+        {err ? <div style={{ color: "#b00020", fontWeight: 700 }}>Erreur : {err}</div> : null}
 
         {resp ? (
           <div style={{ display: "grid", gap: 10 }}>
@@ -243,18 +255,22 @@ export function BiblePage() {
                 lineHeight: 1.45,
               }}
             >
-              {lines.length
-                ? lines.map((l) => `${l.label}  ${l.text}`).join("\n\n")
-                : (resp.text || "").trim()}
+              {lines.length ? lines.map((l) => `${l.label}  ${l.text}`).join("\n\n") : (resp.text || "").trim()}
             </div>
 
-            <div style={{ fontSize: 12, opacity: 0.7 }}>
-              API utilisée : bible-api.com (pas de clé). Si tu veux une traduction FR comme LSG, on pourra brancher une autre API / dataset ensuite.
-            </div>
+            {translation === "LSG1910" ? (
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                Offline: dataset <b>mini</b> pour test. Prochaine étape: importer le dataset complet LSG1910.
+              </div>
+            ) : (
+              <div style={{ fontSize: 12, opacity: 0.7 }}>
+                Online: bible-api.com (pas de clé). Pour traductions FR sous licence, on passera par un provider autorisé.
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ fontSize: 13, opacity: 0.75 }}>
-            Exemple : <b>Jean 3:16-18</b>, <b>Psaume 23</b>, <b>Matthieu 5:1-12</b>.
+            Exemple : <b>Jean 3:16-18</b>, <b>Psaume 23</b>.
           </div>
         )}
       </div>
