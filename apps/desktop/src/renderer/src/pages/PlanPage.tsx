@@ -47,6 +47,68 @@ function isTypingTarget(el: EventTarget | null) {
   return tag === "input" || tag === "textarea" || (t as any).isContentEditable;
 }
 
+
+async function fetchAvailableTranslations() {
+  const res = await fetch("https://bible.helloao.org/api/available_translations.json");
+  if (!res.ok) throw new Error(`translations HTTP ${res.status}`);
+  const data = await res.json();
+  const list = (data?.translations ?? []).map((t: any) => ({
+    id: String(t.id),
+    name: String(t.name ?? t.id),
+    englishName: t.englishName ? String(t.englishName) : undefined,
+  }));
+  return list as { id: string; name: string; englishName?: string }[];
+}
+
+function flattenVerseContent(content: any[]): string {
+  return (content ?? [])
+    .map((c) => {
+      if (typeof c === "string") return c;
+      if (!c || typeof c !== "object") return "";
+      if ("text" in c && typeof c.text === "string") return c.text;
+      if ("heading" in c && typeof c.heading === "string") return `\n${c.heading}\n`;
+      if ("lineBreak" in c) return "\n";
+      // footnote references etc -> ignore
+      return "";
+    })
+    .join("");
+}
+
+async function fetchVersesFromApi(opts: {
+  translationId: string;
+  bookId: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number;
+}): Promise<{ title: string; body: string }> {
+  const { translationId, bookId, chapter, verseStart, verseEnd } = opts;
+  const url = `https://bible.helloao.org/api/${encodeURIComponent(translationId)}/${encodeURIComponent(bookId)}/${chapter}.json`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`bible HTTP ${res.status}`);
+  const data = await res.json();
+
+  const parts = (data?.chapter?.content ?? []).filter((x: any) => x?.type === "verse");
+  const verses = parts
+    .filter((v: any) => typeof v.number === "number" && v.number >= verseStart && v.number <= verseEnd)
+    .map((v: any) => `${v.number}. ${flattenVerseContent(v.content)}`.trim());
+
+  const body = verses.join("\n\n").trim();
+  const rangeLabel = verseStart === verseEnd ? `${verseStart}` : `${verseStart}-${verseEnd}`;
+  const title = `${bookId} ${chapter}:${rangeLabel} (${translationId})`;
+  return { title, body };
+}
+
+function parseVerseRange(range: string): { start: number; end: number } | null {
+  const cleaned = range.trim();
+  if (!cleaned) return null;
+  const m = cleaned.match(/^(\d+)(?:\s*[-–]\s*(\d+))?$/);
+  if (!m) return null;
+  const a = Number(m[1]);
+  const b = m[2] ? Number(m[2]) : a;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a <= 0 || b <= 0) return null;
+  return { start: Math.min(a, b), end: Math.max(a, b) };
+}
+
 function SortableRow(props: {
   item: PlanItem;
   isSelected: boolean;
@@ -156,6 +218,14 @@ export function PlanPage() {
   const [addKind, setAddKind] = useState<string>("ANNOUNCEMENT_TEXT");
   const [addTitle, setAddTitle] = useState<string>("Annonce");
   const [addContent, setAddContent] = useState<string>("");
+
+// Verse API (Free Use Bible API)
+const [verseTranslation, setVerseTranslation] = useState<string>("LSG");
+const [verseBook, setVerseBook] = useState<string>("JHN");
+const [verseChapter, setVerseChapter] = useState<number>(3);
+const [verseRange, setVerseRange] = useState<string>("16"); // "16" or "16-18"
+const [availableTranslations, setAvailableTranslations] = useState<{ id: string; name: string; englishName?: string }[]>([]);
+const [isFetchingVerse, setIsFetchingVerse] = useState(false);
 
   // SongBlock picker
   const [songs, setSongs] = useState<SongListItem[]>([]);
@@ -506,6 +576,7 @@ export function PlanPage() {
                     >
                       <option value="ANNOUNCEMENT_TEXT">ANNOUNCEMENT_TEXT</option>
                       <option value="VERSE_MANUAL">VERSE_MANUAL</option>
+                      <option value="VERSE_API">VERSE_API</option>
                       <option value="SONG_BLOCK">SONG_BLOCK</option>
                     </select>
                   </label>
@@ -578,12 +649,125 @@ export function PlanPage() {
                       </select>
                     </label>
                   </div>
-                ) : (
-                  <label>
-                    <div style={{ fontWeight: 600 }}>Contenu</div>
-                    <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} style={{ width: "100%", padding: 10 }} />
-                  </label>
-                )}
+
+) : addKind === "VERSE_API" ? (
+  <div style={{ display: "grid", gap: 8, border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+    <div style={{ fontWeight: 700 }}>Passage biblique (API)</div>
+
+    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
+      <label>
+        <div style={{ fontWeight: 600 }}>Traduction</div>
+        <input
+          value={verseTranslation}
+          onChange={(e) => setVerseTranslation(e.target.value.toUpperCase())}
+          placeholder="ex: LSG, BSB…"
+          style={{ width: "100%", padding: 10 }}
+        />
+      </label>
+
+      <label>
+        <div style={{ fontWeight: 600 }}>Livre (ID)</div>
+        <input
+          value={verseBook}
+          onChange={(e) => setVerseBook(e.target.value.toUpperCase())}
+          placeholder="ex: JHN, MAT, PSA…"
+          style={{ width: "100%", padding: 10 }}
+        />
+      </label>
+    </div>
+
+    <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
+      <label>
+        <div style={{ fontWeight: 600 }}>Chapitre</div>
+        <input
+          type="number"
+          value={verseChapter}
+          onChange={(e) => setVerseChapter(Number(e.target.value))}
+          min={1}
+          style={{ width: "100%", padding: 10 }}
+        />
+      </label>
+
+      <label>
+        <div style={{ fontWeight: 600 }}>Versets</div>
+        <input
+          value={verseRange}
+          onChange={(e) => setVerseRange(e.target.value)}
+          placeholder="16 ou 16-18"
+          style={{ width: "100%", padding: 10 }}
+        />
+      </label>
+    </div>
+
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <button
+        onClick={async () => {
+          try {
+            setIsFetchingVerse(true);
+            const list = await fetchAvailableTranslations();
+            setAvailableTranslations(list);
+          } catch (e: any) {
+            alert(e?.message ?? String(e));
+          } finally {
+            setIsFetchingVerse(false);
+          }
+        }}
+        style={{ padding: "10px 12px" }}
+        type="button"
+      >
+        Charger traductions
+      </button>
+
+      <button
+        onClick={async () => {
+          try {
+            const r = parseVerseRange(verseRange);
+            if (!r) return alert("Format versets invalide. Exemple: 16 ou 16-18");
+            setIsFetchingVerse(true);
+            const { title, body } = await fetchVersesFromApi({
+              translationId: verseTranslation.trim(),
+              bookId: verseBook.trim(),
+              chapter: verseChapter,
+              verseStart: r.start,
+              verseEnd: r.end,
+            });
+            // Préremplir le formulaire d'ajout
+            setAddTitle(title);
+            setAddContent(body);
+          } catch (e: any) {
+            alert(e?.message ?? String(e));
+          } finally {
+            setIsFetchingVerse(false);
+          }
+        }}
+        style={{ padding: "10px 12px", fontWeight: 700 }}
+        type="button"
+      >
+        {isFetchingVerse ? "Récupération..." : "Récupérer le texte"}
+      </button>
+
+      {availableTranslations.length > 0 ? (
+        <span style={{ opacity: 0.8 }}>
+          {availableTranslations.length} traductions disponibles (recherche dans la console bientôt)
+        </span>
+      ) : null}
+    </div>
+
+    <div style={{ fontSize: 12, opacity: 0.75 }}>
+      Astuce: les IDs de livres sont du type GEN, EXO, PSA, MAT, MRK, LUK, JHN, ROM...
+    </div>
+
+    <label>
+      <div style={{ fontWeight: 600 }}>Contenu (cache du plan)</div>
+      <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={6} style={{ width: "100%", padding: 10 }} />
+    </label>
+  </div>
+) : (
+  <label>
+    <div style={{ fontWeight: 600 }}>Contenu</div>
+    <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} style={{ width: "100%", padding: 10 }} />
+  </label>
+)}
 
                 <button
                   onClick={async () => {
