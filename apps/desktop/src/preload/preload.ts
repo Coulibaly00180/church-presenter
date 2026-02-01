@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-type ControlAction = "NEXT" | "PREV";
+type ScreenKey = "A" | "B" | "C";
+type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
 
 contextBridge.exposeInMainWorld("cp", {
+  // Backward compatible API (A only)
   projection: {
     getState: () => ipcRenderer.invoke("projection:getState"),
     setState: (patch: any) => ipcRenderer.invoke("projection:setState", patch),
@@ -10,59 +12,60 @@ contextBridge.exposeInMainWorld("cp", {
       ipcRenderer.invoke("projection:setContentText", payload),
     setMode: (mode: "NORMAL" | "BLACK" | "WHITE") =>
       ipcRenderer.invoke("projection:setMode", mode),
-
-    // projection window can ask the regie to go NEXT/PREV (click/keys)
-    emitControl: (action: ControlAction) => ipcRenderer.send("projection:control", action),
-    onControl: (cb: (action: ControlAction) => void) => {
-      const handler = (_: any, action: ControlAction) => cb(action);
-      ipcRenderer.on("projection:control", handler);
-      return () => ipcRenderer.removeListener("projection:control", handler);
-    },
-
     onState: (cb: (state: any) => void) => {
-      const handler = (_: any, state: any) => cb(state);
-      ipcRenderer.on("projection:state", handler);
-      return () => ipcRenderer.removeListener("projection:state", handler);
+      const handler = (_: any, payload: { key: ScreenKey; state: any }) => {
+        if (payload?.key === "A") cb(payload.state);
+      };
+      ipcRenderer.on("screens:state", handler);
+      return () => ipcRenderer.removeListener("screens:state", handler);
     },
   },
 
+  // Window control for A (legacy)
   projectionWindow: {
     open: () => ipcRenderer.invoke("projectionWindow:open"),
     close: () => ipcRenderer.invoke("projectionWindow:close"),
     isOpen: () => ipcRenderer.invoke("projectionWindow:isOpen"),
     onWindowState: (cb: (payload: { isOpen: boolean }) => void) => {
-      const handler = (_: any, payload: { isOpen: boolean }) => cb(payload);
-      ipcRenderer.on("projection:window", handler);
-      return () => ipcRenderer.removeListener("projection:window", handler);
+      const handler = (_: any, payload: { key: ScreenKey; isOpen: boolean }) => {
+        if (payload?.key === "A") cb({ isOpen: payload.isOpen });
+      };
+      ipcRenderer.on("screens:window", handler);
+      return () => ipcRenderer.removeListener("screens:window", handler);
+    },
+  },
+
+  // New multi-screen API
+  screens: {
+    list: () => ipcRenderer.invoke("screens:list"),
+    isOpen: (key: ScreenKey) => ipcRenderer.invoke("screens:isOpen", key),
+    open: (key: ScreenKey) => ipcRenderer.invoke("screens:open", key),
+    close: (key: ScreenKey) => ipcRenderer.invoke("screens:close", key),
+    setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) =>
+      ipcRenderer.invoke("screens:setMirror", key, mirror),
+    getState: (key: ScreenKey) => ipcRenderer.invoke("screens:getState", key),
+    setContentText: (key: ScreenKey, payload: { title?: string; body: string }) =>
+      ipcRenderer.invoke("screens:setContentText", key, payload),
+    setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") =>
+      ipcRenderer.invoke("screens:setMode", key, mode),
+    onState: (key: ScreenKey, cb: (state: any) => void) => {
+      const handler = (_: any, payload: { key: ScreenKey; state: any }) => {
+        if (payload?.key === key) cb(payload.state);
+      };
+      ipcRenderer.on("screens:state", handler);
+      return () => ipcRenderer.removeListener("screens:state", handler);
+    },
+    onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => {
+      const handler = (_: any, payload: { key: ScreenKey; isOpen: boolean }) => {
+        if (payload?.key === key) cb({ isOpen: payload.isOpen });
+      };
+      ipcRenderer.on("screens:window", handler);
+      return () => ipcRenderer.removeListener("screens:window", handler);
     },
   },
 
   devtools: {
-    open: (target: "REGIE" | "PROJECTION") => ipcRenderer.invoke("devtools:open", target),
-  },
-
-  songs: {
-    list: (q?: string) => ipcRenderer.invoke("songs:list", q),
-    get: (id: string) => ipcRenderer.invoke("songs:get", id),
-    create: (payload: { title: string; artist?: string; album?: string }) =>
-      ipcRenderer.invoke("songs:create", payload),
-    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) =>
-      ipcRenderer.invoke("songs:updateMeta", payload),
-    replaceBlocks: (payload: { songId: string; blocks: any[] }) =>
-      ipcRenderer.invoke("songs:replaceBlocks", payload),
-    delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
-  },
-
-  plans: {
-    list: () => ipcRenderer.invoke("plans:list"),
-    get: (planId: string) => ipcRenderer.invoke("plans:get", planId),
-    create: (payload: { dateIso: string; title?: string }) =>
-      ipcRenderer.invoke("plans:create", payload),
-    delete: (planId: string) => ipcRenderer.invoke("plans:delete", planId),
-    addItem: (payload: any) => ipcRenderer.invoke("plans:addItem", payload),
-    removeItem: (payload: { planId: string; itemId: string }) =>
-      ipcRenderer.invoke("plans:removeItem", payload),
-    reorder: (payload: { planId: string; orderedItemIds: string[] }) =>
-      ipcRenderer.invoke("plans:reorder", payload),
+    open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") =>
+      ipcRenderer.invoke("devtools:open", target),
   },
 });
