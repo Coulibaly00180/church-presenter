@@ -51,6 +51,7 @@ export function AppShell() {
     () => [
       { to: "/regie", label: "Régie (Live)", desc: "Contrôle, raccourcis, noir/blanc, projection" },
       { to: "/plan", label: "Plan", desc: "Déroulé du culte : items, ordre, drag&drop" },
+      { to: "/bible", label: "Bible", desc: "Rechercher un passage, ajouter au plan, projeter" },
       { to: "/songs", label: "Chants", desc: "Bibliothèque (CRUD) + recherche" },
       { to: "/calendar", label: "Calendrier", desc: "Préparer en avance (plans par date)" },
       { to: "/history", label: "Historique", desc: "Plans passés, duplication ensuite" },
@@ -161,7 +162,7 @@ export function AppShell() {
         </nav>
 
         <div style={{ marginTop: "auto", fontSize: 12, opacity: 0.65 }}>
-          {location.pathname === "/plan" ? "Astuce : active “Plan Live” pour NEXT/PREV." : " "}
+          {location.pathname === "/plan" ? "Astuce : active “Plan Live” pour NEXT/PREV." : location.pathname === "/bible" ? "Astuce : tape une référence (ex: Jean 3:16-18) puis ajoute au plan." : " "}
         </div>
       </aside>
 
