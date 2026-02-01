@@ -260,6 +260,10 @@ ipcMain.handle("projectionWindow:isOpen", () => {
   return { isOpen: !!projWins.A };
 });
 
+ipcMain.on("projection:control", (_evt, payload: { action: "NEXT" | "PREV"; screen?: "A" | "B" | "C" }) => {
+  regieWin?.webContents.send("projection:control", payload);
+});
+
 // Devtools opening
 ipcMain.handle("devtools:open", (_evt, target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => {
   if (target === "REGIE") regieWin?.webContents.openDevTools({ mode: "detach" });

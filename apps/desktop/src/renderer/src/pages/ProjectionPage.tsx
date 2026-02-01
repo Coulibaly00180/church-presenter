@@ -15,6 +15,26 @@ export function ProjectionPage() {
   const [state, setState] = useState<any>(null);
   const [animKey, setAnimKey] = useState(0);
 
+
+  // Live controls from projection window: arrows + click left/right
+  useEffect(() => {
+    if (!window.cp?.projection?.control) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
+        e.preventDefault();
+        window.cp.projection.control!("NEXT", screenKey);
+      }
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") {
+        e.preventDefault();
+        window.cp.projection.control!("PREV", screenKey);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [screenKey]);
+
   useEffect(() => {
     const hasScreens = !!window.cp?.screens?.getState && !!window.cp?.screens?.onState;
 
@@ -82,7 +102,16 @@ export function ProjectionPage() {
   };
 
   return (
-    <div style={containerStyle}>
+    <div style={{ ...containerStyle, position: "relative" }}>
+      {/* click areas */}
+      <div
+        onClick={() => window.cp?.projection?.control?.("PREV", screenKey)}
+        style={{ position: "absolute", left: 0, top: 0, width: "50%", height: "100%", cursor: "pointer" }}
+      />
+      <div
+        onClick={() => window.cp?.projection?.control?.("NEXT", screenKey)}
+        style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", cursor: "pointer" }}
+      />
       <div style={cardStyle} key={animKey}>
         {/* watermark screen id */}
         <div
