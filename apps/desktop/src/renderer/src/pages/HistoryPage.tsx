@@ -25,17 +25,16 @@ export function HistoryPage() {
     return (
       <div style={{ fontFamily: "system-ui", padding: 16 }}>
         <h1 style={{ margin: 0 }}>Historique</h1>
-        <p style={{ color: "crimson" }}>Preload non chargé (window.cp.plans indisponible).</p>
+        <p style={{ color: "crimson" }}>Preload non charge (window.cp.plans indisponible).</p>
       </div>
     );
   }
 
-  // Pour l’instant : on affiche tous les plans. Ensuite : filtre "passés" et duplication.
   return (
     <div style={{ fontFamily: "system-ui", padding: 16 }}>
       <h1 style={{ margin: 0 }}>Historique</h1>
       <p style={{ opacity: 0.75, marginTop: 8 }}>
-        Plans passés (duplication et export JSON).
+        Plans passes (duplication et export JSON).
       </p>
 
       {msg ? (
@@ -43,6 +42,28 @@ export function HistoryPage() {
           {msg}
         </div>
       ) : null}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+        <button
+          onClick={async () => {
+            const r = await window.cp.data?.exportAll();
+            if (r?.ok) setMsg(`Export global -> ${r.path}`);
+          }}
+        >
+          Export JSON global
+        </button>
+        <button
+          onClick={async () => {
+            const r = await window.cp.data?.importAll();
+            if (r?.ok) {
+              setPlans(await window.cp.plans.list());
+              setMsg("Import global OK");
+            }
+          }}
+        >
+          Import JSON global
+        </button>
+      </div>
 
       <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
         {plans.map((p) => (
@@ -55,7 +76,7 @@ export function HistoryPage() {
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <button
                 onClick={async () => {
-                  const next = await window.cp.plans.duplicate({ planId: p.id, dateIso: isoToYmd(new Date().toISOString()) });
+                  await window.cp.plans.duplicate({ planId: p.id, dateIso: isoToYmd(new Date().toISOString()) });
                   setPlans(await window.cp.plans.list());
                   setMsg("Plan duplique.");
                 }}
@@ -65,7 +86,7 @@ export function HistoryPage() {
               <button
                 onClick={async () => {
                   const res = await window.cp.plans.export({ planId: p.id });
-                  if (res?.ok) setMsg(`Plan exporte vers ${res.path}`);
+                  if (res?.ok) setMsg(`Plan exporte -> ${res.path}`);
                   else if (!res?.canceled) setMsg("Export echoue.");
                 }}
               >

@@ -303,6 +303,28 @@ export function SongsPage() {
         </label>
 
         <button onClick={onCreate}>+ Nouveau chant</button>
+        <button
+          onClick={async () => {
+            if (!selectedId) return;
+            const r = await window.cp.songs.exportWord(selectedId);
+            if (r?.ok) setInfo({ kind: "success", text: "Export Word OK" });
+          }}
+          disabled={!selectedId}
+        >
+          Exporter Word
+        </button>
+        <button
+          onClick={async () => {
+            const r = await window.cp.songs.importWord();
+            if (r?.ok) {
+              await refresh(q);
+              if (r.song) await loadSong(r.song.id);
+              setInfo({ kind: "success", text: "Import Word OK" });
+            }
+          }}
+        >
+          Importer Word
+        </button>
       </div>
 
       {err ? (

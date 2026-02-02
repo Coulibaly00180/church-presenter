@@ -72,6 +72,37 @@ async function projectTextToTarget(target: ScreenKey, title: string | undefined,
   }
 }
 
+async function projectMediaToTarget(
+  target: ScreenKey,
+  title: string | undefined,
+  mediaPath: string,
+  mediaType: "IMAGE" | "PDF",
+  live: LiveState | null
+) {
+  if (live?.lockedScreens?.[target]) return;
+  const screensApi = window.cp.screens;
+  const list: ScreenMeta[] = screensApi ? await screensApi.list() : [];
+  const meta = list.find((s) => s.key === target);
+
+  if (target === "A") {
+    await window.cp.projectionWindow.open();
+  } else if (!meta?.isOpen && screensApi) {
+    await screensApi.open(target);
+  }
+
+  const isMirrorOfA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
+  const dest: ScreenKey = isMirrorOfA ? "A" : target;
+
+  if (dest === "A" || !screensApi) {
+    await window.cp.projection.setContentMedia({ title, mediaPath, mediaType });
+    return;
+  }
+  const res: any = await screensApi.setContentMedia(dest, { title, mediaPath, mediaType });
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    await window.cp.projection.setContentMedia({ title, mediaPath, mediaType });
+  }
+}
+
 function SortableRow(props: {
   item: PlanItem;
   onProject: () => void;
@@ -236,7 +267,13 @@ export function PlanPage() {
     void projectTextToTarget(live.target, formatForProjection(item).title, formatForProjection(item).body, live);
   }, [live?.updatedAt, plan]);
 
-  const orderedIds = useMemo(() => (plan?.items ?? []).map((i) => i.id), [plan]);
+  const visibleItems = useMemo(() => {
+    if (!plan) return [];
+    if (!filterSongsOnly) return plan.items;
+    return plan.items.filter((i) => i.kind === "SONG_BLOCK");
+  }, [plan, filterSongsOnly]);
+
+  const orderedIds = useMemo(() => visibleItems.map((i) => i.id), [visibleItems]);
 
   async function onDragEnd(event: DragEndEvent) {
     if (!plan) return;
@@ -432,6 +469,8 @@ export function PlanPage() {
                       <option value="VERSE_MANUAL">VERSE_MANUAL</option>
                       <option value="BIBLE_VERSE">BIBLE_VERSE</option>
                       <option value="BIBLE_PASSAGE">BIBLE_PASSAGE</option>
+                      <option value="ANNOUNCEMENT_IMAGE">ANNOUNCEMENT_IMAGE</option>
+                      <option value="ANNOUNCEMENT_PDF">ANNOUNCEMENT_PDF</option>
                     </select>
                   </label>
                   <label>
@@ -445,6 +484,20 @@ export function PlanPage() {
                   <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} style={{ width: "100%", padding: 10 }} />
                 </label>
 
+                {(addKind === "ANNOUNCEMENT_IMAGE" || addKind === "ANNOUNCEMENT_PDF") && (
+                  <button
+                    onClick={async () => {
+                      const res = await window.cp.files?.pickMedia?.();
+                      if (res?.ok && res.path) {
+                        setAddContent(res.path);
+                      }
+                    }}
+                    style={{ padding: "8px 10px", width: 220 }}
+                  >
+                    Choisir fichier
+                  </button>
+                )}
+
                 <button
                   onClick={async () => {
                     await window.cp.plans.addItem({
@@ -452,6 +505,7 @@ export function PlanPage() {
                       kind: addKind,
                       title: addTitle.trim() || undefined,
                       content: addContent || undefined,
+                      mediaPath: addKind === "ANNOUNCEMENT_IMAGE" || addKind === "ANNOUNCEMENT_PDF" ? addContent || undefined : undefined,
                     });
                     setAddContent("");
                     await loadPlan(plan.id);
@@ -470,14 +524,20 @@ export function PlanPage() {
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
                   <div style={{ display: "grid", gap: 10 }}>
-                    {plan.items.map((it, idx) => (
+                    {visibleItems.map((it, idx) => (
                       <SortableRow
                         key={it.id}
                         item={it}
                         onProject={async () => {
                           const { title, body } = formatForProjection(it);
                           const next = (await updateLive({ planId: plan.id, cursor: idx, enabled: true, target })) || live;
-                          await projectTextToTarget(target, title, body, next);
+                          if (it.kind === "ANNOUNCEMENT_IMAGE" && it.mediaPath) {
+                            await projectMediaToTarget(target, title, it.mediaPath, "IMAGE", next);
+                          } else if (it.kind === "ANNOUNCEMENT_PDF" && it.mediaPath) {
+                            await projectMediaToTarget(target, title, it.mediaPath, "PDF", next);
+                          } else {
+                            await projectTextToTarget(target, title, body, next);
+                          }
                         }}
                         onRemove={async () => {
                           await window.cp.plans.removeItem({ planId: plan.id, itemId: it.id });

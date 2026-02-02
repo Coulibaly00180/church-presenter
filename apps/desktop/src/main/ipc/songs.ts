@@ -1,5 +1,9 @@
 import { ipcMain } from "electron";
 import { getPrisma } from "../db";
+import { Document, Packer, Paragraph, TextRun } from "docx";
+import { dialog } from "electron";
+import mammoth from "mammoth";
+import fs from "fs";
 
 type BlockInput = {
   order: number;
@@ -97,5 +101,96 @@ export function registerSongsIpc() {
     const prisma = getPrisma();
     await prisma.song.delete({ where: { id } });
     return { ok: true };
+  });
+
+  ipcMain.handle("songs:exportWord", async (_evt, songId: string) => {
+    const prisma = getPrisma();
+    const song = await prisma.song.findUnique({ where: { id: songId }, include: { blocks: { orderBy: { order: "asc" } } } });
+    if (!song) throw new Error("Song not found");
+
+    const lyrics = (song.blocks || []).map((b) => (b.content || "").trim()).filter(Boolean).join("\n\n");
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({ children: [new TextRun({ text: `Titre : ${song.title}`, bold: true })] }),
+            new Paragraph(`Auteur : ${song.artist || ""}`),
+            new Paragraph(`Année de parution : ${""}`),
+            new Paragraph(`Album : ${song.album || ""}`),
+            new Paragraph(""),
+            new Paragraph({ children: [new TextRun({ text: "Paroles :", bold: true })] }),
+            ...lyrics.split("\n").map((line) => new Paragraph(line)),
+          ],
+        },
+      ],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+
+    const res = await dialog.showSaveDialog({
+      title: "Exporter le chant",
+      defaultPath: `${song.title}.docx`,
+      filters: [{ name: "Word", extensions: ["docx"] }],
+    });
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(res.filePath, buffer);
+    return { ok: true, path: res.filePath };
+  });
+
+  ipcMain.handle("songs:importWord", async () => {
+    const res = await dialog.showOpenDialog({
+      title: "Importer un chant (Word)",
+      filters: [{ name: "Word", extensions: ["docx"] }],
+      properties: ["openFile"],
+    });
+    if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
+
+    const filePath = res.filePaths[0];
+    const { value } = await mammoth.extractRawText({ path: filePath });
+    const lines = value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+    let title = "Sans titre";
+    let artist: string | undefined;
+    let album: string | undefined;
+    const lyricsLines: string[] = [];
+
+    let inLyrics = false;
+    for (const l of lines) {
+      const lower = l.toLowerCase();
+      if (lower.startsWith("titre")) {
+        title = l.split(":").slice(1).join(":").trim() || title;
+      } else if (lower.startsWith("auteur")) {
+        artist = l.split(":").slice(1).join(":").trim() || undefined;
+      } else if (lower.startsWith("album")) {
+        album = l.split(":").slice(1).join(":").trim() || undefined;
+      } else if (lower.startsWith("paroles")) {
+        inLyrics = true;
+      } else if (inLyrics) {
+        lyricsLines.push(l);
+      }
+    }
+
+    const prisma = getPrisma();
+    const created = await prisma.song.create({
+      data: {
+        title,
+        artist,
+        album,
+        blocks: {
+          create: [
+            {
+              order: 1,
+              type: "VERSE",
+              title: "Couplet",
+              content: lyricsLines.join("\n"),
+            },
+          ],
+        },
+      },
+      include: { blocks: { orderBy: { order: "asc" } } },
+    });
+
+    return { ok: true, song: created };
   });
 }

@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("cp", {
     setState: (patch: any) => ipcRenderer.invoke("projection:setState", patch),
     setContentText: (payload: { title?: string; body: string }) =>
       ipcRenderer.invoke("projection:setContentText", payload),
+    setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) =>
+      ipcRenderer.invoke("projection:setContentMedia", payload),
     setMode: (mode: "NORMAL" | "BLACK" | "WHITE") =>
       ipcRenderer.invoke("projection:setMode", mode),
     onState: (cb: (state: any) => void) => {
@@ -46,6 +48,8 @@ contextBridge.exposeInMainWorld("cp", {
     getState: (key: ScreenKey) => ipcRenderer.invoke("screens:getState", key),
     setContentText: (key: ScreenKey, payload: { title?: string; body: string }) =>
       ipcRenderer.invoke("screens:setContentText", key, payload),
+    setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) =>
+      ipcRenderer.invoke("screens:setContentMedia", key, payload),
     setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") =>
       ipcRenderer.invoke("screens:setMode", key, mode),
     onState: (key: ScreenKey, cb: (state: any) => void) => {
@@ -75,6 +79,8 @@ contextBridge.exposeInMainWorld("cp", {
       blocks: Array<{ order: number; type: string; title?: string; content: string }>;
     }) => ipcRenderer.invoke("songs:replaceBlocks", payload),
     delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
+    exportWord: (id: string) => ipcRenderer.invoke("songs:exportWord", id),
+    importWord: () => ipcRenderer.invoke("songs:importWord"),
   },
 
   plans: {
@@ -95,6 +101,11 @@ contextBridge.exposeInMainWorld("cp", {
     removeItem: (payload: { planId: string; itemId: string }) => ipcRenderer.invoke("plans:removeItem", payload),
     reorder: (payload: { planId: string; orderedItemIds: string[] }) => ipcRenderer.invoke("plans:reorder", payload),
     export: (payload: { planId: string }) => ipcRenderer.invoke("plans:export", payload),
+  },
+
+  data: {
+    exportAll: () => ipcRenderer.invoke("data:exportAll"),
+    importAll: () => ipcRenderer.invoke("data:importAll"),
   },
 
 
@@ -124,5 +135,9 @@ contextBridge.exposeInMainWorld("cp", {
   devtools: {
     open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") =>
       ipcRenderer.invoke("devtools:open", target),
+  },
+
+  files: {
+    pickMedia: () => ipcRenderer.invoke("files:pickMedia"),
   },
 });

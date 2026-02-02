@@ -10,6 +10,7 @@ declare global {
         getState: () => Promise<any>;
         setState: (patch: any) => Promise<any>;
         setContentText: (payload: { title?: string; body: string }) => Promise<any>;
+        setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => Promise<any>;
         setMode: (mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
         onState: (cb: (state: any) => void) => () => void;
       };
@@ -29,6 +30,7 @@ declare global {
         setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) => Promise<any>;
         getState: (key: ScreenKey) => Promise<any>;
         setContentText: (key: ScreenKey, payload: { title?: string; body: string }) => Promise<any>;
+        setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => Promise<any>;
         setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
         onState: (key: ScreenKey, cb: (state: any) => void) => () => void;
         onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => () => void;
@@ -44,6 +46,8 @@ declare global {
           blocks: Array<{ order: number; type: string; title?: string; content: string }>;
         }) => Promise<any>;
         delete: (id: string) => Promise<any>;
+        exportWord: (id: string) => Promise<any>;
+        importWord: () => Promise<any>;
       };
 
       plans?: {
@@ -64,6 +68,11 @@ declare global {
         removeItem: (payload: { planId: string; itemId: string }) => Promise<any>;
         reorder: (payload: { planId: string; orderedItemIds: string[] }) => Promise<any>;
         export: (payload: { planId: string }) => Promise<any>;
+      };
+
+      data?: {
+        exportAll: () => Promise<any>;
+        importAll: () => Promise<any>;
       };
 
       live?: {
@@ -93,6 +102,10 @@ declare global {
 
       devtools?: {
         open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => Promise<any>;
+      };
+
+      files?: {
+        pickMedia: () => Promise<{ ok: boolean; canceled?: boolean; path?: string; mediaType?: "IMAGE" | "PDF" }>;
       };
 
       [k: string]: any;

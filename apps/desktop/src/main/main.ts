@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
 import { join } from "path";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
+import { registerDataIpc } from "./ipc/data";
+import { registerDataIpc } from "./ipc/data";
 
 type ProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 type ScreenKey = "A" | "B" | "C";
@@ -12,9 +14,11 @@ type ProjectionState = {
   lowerThirdEnabled: boolean;
   transitionEnabled: boolean;
   current: {
-    kind: "EMPTY" | "TEXT";
+    kind: "EMPTY" | "TEXT" | "MEDIA";
     title?: string;
     body?: string;
+    mediaPath?: string;
+    mediaType?: "IMAGE" | "PDF";
   };
   updatedAt: number;
 };
@@ -229,6 +233,12 @@ app.whenReady().then(() => {
   }
 
   try {
+    registerDataIpc();
+  } catch (e) {
+    console.error("registerDataIpc failed", e);
+  }
+
+  try {
     createRegieWindow();
   } catch (e) {
     console.error("createRegieWindow failed", e);
@@ -269,6 +279,21 @@ ipcMain.handle("devtools:open", (_evt, target: "REGIE" | "PROJECTION" | "SCREEN_
   return { ok: true };
 });
 
+ipcMain.handle("files:pickMedia", async () => {
+  const res = await dialog.showOpenDialog({
+    title: "Choisir une image ou un PDF",
+    filters: [
+      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf"] },
+      { name: "All", extensions: ["*"] },
+    ],
+    properties: ["openFile"],
+  });
+  if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
+  const p = res.filePaths[0];
+  const isPdf = p.toLowerCase().endsWith(".pdf");
+  return { ok: true, path: p, mediaType: isPdf ? "PDF" : "IMAGE" };
+});
+
 // A-only projection state API (legacy)
 ipcMain.handle("projection:getState", () => screenStates.A);
 
@@ -284,6 +309,18 @@ ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; bo
     ...screenStates.A,
     mode: "NORMAL",
     current: { kind: "TEXT", title: payload.title, body: payload.body },
+    updatedAt: Date.now(),
+  };
+  sendScreenState("A");
+  applyMirrorsFrom("A");
+  return screenStates.A;
+});
+
+ipcMain.handle("projection:setContentMedia", (_evt, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => {
+  screenStates.A = {
+    ...screenStates.A,
+    mode: "NORMAL",
+    current: { kind: "MEDIA", title: payload.title, mediaPath: payload.mediaPath, mediaType: payload.mediaType },
     updatedAt: Date.now(),
   };
   sendScreenState("A");
@@ -345,6 +382,21 @@ ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title
   sendScreenState(key);
   return { ok: true, state: screenStates[key] };
 });
+
+ipcMain.handle(
+  "screens:setContentMedia",
+  (_evt, key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => {
+    if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
+    screenStates[key] = {
+      ...screenStates[key],
+      mode: "NORMAL",
+      current: { kind: "MEDIA", title: payload.title, mediaPath: payload.mediaPath, mediaType: payload.mediaType },
+      updatedAt: Date.now(),
+    };
+    sendScreenState(key);
+    return { ok: true, state: screenStates[key] };
+  }
+);
 
 ipcMain.handle("screens:setMode", (_evt, key: ScreenKey, mode: ProjectionMode) => {
   // If screen is mirroring, ignore

@@ -62,8 +62,7 @@ export function ProjectionPage() {
   const current = state?.current ?? { kind: "EMPTY" };
   const lowerThird = !!state?.lowerThirdEnabled;
 
-  const bg =
-    mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : "#050505";
+  const bg = mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : "#050505";
   const fg =
     mode === "BLACK" ? "white" : mode === "WHITE" ? "black" : "white";
 
@@ -132,6 +131,18 @@ export function ProjectionPage() {
 
         {current.kind === "EMPTY" ? (
           <div style={{ opacity: 0.7, fontSize: 28 }}>Pret.</div>
+        ) : current.kind === "MEDIA" && current.mediaPath ? (
+          <>
+            {current.title ? <div style={titleStyle}>{current.title}</div> : null}
+            {current.mediaType === "PDF" ? (
+              <embed src={current.mediaPath} type="application/pdf" style={{ width: "100%", height: "70vh", border: "none" }} />
+            ) : (
+              <img
+                src={current.mediaPath}
+                style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: 12 }}
+              />
+            )}
+          </>
         ) : (
           <>
             {current.title ? <div style={titleStyle}>{current.title}</div> : null}
