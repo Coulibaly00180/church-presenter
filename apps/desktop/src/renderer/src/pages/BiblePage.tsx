@@ -14,47 +14,48 @@ function parseLines(verses: { chapter: number; verse: number; text: string }[]) 
   }));
 }
 
-async function ensureScreenOpen(target: ScreenKey) {
-  if (target === "A") {
-    await window.cp.projectionWindow.open();
-    return;
-  }
-  const screens = await window.cp.screens.list();
-  const meta = screens.find((s: any) => s.key === target);
-  if (!meta?.isOpen) {
-    await window.cp.screens.open(target);
-  }
+function versesToBody(verses: BibleApiVerse[], fallbackText?: string) {
+  if (!verses?.length) return (fallbackText || "").trim();
+  return verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n");
 }
 
-async function projectText(target: ScreenKey, title: string | undefined, body: string) {
-  await ensureScreenOpen(target);
+async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string) {
+  const screensApi = window.cp.screens;
+  const list = screensApi ? await screensApi.list() : [];
+  const meta = list.find((s: any) => s.key === target);
 
-  // Prefer multiscreen API
-  if (window.cp?.screens?.setContentText) {
-    await window.cp.screens.setContentText(target, { title, body });
+  if (target === "A") {
+    await window.cp.projectionWindow.open();
+  } else if (!meta?.isOpen && screensApi) {
+    await screensApi.open(target);
+  }
+
+  const isMirrorA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
+  const dest = isMirrorA ? "A" : target;
+
+  if (dest === "A" || !screensApi) {
+    await window.cp.projection.setContentText({ title, body });
     return;
   }
 
-  // fallback
-  await window.cp.projection.setContentText({ title, body });
+  const res: any = await screensApi.setContentText(dest, { title, body });
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    await window.cp.projection.setContentText({ title, body });
+  }
 }
 
 export function BiblePage() {
   const [ref, setRef] = useState("Jean 3:16-18");
-
-  // translation ids:
-  // - LSG1910 = offline dataset (mini for now)
-  // - WEB = bible-api.com (no key)
   const [translation, setTranslation] = useState<"LSG1910" | "WEB">("LSG1910");
+  const [addMode, setAddMode] = useState<"PASSAGE" | "VERSES">("VERSES");
+  const [target, setTarget] = useState<ScreenKey>("A");
+
+  const [plans, setPlans] = useState<any[]>([]);
+  const [planId, setPlanId] = useState<string>("");
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [resp, setResp] = useState<BibleApiResp | null>(null);
-
-  const [plans, setPlans] = useState<any[]>([]);
-  const [addMode, setAddMode] = useState<"PASSAGE" | "VERSES">("VERSES");
-  const [planId, setPlanId] = useState<string>("");
-  const [target, setTarget] = useState<ScreenKey>("A");
 
   const lines = useMemo(() => (resp?.verses ? parseLines(resp.verses) : []), [resp]);
 
@@ -63,12 +64,11 @@ export function BiblePage() {
       try {
         const ps = await window.cp.plans.list();
         setPlans(ps || []);
-        if (!planId && ps?.length) setPlanId(ps[0].id);
-      } catch (e: any) {
-        console.warn("plans.list failed", e);
+        if (ps?.length) setPlanId(ps[0].id);
+      } catch (e) {
+        // ignore if plans API not ready
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchPassage() {
@@ -79,7 +79,7 @@ export function BiblePage() {
     try {
       if (translation === "LSG1910") {
         const r = lookupLSG1910(ref.trim());
-        if (!r) throw new Error("Pas trouvé dans le dataset offline (mini).");
+        if (!r) throw new Error("Pas trouve dans le dataset offline (mini).");
         setResp({
           reference: r.reference,
           translation_id: "LSG1910",
@@ -89,13 +89,12 @@ export function BiblePage() {
         return;
       }
 
-      // WEB via bible-api.com
       const q = encodeURIComponent(ref.trim());
       const url = `https://bible-api.com/${q}?translation=web`;
       const r = await fetch(url);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const json = (await r.json()) as BibleApiResp;
-      if (!json.verses?.length && !json.text) throw new Error("Aucun résultat.");
+      if (!json.verses?.length && !json.text) throw new Error("Aucun resultat.");
       setResp(json);
     } catch (e: any) {
       setErr(e?.message || String(e));
@@ -105,123 +104,55 @@ export function BiblePage() {
   }
 
   async function addToPlan() {
-  if (!planId) {
-    setErr("Choisis d’abord un plan.");
-    return;
-  }
-  if (!resp) {
-    setErr("Fais d’abord une recherche.");
-    return;
-  }
-
-  const reference = resp.reference || ref.trim();
-  const tLabel = translation === "LSG1910" ? "LSG1910" : (resp.translation_id || "WEB");
-
-  const api: any = window.cp.plans as any;
-
-  // Helper: add a single item (supports addItem or setItems fallback)
-  async function addOne(item: any) {
-    if (api.addItem) {
-      await api.addItem({ planId, item });
+    if (!planId) {
+      setErr("Choisis d'abord un plan.");
       return;
     }
-    const p = await api.get(planId);
-    const items = Array.isArray(p?.items) ? p.items.slice() : [];
-    items.push(item);
-    await api.setItems({ id: planId, items });
-  }
-
-  if (addMode === "PASSAGE") {
-    // Cache : on stocke le texte complet dans l’item
-    const body = resp.verses?.length
-      ? resp.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n")
-      : (resp.text || "").trim();
-
-    const item = {
-      kind: "BIBLE_PASSAGE",
-      reference,
-      translation: tLabel,
-      title: `${reference} (${tLabel})`,
-      body,
-      verses: resp.verses || [],
-      createdAt: new Date().toISOString(),
-    };
-
-    await addOne(item);
-    return;
-  }
-
-  // VERSES: on éclate en items (navigation live = plus fluide)
-  const verses = resp.verses || [];
-  if (!verses.length) {
-    setErr("Ce passage ne contient pas de versets structurés (utilise 'Passage (1 item)').");
-    return;
-  }
-
-  for (const v of verses) {
-    const verseRef = `${reference.split(":")[0]}:${v.verse}`;
-    const body = `${v.chapter}:${v.verse}  ${String(v.text || "").trim()}`;
-    const item = {
-      kind: "BIBLE_VERSE",
-      reference: verseRef,
-      translation: tLabel,
-      title: `${verseRef} (${tLabel})`,
-      body,
-      verses: [v],
-      createdAt: new Date().toISOString(),
-    };
-    await addOne(item);
-  }
-}
     if (!resp) {
-      setErr("Fais d’abord une recherche.");
+      setErr("Fais d'abord une recherche.");
       return;
     }
 
     const reference = resp.reference || ref.trim();
-    const tLabel = translation === "LSG1910" ? "LSG1910" : (resp.translation_id || "WEB");
+    const label = translation === "LSG1910" ? "LSG1910" : resp.translation_id || "WEB";
+    const verses = resp.verses || [];
 
-    // Cache : on stocke le texte dans l’item pour être robuste en live (pas d’API nécessaire).
-    const body = resp.verses?.length
-      ? resp.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n")
-      : (resp.text || "").trim();
+    if (addMode === "PASSAGE" || !verses.length) {
+      const body = versesToBody(verses, resp.text);
+      await window.cp.plans.addItem({
+        planId,
+        kind: "BIBLE_PASSAGE",
+        title: `${reference} (${label})`,
+        content: body,
+        refId: reference,
+        refSubId: label,
+      });
+      return;
+    }
 
-    const item = {
-      kind: "BIBLE_PASSAGE",
-      reference,
-      translation: tLabel,
-      title: `${reference} (${tLabel})`,
-      body,
-      verses: resp.verses || [],
-      createdAt: new Date().toISOString(),
-    };
-
-    const api: any = window.cp.plans as any;
-    if (api.addItem) {
-      await api.addItem({ planId, item });
-    } else {
-      const p = await api.get(planId);
-      const items = Array.isArray(p?.items) ? p.items.slice() : [];
-      items.push(item);
-      await api.setItems({ id: planId, items });
+    for (const v of verses) {
+      const verseRef = `${reference.split(":")[0]}:${v.verse}`;
+      const body = `${v.chapter}:${v.verse}  ${String(v.text || "").trim()}`;
+      await window.cp.plans.addItem({
+        planId,
+        kind: "BIBLE_VERSE",
+        title: `${verseRef} (${label})`,
+        content: body,
+        refId: reference,
+        refSubId: `${v.chapter}:${v.verse}`,
+      });
     }
   }
 
   async function projectNow() {
     if (!resp) {
-      setErr("Fais d’abord une recherche.");
+      setErr("Fais d'abord une recherche.");
       return;
     }
-
     const reference = resp.reference || ref.trim();
-    const tLabel = translation === "LSG1910" ? "LSG1910" : (resp.translation_id || "WEB");
-
-    const body = resp.verses?.length
-      ? resp.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n")
-      : (resp.text || "").trim();
-
-    // ✅ On inclut la traduction dans le titre projeté (demande)
-    await projectText(target, `${reference} (${tLabel})`, body);
+    const label = translation === "LSG1910" ? "LSG1910" : resp.translation_id || "WEB";
+    const body = versesToBody(resp.verses || [], resp.text);
+    await projectTextToTarget(target, `${reference} (${label})`, body);
   }
 
   return (
@@ -230,7 +161,7 @@ export function BiblePage() {
         <div>
           <h1 style={{ margin: 0 }}>Bible</h1>
           <div style={{ opacity: 0.7, marginTop: 4 }}>
-            Cherche un passage puis <b>ajoute au plan</b> (cache) ou <b>projette</b>.
+            Cherche un passage puis ajoute-le au plan ou projette-le directement.
           </div>
         </div>
 
@@ -244,11 +175,19 @@ export function BiblePage() {
           </label>
 
           <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            Mode ajout
+            <select value={addMode} onChange={(e) => setAddMode(e.target.value as "PASSAGE" | "VERSES")}>
+              <option value="PASSAGE">Passage (1 item)</option>
+              <option value="VERSES">Verset par verset</option>
+            </select>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
             Projeter vers
             <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
-              <option value="A">Écran A</option>
-              <option value="B">Écran B</option>
-              <option value="C">Écran C</option>
+              <option value="A">Ecran A</option>
+              <option value="B">Ecran B</option>
+              <option value="C">Ecran C</option>
             </select>
           </label>
 
@@ -284,7 +223,7 @@ export function BiblePage() {
 
           <button
             onClick={addToPlan}
-            disabled={!resp}
+            disabled={!resp || !planId}
             style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid #e6e6e6", background: "white", fontWeight: 800 }}
           >
             Ajouter au plan
@@ -323,15 +262,9 @@ export function BiblePage() {
               {lines.length ? lines.map((l) => `${l.label}  ${l.text}`).join("\n\n") : (resp.text || "").trim()}
             </div>
 
-            {translation === "LSG1910" ? (
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                Offline: dataset <b>mini</b> pour test. Astuce: “Verset par verset” = navigation live super fluide. Prochaine étape: importer le dataset complet LSG1910.
-              </div>
-            ) : (
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                Online: bible-api.com (pas de clé). Pour traductions FR sous licence, on passera par un provider autorisé.
-              </div>
-            )}
+            <div style={{ fontSize: 12, opacity: 0.7 }}>
+              Mode "Verses" ajoute un item par verset pour une navigation live fluide. Le mode "Passage" ajoute un seul bloc.
+            </div>
           </div>
         ) : (
           <div style={{ fontSize: 13, opacity: 0.75 }}>

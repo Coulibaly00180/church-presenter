@@ -16,8 +16,8 @@ type PlanItem = {
 };
 type Plan = { id: string; date: string; title?: string | null; items: PlanItem[] };
 
-
 type ScreenKey = "A" | "B" | "C";
+type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
 type LiveState = {
   enabled: boolean;
   planId: string | null;
@@ -28,16 +28,7 @@ type LiveState = {
   lockedScreens: Record<ScreenKey, boolean>;
   updatedAt: number;
 };
-
-async function projectToTarget(target: ScreenKey, title: string, body: string) {
-  // Multi-screen compatible
-  if (window.cp?.screens?.setContentText) {
-    await window.cp.screens.setContentText(target, { title, body });
-    return;
-  }
-  // Fallback single-screen
-  await projectToTarget((live?.target as any) || "A", title, body);
-}
+type ScreenMeta = { key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode };
 
 function isoToYmd(iso: string) {
   const d = new Date(iso);
@@ -47,13 +38,46 @@ function isoToYmd(iso: string) {
   return `${y}-${m}-${day}`;
 }
 
+function formatForProjection(item: PlanItem) {
+  return {
+    title: item.title || item.kind,
+    body: (item.content ?? "").trim(),
+  };
+}
+
+async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string, live: LiveState | null) {
+  if (live?.lockedScreens?.[target]) return; // respect lock
+
+  const screensApi = window.cp.screens;
+  const list: ScreenMeta[] = screensApi ? await screensApi.list() : [];
+  const meta = list.find((s) => s.key === target);
+
+  if (target === "A") {
+    await window.cp.projectionWindow.open();
+  } else if (!meta?.isOpen && screensApi) {
+    await screensApi.open(target);
+  }
+
+  const isMirrorOfA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
+  const dest: ScreenKey = isMirrorOfA ? "A" : target;
+
+  if (dest === "A" || !screensApi) {
+    await window.cp.projection.setContentText({ title, body });
+    return;
+  }
+
+  const res: any = await screensApi.setContentText(dest, { title, body });
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    await window.cp.projection.setContentText({ title, body });
+  }
+}
+
 function SortableRow(props: {
   item: PlanItem;
   onProject: () => void;
   onRemove: () => void;
 }) {
   const { item, onProject, onRemove } = props;
-
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
   const style: React.CSSProperties = {
@@ -68,21 +92,7 @@ function SortableRow(props: {
     gap: 10,
   };
 
-  
-  function isLivePlanId(id: string) {
-    return liveEnabled && livePlanId && livePlanId === id;
-  }
-
-  function viewingPlanId(): string | null {
-    return (plan?.id as string) || (selectedPlanId as string) || null;
-  }
-
-  function isViewingLivePlan() {
-    const pid = viewingPlanId();
-    return !!pid && liveEnabled && livePlanId === pid;
-  }
-
-return (
+  return (
     <div ref={setNodeRef} style={style}>
       <div
         {...attributes}
@@ -98,16 +108,16 @@ return (
           background: "#fafafa",
         }}
       >
-        ☰
+        #
       </div>
 
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 800 }}>
-          #{item.order} — {item.title || item.kind}
+          #{item.order} - {item.title || item.kind}
         </div>
         <div style={{ opacity: 0.75, fontSize: 13 }}>
           {item.kind}
-          {item.content ? ` • ${item.content.slice(0, 80)}${item.content.length > 80 ? "…" : ""}` : ""}
+          {item.content ? ` * ${item.content.slice(0, 80)}${item.content.length > 80 ? "..." : ""}` : ""}
         </div>
       </div>
 
@@ -125,11 +135,6 @@ export function PlanPage() {
   const canUse = !!window.cp?.plans && !!window.cp?.projection && !!window.cp?.projectionWindow;
 
   const [projOpen, setProjOpen] = useState(false);
-
-  const [live, setLive] = useState<LiveState | null>(null);
-  const lastProjected = useRef<{ planId: string | null; cursor: number; target: ScreenKey; updatedAt: number } | null>(null);
-
-
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -143,6 +148,14 @@ export function PlanPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  const [live, setLive] = useState<LiveState | null>(null);
+  const lastProjectionKey = useRef<string | null>(null);
+
+  const target = live?.target ?? "A";
+  const liveEnabled = !!live?.enabled;
+  const livePlanId = live?.planId ?? null;
+  const liveCursor = live?.cursor ?? -1;
+
   async function refreshPlans() {
     const list = await window.cp.plans.list();
     setPlans(list);
@@ -154,6 +167,13 @@ export function PlanPage() {
     setSelectedPlanId(id);
   }
 
+  async function updateLive(patch: Partial<LiveState>) {
+    if (!window.cp.live) return;
+    const next = await window.cp.live.set(patch);
+    setLive(next);
+    return next;
+  }
+
   useEffect(() => {
     if (!canUse) return;
 
@@ -162,17 +182,36 @@ export function PlanPage() {
 
     refreshPlans();
 
-    return () => offWin();
+    window.cp.live?.get?.().then(setLive).catch(() => null);
+    const offLive = window.cp.live?.onUpdate?.((s: LiveState) => setLive(s));
+
+    return () => {
+      offWin?.();
+      offLive?.();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-projection when live cursor changes on the active plan
+  useEffect(() => {
+    if (!plan || !live || !live.enabled || live.planId !== plan.id) return;
+    const idx = Math.max(0, Math.min(live.cursor ?? 0, (plan.items?.length ?? 1) - 1));
+    const item = plan.items[idx];
+    if (!item) return;
+
+    const key = `${live.planId}:${idx}:${live.target}:${live.updatedAt}`;
+    if (lastProjectionKey.current === key) return;
+    lastProjectionKey.current = key;
+
+    void projectTextToTarget(live.target, formatForProjection(item).title, formatForProjection(item).body, live);
+  }, [live?.updatedAt, plan]);
 
   const orderedIds = useMemo(() => (plan?.items ?? []).map((i) => i.id), [plan]);
 
   async function onDragEnd(event: DragEndEvent) {
     if (!plan) return;
     const { active, over } = event;
-    if (!over) return;
-    if (active.id === over.id) return;
+    if (!over || active.id === over.id) return;
 
     const oldIndex = plan.items.findIndex((i) => i.id === active.id);
     const newIndex = plan.items.findIndex((i) => i.id === over.id);
@@ -190,70 +229,7 @@ export function PlanPage() {
     return (
       <div style={{ fontFamily: "system-ui", padding: 16 }}>
         <h1 style={{ margin: 0 }}>Plan</h1>
-        {/* Go prev/next (Plan toolbar) */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, opacity: 0.7 }}>Live</span>
-          <button
-            onClick={async () => {
-              const pid = viewingPlanId();
-              if (!pid) return;
-              const prev = Math.max((liveCursor ?? -1) - 1, 0);
-              await window.cp.live.set({ planId: pid, cursor: prev, enabled: true, target });
-            }}
-          >
-            ◀ Prev
-          </button>
-          <button
-            onClick={async () => {
-              const pid = viewingPlanId();
-              if (!pid) return;
-              const next = Math.min((liveCursor ?? -1) + 1, (items?.length ?? 0) - 1);
-              if (next < 0) return;
-              await window.cp.live.set({ planId: pid, cursor: next, enabled: true, target });
-            }}
-          >
-            Next ▶
-          </button>
-          <button
-            onClick={async () => {
-              const pid = viewingPlanId();
-              if (!pid) return;
-              const cur = liveCursor ?? -1;
-              const idx = cur >= 0 ? cur : 0;
-              await window.cp.live.set({ planId: pid, cursor: idx, enabled: true, target });
-            }}
-          >
-            Set current
-          </button>
-          <label style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: 6 }}>
-            <input
-              type="checkbox"
-              checked={liveEnabled}
-              onChange={async (e) => {
-                const pid = viewingPlanId();
-                setLiveEnabled(e.target.checked);
-                await window.cp.live.set({ planId: pid, enabled: e.target.checked });
-              }}
-            />
-            Live
-          </label>
-          {isViewingLivePlan() ? (
-            <span
-              style={{
-                marginLeft: 6,
-                fontSize: 12,
-                fontWeight: 900,
-                padding: "2px 8px",
-                borderRadius: 999,
-                background: "#222",
-                color: "#fff",
-              }}
-            >
-              LIVE
-            </span>
-          ) : null}
-        </div>
-        <p style={{ color: "crimson" }}>Preload non chargé (window.cp.plans indisponible).</p>
+        <p style={{ color: "crimson" }}>Preload non charge (window.cp.plans indisponible).</p>
       </div>
     );
   }
@@ -263,96 +239,44 @@ export function PlanPage() {
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
         <div>
           <h1 style={{ margin: 0 }}>Plan</h1>
-        {/* Go prev/next (Plan toolbar) */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 13, opacity: 0.7 }}>Live</span>
-          <button
-            onClick={async () => {
-              const pid = viewingPlanId();
-              if (!pid) return;
-              const prev = Math.max((liveCursor ?? -1) - 1, 0);
-              await window.cp.live.set({ planId: pid, cursor: prev, enabled: true, target });
-            }}
-          >
-            ◀ Prev
-          </button>
-          <button
-            onClick={async () => {
-              const pid = viewingPlanId();
-              if (!pid) return;
-              const next = Math.min((liveCursor ?? -1) + 1, (items?.length ?? 0) - 1);
-              if (next < 0) return;
-              await window.cp.live.set({ planId: pid, cursor: next, enabled: true, target });
-            }}
-          >
-            Next ▶
-          </button>
-          <button
-            onClick={async () => {
-              const pid = viewingPlanId();
-              if (!pid) return;
-              const cur = liveCursor ?? -1;
-              const idx = cur >= 0 ? cur : 0;
-              await window.cp.live.set({ planId: pid, cursor: idx, enabled: true, target });
-            }}
-          >
-            Set current
-          </button>
-          <label style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: 6 }}>
+          <div style={{ opacity: 0.7 }}>Projection: {projOpen ? "OUVERTE" : "FERMEE"}</div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <input
               type="checkbox"
               checked={liveEnabled}
-              onChange={async (e) => {
-                const pid = viewingPlanId();
-                setLiveEnabled(e.target.checked);
-                await window.cp.live.set({ planId: pid, enabled: e.target.checked });
-              }}
+              onChange={(e) => updateLive({ enabled: e.target.checked })}
             />
             Live
           </label>
-          {isViewingLivePlan() ? (
-            <span
-              style={{
-                marginLeft: 6,
-                fontSize: 12,
-                fontWeight: 900,
-                padding: "2px 8px",
-                borderRadius: 999,
-                background: "#222",
-                color: "#fff",
-              }}
-            >
-              LIVE
-            </span>
-          ) : null}
-        </div>
-          <div style={{ opacity: 0.7 }}>Projection: {projOpen ? "OPEN" : "CLOSED"}</div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {!projOpen ? (
-            <button
-              onClick={async () => {
-                const r = await window.cp.projectionWindow.open();
-                setProjOpen(!!r?.isOpen);
-              }}
-              style={{ padding: "10px 14px" }}
-            >
-              Ouvrir Projection
-            </button>
-          ) : (
-            <button
-              onClick={async () => {
-                const r = await window.cp.projectionWindow.close();
-                setProjOpen(!!r?.isOpen);
-              }}
-              style={{ padding: "10px 14px" }}
-            >
-              Fermer Projection
-            </button>
-          )}
-          <button onClick={() => window.cp.devtools?.open?.("REGIE")} style={{ padding: "10px 14px" }}>
-            DevTools Régie
+          <div style={{ display: "flex", gap: 6 }}>
+            {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+              <button
+                key={k}
+                onClick={() => updateLive({ target: k })}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  border: target === k ? "2px solid #111" : "1px solid #ddd",
+                  background: target === k ? "#111" : "white",
+                  color: target === k ? "white" : "#111",
+                  fontWeight: 800,
+                }}
+              >
+                {k}
+              </button>
+            ))}
+          </div>
+          <button onClick={() => window.cp.live?.prev()} style={{ padding: "8px 10px" }}>
+            {"< Prev"}
+          </button>
+          <button onClick={() => window.cp.live?.next()} style={{ padding: "8px 10px" }}>
+            {"Next >"}
+          </button>
+          <button onClick={() => window.cp.live?.resume()} style={{ padding: "8px 10px" }}>
+            Reprendre
           </button>
         </div>
       </div>
@@ -360,7 +284,7 @@ export function PlanPage() {
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 12 }}>
         {/* LEFT: list + create */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Créer un plan</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
           <div style={{ display: "grid", gap: 8 }}>
             <label>
               <div style={{ fontWeight: 600 }}>Date</div>
@@ -378,7 +302,7 @@ export function PlanPage() {
               }}
               style={{ padding: "10px 14px" }}
             >
-              + Créer
+              + Creer
             </button>
           </div>
 
@@ -401,6 +325,9 @@ export function PlanPage() {
               >
                 <div style={{ fontWeight: 800 }}>{p.title || "Culte"}</div>
                 <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
+                {livePlanId === p.id ? (
+                  <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: "#0a6847" }}>LIVE</div>
+                ) : null}
               </button>
             ))}
           </div>
@@ -409,34 +336,47 @@ export function PlanPage() {
         {/* RIGHT: plan detail */}
         <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
           {!plan ? (
-            <div style={{ opacity: 0.75 }}>Sélectionne un plan à gauche.</div>
+            <div style={{ opacity: 0.75 }}>Selectionne un plan a gauche.</div>
           ) : (
             <>
               <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontWeight: 900, fontSize: 18 }}>{plan.title || "Culte"}</div>
                   <div style={{ opacity: 0.75 }}>{isoToYmd(plan.date)}</div>
+                  {livePlanId === plan.id ? (
+                    <div style={{ marginTop: 4, fontSize: 12, fontWeight: 800, color: "#0a6847" }}>LIVE (cursor {liveCursor + 1})</div>
+                  ) : null}
                 </div>
 
-                <button
-                  onClick={async () => {
-                    if (!confirm("Supprimer ce plan ?")) return;
-                    await window.cp.plans.delete(plan.id);
-                    setPlan(null);
-                    setSelectedPlanId(null);
-                    await refreshPlans();
-                  }}
-                  style={{ padding: "10px 14px" }}
-                >
-                  Supprimer Plan
-                </button>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <button
+                    onClick={async () => {
+                      await updateLive({ planId: plan.id, enabled: true, cursor: Math.max(liveCursor, 0) });
+                    }}
+                    style={{ padding: "10px 14px" }}
+                  >
+                    Utiliser en live
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm("Supprimer ce plan ?")) return;
+                      await window.cp.plans.delete(plan.id);
+                      setPlan(null);
+                      setSelectedPlanId(null);
+                      await refreshPlans();
+                    }}
+                    style={{ padding: "10px 14px" }}
+                  >
+                    Supprimer Plan
+                  </button>
+                </div>
               </div>
 
               <hr style={{ margin: "14px 0" }} />
 
               {/* Add item */}
               <div style={{ display: "grid", gap: 8 }}>
-                <div style={{ fontWeight: 800 }}>Ajouter un élément</div>
+                <div style={{ fontWeight: 800 }}>Ajouter un element</div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
                   <label>
@@ -444,6 +384,8 @@ export function PlanPage() {
                     <select value={addKind} onChange={(e) => setAddKind(e.target.value)} style={{ width: "100%", padding: 10 }}>
                       <option value="ANNOUNCEMENT_TEXT">ANNOUNCEMENT_TEXT</option>
                       <option value="VERSE_MANUAL">VERSE_MANUAL</option>
+                      <option value="BIBLE_VERSE">BIBLE_VERSE</option>
+                      <option value="BIBLE_PASSAGE">BIBLE_PASSAGE</option>
                     </select>
                   </label>
                   <label>
@@ -465,6 +407,7 @@ export function PlanPage() {
                       title: addTitle.trim() || undefined,
                       content: addContent || undefined,
                     });
+                    setAddContent("");
                     await loadPlan(plan.id);
                   }}
                   style={{ padding: "10px 14px", width: 220 }}
@@ -481,15 +424,14 @@ export function PlanPage() {
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
                   <div style={{ display: "grid", gap: 10 }}>
-                    {plan.items.map((it) => (
+                    {plan.items.map((it, idx) => (
                       <SortableRow
                         key={it.id}
                         item={it}
                         onProject={async () => {
-                          if (!projOpen) return alert("Ouvre la projection d’abord.");
-                          const title = it.title || it.kind;
-                          const body = it.content || "";
-                          await projectToTarget((live?.target as any) || "A", title, body);
+                          const { title, body } = formatForProjection(it);
+                          const next = (await updateLive({ planId: plan.id, cursor: idx, enabled: true, target })) || live;
+                          await projectTextToTarget(target, title, body, next);
                         }}
                         onRemove={async () => {
                           await window.cp.plans.removeItem({ planId: plan.id, itemId: it.id });

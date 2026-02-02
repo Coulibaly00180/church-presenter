@@ -18,16 +18,14 @@ export function ProjectionPage() {
 
   // Live controls from projection window: arrows + click left/right
   useEffect(() => {
-    if (!window.cp?.projection?.control) return;
-
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
         e.preventDefault();
-        window.cp.projection.control!("NEXT", screenKey);
+        window.cp.live?.next?.();
       }
       if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") {
         e.preventDefault();
-        window.cp.projection.control!("PREV", screenKey);
+        window.cp.live?.prev?.();
       }
     };
 
@@ -54,7 +52,7 @@ export function ProjectionPage() {
     return () => off();
   }, [screenKey]);
 
-  // Déclenche une transition douce à chaque changement de "current"
+  // Declenche une transition douce a chaque changement de "current"
   useEffect(() => {
     setAnimKey((k) => k + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,6 +60,7 @@ export function ProjectionPage() {
 
   const mode = state?.mode ?? "NORMAL";
   const current = state?.current ?? { kind: "EMPTY" };
+  const lowerThird = !!state?.lowerThirdEnabled;
 
   const bg =
     mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : "#050505";
@@ -74,30 +73,33 @@ export function ProjectionPage() {
     background: bg,
     color: fg,
     display: "flex",
-    alignItems: "center",
+    alignItems: lowerThird ? "flex-end" : "center",
     justifyContent: "center",
     overflow: "hidden",
+    paddingBottom: lowerThird ? "6vh" : 0,
   };
 
   const cardStyle: React.CSSProperties = {
     width: "92%",
     maxWidth: 1600,
-    textAlign: "center",
+    textAlign: lowerThird ? "left" : "center",
     fontFamily: "system-ui",
-    padding: 24,
+    padding: lowerThird ? "10px 24px 12px" : 24,
+    background: lowerThird ? "rgba(0,0,0,0.35)" : "transparent",
+    borderRadius: lowerThird ? 16 : 0,
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: 46,
+    fontSize: lowerThird ? 32 : 46,
     fontWeight: 900,
-    marginBottom: 18,
+    marginBottom: lowerThird ? 8 : 18,
     letterSpacing: -0.5,
   };
 
   const bodyStyle: React.CSSProperties = {
-    fontSize: 56,
+    fontSize: lowerThird ? 40 : 56,
     fontWeight: 800,
-    lineHeight: 1.15,
+    lineHeight: lowerThird ? 1.1 : 1.15,
     whiteSpace: "pre-wrap",
   };
 
@@ -105,11 +107,11 @@ export function ProjectionPage() {
     <div style={{ ...containerStyle, position: "relative" }}>
       {/* click areas */}
       <div
-        onClick={() => window.cp?.projection?.control?.("PREV", screenKey)}
+        onClick={() => window.cp.live?.prev?.()}
         style={{ position: "absolute", left: 0, top: 0, width: "50%", height: "100%", cursor: "pointer" }}
       />
       <div
-        onClick={() => window.cp?.projection?.control?.("NEXT", screenKey)}
+        onClick={() => window.cp.live?.next?.()}
         style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", cursor: "pointer" }}
       />
       <div style={cardStyle} key={animKey}>
@@ -129,7 +131,7 @@ export function ProjectionPage() {
         </div>
 
         {current.kind === "EMPTY" ? (
-          <div style={{ opacity: 0.7, fontSize: 28 }}>Prêt.</div>
+          <div style={{ opacity: 0.7, fontSize: 28 }}>Pret.</div>
         ) : (
           <>
             {current.title ? <div style={titleStyle}>{current.title}</div> : null}

@@ -1,5 +1,20 @@
 import React, { useEffect, useMemo, useState } from "react";
 
+type ScreenKey = "A" | "B" | "C";
+type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
+type ProjectionState = { mode: string; lowerThirdEnabled: boolean; current: any };
+type ScreenMeta = { key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode };
+type LiveState = {
+  enabled: boolean;
+  planId: string | null;
+  cursor: number;
+  target: ScreenKey;
+  black: boolean;
+  white: boolean;
+  lockedScreens: Record<ScreenKey, boolean>;
+  updatedAt: number;
+};
+
 function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;
   if (!t) return false;
@@ -8,269 +23,297 @@ function isTypingTarget(el: EventTarget | null) {
 }
 
 function splitBlocks(text: string) {
-  // Un "bloc" = paragraphes séparés par 1+ lignes vides
   return text
     .split(/\n\s*\n/g)
     .map((s) => s.trim())
     .filter(Boolean);
 }
 
+async function projectText(target: ScreenKey, title: string | undefined, body: string) {
+  const screensApi = window.cp.screens;
+  const list: ScreenMeta[] = screensApi ? await screensApi.list() : [];
+  const meta = list.find((s) => s.key === target);
+
+  if (target === "A") {
+    await window.cp.projectionWindow?.open?.();
+  } else if (!meta?.isOpen && screensApi) {
+    await screensApi.open(target);
+  }
+
+  const isMirrorOfA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
+  const dest: ScreenKey = isMirrorOfA ? "A" : target;
+
+  if (dest === "A" || !screensApi) {
+    await window.cp.projection.setContentText({ title, body });
+    return;
+  }
+
+  const res: any = await screensApi.setContentText(dest, { title, body });
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    await window.cp.projection.setContentText({ title, body });
+  }
+}
+
 export function RegiePage() {
   const [title, setTitle] = useState("Bienvenue");
   const [body, setBody] = useState("Tape ton texte ici, puis clique Afficher.");
-  const [state, setState] = useState<any>(null);
-  const [projOpen, setProjOpen] = useState<boolean>(false);
-  const [screens, setScreens] = useState<any[]>([]);
-  const [openB, setOpenB] = useState(false);
-  const [openC, setOpenC] = useState(false);
-  const [mirrorB, setMirrorB] = useState(true);
-  const [mirrorC, setMirrorC] = useState(true);
+  const [stateA, setStateA] = useState<ProjectionState | null>(null);
+  const [screens, setScreens] = useState<ScreenMeta[]>([]);
+  const [projOpenA, setProjOpenA] = useState(false);
   const [blockCursor, setBlockCursor] = useState<number>(-1);
+  const [live, setLive] = useState<LiveState | null>(null);
+
+  const target = live?.target ?? "A";
+  const locked = live?.lockedScreens ?? { A: false, B: false, C: false };
 
   useEffect(() => {
-    window.cp.projection.getState().then(setState);
-    const offState = window.cp.projection.onState(setState);
+    window.cp.projection.getState().then(setStateA);
+    const offProjection = window.cp.projection.onState(setStateA);
 
-    window.cp.projectionWindow.isOpen().then((r: any) => setProjOpen(!!r?.isOpen));
-
-    // Multi-screens init
-    if (window.cp.screens?.list) {
-      window.cp.screens.list().then((list: any[]) => {
-        setScreens(list);
-        setOpenB(!!list.find((x) => x.key === "B")?.isOpen);
-        setOpenC(!!list.find((x) => x.key === "C")?.isOpen);
-        const mb = list.find((x) => x.key === "B")?.mirror;
-        const mc = list.find((x) => x.key === "C")?.mirror;
-        setMirrorB(mb?.kind !== "FREE");
-        setMirrorC(mc?.kind !== "FREE");
-      });
-
-      const offB = window.cp.screens.onWindowState("B", (p: any) => setOpenB(!!p.isOpen));
-      const offC = window.cp.screens.onWindowState("C", (p: any) => setOpenC(!!p.isOpen));
-
+    const screensApi = window.cp.screens;
+    if (screensApi) {
+      screensApi.list().then(setScreens);
+      const offA = screensApi.onWindowState("A", (p) => setProjOpenA(!!p.isOpen));
+      const offB = screensApi.onWindowState("B", (p) =>
+        setScreens((prev) => prev.map((s) => (s.key === "B" ? { ...s, isOpen: !!p.isOpen } : s)))
+      );
+      const offC = screensApi.onWindowState("C", (p) =>
+        setScreens((prev) => prev.map((s) => (s.key === "C" ? { ...s, isOpen: !!p.isOpen } : s)))
+      );
       return () => {
-        offB();
-        offC();
+        offProjection();
+        offA?.();
+        offB?.();
+        offC?.();
       };
     }
 
-    const offWin = window.cp.projectionWindow.onWindowState((p) => setProjOpen(p.isOpen));
-
+    window.cp.projectionWindow?.isOpen?.().then((r) => setProjOpenA(!!r?.isOpen));
+    const offWin = window.cp.projectionWindow?.onWindowState?.((p) => setProjOpenA(!!p.isOpen));
     return () => {
-      offState();
-      offWin();
+      offProjection();
+      offWin?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!window.cp.live) return;
+    window.cp.live.get().then(setLive).catch(() => null);
+    const off = window.cp.live.onUpdate((s: LiveState) => setLive(s));
+    return () => off?.();
+  }, []);
+
+  async function updateLive(patch: Partial<LiveState>) {
+    if (!window.cp.live) return;
+    const next = await window.cp.live.set(patch);
+    setLive(next);
+  }
+
+  const status = useMemo(() => {
+    if (!stateA) return "Chargement...";
+    return `Mode=${stateA.mode} * LowerThird=${stateA.lowerThirdEnabled ? "ON" : "OFF"} * A=${projOpenA ? "OUVERT" : "FERME"}`;
+  }, [stateA, projOpenA]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
 
-      if (e.key === "b" || e.key === "B") window.cp.live?.toggleBlack();
-      if (e.key === "w" || e.key === "W") window.cp.live?.toggleWhite();
-      if (e.key === "r" || e.key === "R") window.cp.live?.resume();
-      if (e.key === "l" || e.key === "L") {
-        window.cp.projection.setState({ lowerThirdEnabled: !(state?.lowerThirdEnabled ?? false) });
-
-
-// Target screen shortcuts
-if (e.key === "1") window.cp.live?.setTarget("A");
-if (e.key === "2") window.cp.live?.setTarget("B");
-if (e.key === "3") window.cp.live?.setTarget("C");
-
-// Live navigation (Plan cursor)
-if (e.key === "ArrowLeft") {
-  e.preventDefault();
-  window.cp.live?.prev();
-}
-if (e.key === "ArrowRight") {
-  e.preventDefault();
-  window.cp.live?.next();
-}
-
+      if (e.key === "1") {
+        e.preventDefault();
+        updateLive({ target: "A" });
+      }
+      if (e.key === "2") {
+        e.preventDefault();
+        updateLive({ target: "B" });
+      }
+      if (e.key === "3") {
+        e.preventDefault();
+        updateLive({ target: "C" });
       }
 
-      // Navigation blocs (↑ ↓) + Enter
-      if (!projOpen) return;
+      if (e.key === "b" || e.key === "B") {
+        e.preventDefault();
+        window.cp.live?.toggleBlack();
+      }
+      if (e.key === "w" || e.key === "W") {
+        e.preventDefault();
+        window.cp.live?.toggleWhite();
+      }
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        window.cp.live?.resume();
+      }
 
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        window.cp.live?.prev();
+      }
+      if (e.key === "ArrowRight" || e.key === " ") {
+        e.preventDefault();
+        window.cp.live?.next();
+      }
+
+      // Manual text navigation (up/down + Enter/Space)
       const blocks = splitBlocks(body);
       if (blocks.length === 0) return;
 
-      const projectByIndex = async (i: number) => {
-        const idx = Math.max(0, Math.min(i, blocks.length - 1));
-        setBlockCursor(idx);
-        await window.cp.projection.setContentText({
-          title,
-          body: blocks[idx],
-        });
+      const projectByIndex = async (idx: number) => {
+        const bounded = Math.max(0, Math.min(idx, blocks.length - 1));
+        setBlockCursor(bounded);
+        await projectText(target, title, blocks[bounded]);
       };
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        const next = Math.min((blockCursor < 0 ? -1 : blockCursor) + 1, blocks.length - 1);
-        void projectByIndex(next);
+        projectByIndex(Math.min((blockCursor < 0 ? -1 : blockCursor) + 1, blocks.length - 1));
       }
-
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        const prev = Math.max((blockCursor < 0 ? 0 : blockCursor) - 1, 0);
-        void projectByIndex(prev);
+        projectByIndex(Math.max((blockCursor < 0 ? 0 : blockCursor) - 1, 0));
       }
-
       if (e.key === "Enter") {
-        // Enter projette le bloc courant (ou le 1er)
-        if (blocks.length > 0) {
-          e.preventDefault();
-          const idx = blockCursor >= 0 ? blockCursor : 0;
-          void projectByIndex(idx);
-        }
+        e.preventDefault();
+        projectByIndex(blockCursor >= 0 ? blockCursor : 0);
       }
     };
+
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state, projOpen, body, title, blockCursor]);
-
-  const status = useMemo(() => {
-    if (!state) return "Loading…";
-    return `Mode=${state.mode} | LowerThird=${state.lowerThirdEnabled ? "ON" : "OFF"} | Projection=${
-      projOpen ? "OPEN" : "CLOSED"
-    }`;
-  }, [state, projOpen]);
+  }, [body, blockCursor, target, title]);
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16 }}>
-      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12, marginBottom: 12 }}>
-        <div style={{ fontWeight: 900, marginBottom: 8 }}>Écrans (A/B/C)</div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+    <div style={{ fontFamily: "system-ui", padding: 16, display: "grid", gap: 16 }}>
+      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12, display: "grid", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontWeight: 900, fontSize: 20 }}>Live / Projection</div>
+            <div style={{ opacity: 0.75 }}>{status}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={!!live?.enabled}
+                onChange={(e) => updateLive({ enabled: e.target.checked })}
+              />
+              Live
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => updateLive({ target: k })}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    border: target === k ? "2px solid #111" : "1px solid #ddd",
+                    background: target === k ? "#111" : "white",
+                    color: target === k ? "white" : "#111",
+                    fontWeight: 800,
+                  }}
+                >
+                  {k}
+                  {locked[k] ? " [LOCK]" : ""}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => window.cp.live?.toggleBlack()} style={{ padding: "10px 14px" }}>
+            Noir (B)
+          </button>
+          <button onClick={() => window.cp.live?.toggleWhite()} style={{ padding: "10px 14px" }}>
+            Blanc (W)
+          </button>
+          <button onClick={() => window.cp.live?.resume()} style={{ padding: "10px 14px" }}>
+            Reprendre (R)
+          </button>
+          <button
+            onClick={() => window.cp.projection.setState({ lowerThirdEnabled: !(stateA?.lowerThirdEnabled ?? false) })}
+            style={{ padding: "10px 14px" }}
+          >
+            Lower Third (L)
+          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 10 }}>
+            {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+              <label key={k} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={!!locked[k]}
+                  onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
+                />
+                Lock {k}
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>
+        <div style={{ fontWeight: 900, marginBottom: 4 }}>Ecrans (ouvrir / miroir)</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <button
             onClick={async () => {
               const r = await window.cp.projectionWindow.open();
-              setProjOpen(!!r?.isOpen);
+              setProjOpenA(!!r?.isOpen);
             }}
           >
-            Ouvrir A
+            {projOpenA ? "A ouvert" : "Ouvrir A"}
           </button>
-
-          <button
-            onClick={async () => {
-              if (!window.cp.screens) return;
-              const r = openB ? await window.cp.screens.close("B") : await window.cp.screens.open("B");
-              setOpenB(!!r?.isOpen);
-            }}
-          >
-            {openB ? "Fermer B" : "Ouvrir B"}
-          </button>
-
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={mirrorB}
-              onChange={async (e) => {
-                const v = e.target.checked;
-                setMirrorB(v);
-                if (!window.cp.screens) return;
-                await window.cp.screens.setMirror("B", v ? { kind: "MIRROR", from: "A" } : { kind: "FREE" });
-              }}
-            />
-            B miroir de A
-          </label>
-
-          <button
-            onClick={async () => {
-              if (!window.cp.screens) return;
-              const r = openC ? await window.cp.screens.close("C") : await window.cp.screens.open("C");
-              setOpenC(!!r?.isOpen);
-            }}
-          >
-            {openC ? "Fermer C" : "Ouvrir C"}
-          </button>
-
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={mirrorC}
-              onChange={async (e) => {
-                const v = e.target.checked;
-                setMirrorC(v);
-                if (!window.cp.screens) return;
-                await window.cp.screens.setMirror("C", v ? { kind: "MIRROR", from: "A" } : { kind: "FREE" });
-              }}
-            />
-            C miroir de A
-          </label>
-
+          {(["B", "C"] as ScreenKey[]).map((k) => {
+            const meta = screens.find((s) => s.key === k);
+            const isOpen = !!meta?.isOpen;
+            const isMirror = meta?.mirror?.kind === "MIRROR";
+            return (
+              <div key={k} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <button
+                  onClick={async () => {
+                    if (!window.cp.screens) return;
+                    const res = isOpen ? await window.cp.screens.close(k) : await window.cp.screens.open(k);
+                    if (res) {
+                      setScreens((prev) => prev.map((s) => (s.key === k ? { ...s, isOpen: !!res.isOpen } : s)));
+                    }
+                  }}
+                >
+                  {isOpen ? `Fermer ${k}` : `Ouvrir ${k}`}
+                </button>
+                <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={isMirror}
+                    onChange={async (e) => {
+                      if (!window.cp.screens) return;
+                      const mirror = e.target.checked ? { kind: "MIRROR", from: "A" } : { kind: "FREE" };
+                      await window.cp.screens.setMirror(k, mirror);
+                      setScreens((prev) => prev.map((s) => (s.key === k ? { ...s, mirror } : s)));
+                    }}
+                  />
+                  {k} miroir de A
+                </label>
+              </div>
+            );
+          })}
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_A")}>DevTools A</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_B")}>DevTools B</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_C")}>DevTools C</button>
         </div>
-
-        <div style={{ marginTop: 8, opacity: 0.7, fontSize: 13 }}>
-          Astuce : mets B/C en mode <b>Libre</b> pour afficher autre chose ensuite (versets/chant/plan). En mode miroir, ils suivent A.
+        <div style={{ fontSize: 12, opacity: 0.7 }}>
+          Astuce: B/C en miroir suivent A. Decoche pour utiliser en ecran libre (versets, annonces...).
         </div>
       </div>
 
-      <h1 style={{ margin: 0 }}>Régie</h1>
-      <p style={{ opacity: 0.75 }}>{status}</p>
+      <div style={{ display: "grid", gap: 10, maxWidth: 900 }}>
+        <h2 style={{ margin: 0 }}>Texte rapide</h2>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        {!projOpen ? (
-          <button
-            onClick={async () => {
-              try {
-                console.log("[REGIE] open projection click");
-                const r = await window.cp.projectionWindow.open();
-                console.log("[REGIE] open result", r);
-                setProjOpen(!!r?.isOpen);
-              } catch (e) {
-                console.error("[REGIE] open projection failed", e);
-                alert("Impossible d'ouvrir la projection (voir console).");
-              }
-            }}
-            style={{ padding: "10px 14px", fontSize: 16 }}
-          >
-            Ouvrir Projection
-          </button>
-        ) : (
-          <button
-            onClick={async () => {
-              const r = await window.cp.projectionWindow.close();
-              setProjOpen(!!r?.isOpen);
-            }}
-            style={{ padding: "10px 14px", fontSize: 16 }}
-          >
-            Fermer Projection
-          </button>
-        )}
-
-        <button
-          onClick={() => window.cp.devtools.open("REGIE")}
-          style={{ padding: "10px 14px", fontSize: 16 }}
-        >
-          DevTools Régie
-        </button>
-
-        <button
-          onClick={() => window.cp.devtools.open("PROJECTION")}
-          style={{ padding: "10px 14px", fontSize: 16 }}
-          disabled={!projOpen}
-          title={!projOpen ? "Ouvre la projection d’abord" : ""}
-        >
-          DevTools Projection
-        </button>
-      </div>
-
-      <div style={{ display: "grid", gap: 12, maxWidth: 900 }}>
         <label>
-          <div style={{ fontWeight: 600 }}>Titre</div>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{ width: "100%", padding: 10, fontSize: 16 }}
-          />
+          <div style={{ fontWeight: 700 }}>Titre</div>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%", padding: 10, fontSize: 16 }} />
         </label>
 
         <label>
-          <div style={{ fontWeight: 600 }}>Texte</div>
+          <div style={{ fontWeight: 700 }}>Texte</div>
           <textarea
             value={body}
             onChange={(e) => setBody(e.target.value)}
@@ -284,42 +327,29 @@ if (e.key === "ArrowRight") {
             onClick={async () => {
               const blocks = splitBlocks(body);
               if (blocks.length === 0) {
-                await window.cp.projection.setContentText({ title, body: "" });
+                await projectText(target, title, "");
                 setBlockCursor(-1);
                 return;
               }
               setBlockCursor(0);
-              await window.cp.projection.setContentText({ title, body: blocks[0] });
+              await projectText(target, title, blocks[0]);
             }}
             style={{ padding: "10px 14px", fontSize: 16 }}
-            disabled={!projOpen}
           >
             Afficher
           </button>
-
-          <button onClick={() => window.cp.projection.setMode("BLACK")} style={{ padding: "10px 14px" }} disabled={!projOpen}>
-            Noir (B)
+          <button onClick={() => window.cp.devtools?.open?.("REGIE")} style={{ padding: "10px 14px" }}>
+            DevTools Regie
           </button>
-          <button onClick={() => window.cp.projection.setMode("WHITE")} style={{ padding: "10px 14px" }} disabled={!projOpen}>
-            Blanc (W)
-          </button>
-          <button onClick={() => window.cp.projection.setMode("NORMAL")} style={{ padding: "10px 14px" }} disabled={!projOpen}>
-            Reprendre (R)
-          </button>
-
-          <button
-            onClick={() => window.cp.projection.setState({ lowerThirdEnabled: !(state?.lowerThirdEnabled ?? false) })}
-            style={{ padding: "10px 14px" }}
-            disabled={!projOpen}
-          >
-            Lower Third (L)
+          <button onClick={() => window.cp.devtools?.open?.("PROJECTION")} style={{ padding: "10px 14px" }}>
+            DevTools Projection
           </button>
         </div>
 
-        <div style={{ marginTop: 6, padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Blocs (clic ou ↑/↓)</div>
+        <div style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>Blocs (clic ou ^/v)</div>
           {splitBlocks(body).length === 0 ? (
-            <div style={{ opacity: 0.7 }}>Aucun bloc (sépare par des lignes vides).</div>
+            <div style={{ opacity: 0.7 }}>Aucun bloc (separe avec des lignes vides).</div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
               {splitBlocks(body).map((b, idx) => {
@@ -328,9 +358,8 @@ if (e.key === "ArrowRight") {
                   <button
                     key={idx}
                     onClick={async () => {
-                      if (!projOpen) return;
                       setBlockCursor(idx);
-                      await window.cp.projection.setContentText({ title, body: b });
+                      await projectText(target, title, b);
                     }}
                     style={{
                       textAlign: "left",
@@ -340,13 +369,9 @@ if (e.key === "ArrowRight") {
                       background: "white",
                       cursor: "pointer",
                     }}
-                    title="Cliquer pour projeter"
-                    disabled={!projOpen}
                   >
                     <div style={{ fontWeight: 800 }}>#{idx + 1}</div>
-                    <div style={{ opacity: 0.8, whiteSpace: "pre-wrap" }}>
-                      {b.length > 120 ? `${b.slice(0, 120)}…` : b}
-                    </div>
+                    <div style={{ opacity: 0.8, whiteSpace: "pre-wrap" }}>{b.length > 120 ? `${b.slice(0, 120)}...` : b}</div>
                   </button>
                 );
               })}
@@ -354,9 +379,11 @@ if (e.key === "ArrowRight") {
           )}
         </div>
 
-        <div style={{ marginTop: 12, padding: 12, background: "#f5f5f5", borderRadius: 8 }}>
+        <div style={{ marginTop: 8, padding: 12, background: "#f5f5f5", borderRadius: 8, fontSize: 13 }}>
           <div style={{ fontWeight: 700 }}>Raccourcis</div>
-          <div>B = Noir • W = Blanc • R = Reprendre • L = Lower third • ↑/↓ = bloc • Enter = projeter</div>
+          <div>
+            {"1/2/3 = cible A/B/C * <-/-> = plan live prev/next * B/W/R = noir/blanc/reprendre * ^/v = bloc * Entree/Espace = projeter bloc"}
+          </div>
         </div>
       </div>
     </div>

@@ -350,6 +350,11 @@ ipcMain.handle("screens:setMode", (_evt, key: ScreenKey, mode: ProjectionMode) =
   // If screen is mirroring, ignore
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
 
+  screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
+  sendScreenState(key);
+  return { ok: true, state: screenStates[key] };
+});
+
 // --------------------
 // LiveState (central) - sync Regie / Plan / Projection targets
 // --------------------
@@ -408,6 +413,7 @@ function applyLiveProjectionMode() {
 
   screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
   sendScreenState(key);
+  applyMirrorsFrom(key);
 }
 
 function mergeLive(patch: Partial<LiveState>) {
@@ -467,11 +473,4 @@ ipcMain.handle("live:resume", () => mergeLive({ black: false, white: false, enab
 ipcMain.handle("live:setLocked", (_evt, payload: { key: ScreenKey; locked: boolean }) => {
   const next = { ...liveState.lockedScreens, [payload.key]: payload.locked };
   return mergeLive({ lockedScreens: next });
-});
-
-
-
-  screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
-  sendScreenState(key);
-  return { ok: true, state: screenStates[key] };
 });

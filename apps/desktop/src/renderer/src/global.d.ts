@@ -34,6 +34,36 @@ declare global {
         onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => () => void;
       };
 
+      songs?: {
+        list: (q?: string) => Promise<any[]>;
+        get: (id: string) => Promise<any>;
+        create: (payload: { title: string; artist?: string; album?: string }) => Promise<any>;
+        updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) => Promise<any>;
+        replaceBlocks: (payload: {
+          songId: string;
+          blocks: Array<{ order: number; type: string; title?: string; content: string }>;
+        }) => Promise<any>;
+        delete: (id: string) => Promise<any>;
+      };
+
+      plans?: {
+        list: () => Promise<any[]>;
+        get: (id: string) => Promise<any>;
+        create: (payload: { dateIso: string; title?: string }) => Promise<any>;
+        delete: (planId: string) => Promise<any>;
+        addItem: (payload: {
+          planId: string;
+          kind: string;
+          title?: string;
+          content?: string;
+          refId?: string;
+          refSubId?: string;
+          mediaPath?: string;
+        }) => Promise<any>;
+        removeItem: (payload: { planId: string; itemId: string }) => Promise<any>;
+        reorder: (payload: { planId: string; orderedItemIds: string[] }) => Promise<any>;
+      };
+
       live?: {
         get: () => Promise<{
           enabled: boolean;
@@ -63,7 +93,6 @@ declare global {
         open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => Promise<any>;
       };
 
-      // other namespaces exist (songs/plans) but are defined elsewhere
       [k: string]: any;
     };
   }

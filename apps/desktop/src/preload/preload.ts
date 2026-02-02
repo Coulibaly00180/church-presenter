@@ -64,6 +64,37 @@ contextBridge.exposeInMainWorld("cp", {
     },
   },
 
+  songs: {
+    list: (q?: string) => ipcRenderer.invoke("songs:list", q),
+    get: (id: string) => ipcRenderer.invoke("songs:get", id),
+    create: (payload: { title: string; artist?: string; album?: string }) => ipcRenderer.invoke("songs:create", payload),
+    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) =>
+      ipcRenderer.invoke("songs:updateMeta", payload),
+    replaceBlocks: (payload: {
+      songId: string;
+      blocks: Array<{ order: number; type: string; title?: string; content: string }>;
+    }) => ipcRenderer.invoke("songs:replaceBlocks", payload),
+    delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
+  },
+
+  plans: {
+    list: () => ipcRenderer.invoke("plans:list"),
+    get: (id: string) => ipcRenderer.invoke("plans:get", id),
+    create: (payload: { dateIso: string; title?: string }) => ipcRenderer.invoke("plans:create", payload),
+    delete: (planId: string) => ipcRenderer.invoke("plans:delete", planId),
+    addItem: (payload: {
+      planId: string;
+      kind: string;
+      title?: string;
+      content?: string;
+      refId?: string;
+      refSubId?: string;
+      mediaPath?: string;
+    }) => ipcRenderer.invoke("plans:addItem", payload),
+    removeItem: (payload: { planId: string; itemId: string }) => ipcRenderer.invoke("plans:removeItem", payload),
+    reorder: (payload: { planId: string; orderedItemIds: string[] }) => ipcRenderer.invoke("plans:reorder", payload),
+  },
+
 
   // -----------------------
   // Live sync between pages (Regie <-> Plan)
