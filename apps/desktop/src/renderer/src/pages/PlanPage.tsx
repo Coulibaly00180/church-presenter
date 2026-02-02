@@ -269,6 +269,18 @@ export function PlanPage() {
               </button>
             ))}
           </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+              <label key={k} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={!!live?.lockedScreens?.[k]}
+                  onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
+                />
+                Lock {k}
+              </label>
+            ))}
+          </div>
           <button onClick={() => window.cp.live?.prev()} style={{ padding: "8px 10px" }}>
             {"< Prev"}
           </button>

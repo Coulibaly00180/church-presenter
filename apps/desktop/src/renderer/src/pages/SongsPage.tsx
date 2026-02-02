@@ -73,6 +73,8 @@ export function SongsPage() {
   const [song, setSong] = useState<SongDetail | null>(null);
 
   const [target, setTarget] = useState<ScreenKey>("A");
+  const [plans, setPlans] = useState<Array<{ id: string; title?: string | null; date?: string }>>([]);
+  const [planId, setPlanId] = useState<string>("");
 
   // Meta form
   const [title, setTitle] = useState("");
@@ -98,6 +100,13 @@ export function SongsPage() {
 
   useEffect(() => {
     refresh("").catch((e) => setErr(String(e)));
+    window.cp.plans
+      ?.list?.()
+      .then((ps: any[]) => {
+        setPlans(ps || []);
+        if ((ps || []).length > 0) setPlanId(ps[0].id);
+      })
+      .catch(() => void 0);
   }, []);
 
   const filtered = useMemo(() => list, [list]);
@@ -194,6 +203,45 @@ export function SongsPage() {
     await projectTextToTarget(target, song.title, b.content || "");
   }
 
+  async function addBlockToPlan(i: number) {
+    if (!song || !planId) return;
+    // ensure block ids exist by saving if needed
+    if (!song.blocks[i]?.id) {
+      await onSaveBlocks();
+      const re = await window.cp.songs.get(song.id);
+      setSong(re);
+    }
+    const b = (song.blocks[i] as SongBlock) || {};
+    const payload = {
+      planId,
+      kind: "SONG_BLOCK",
+      title: `${song.title} - ${b.title || b.type}`,
+      content: b.content || "",
+      refId: song.id,
+      refSubId: b.id,
+    };
+    await window.cp.plans.addItem(payload);
+    alert("Bloc ajoute au plan.");
+  }
+
+  async function addAllBlocksToPlan() {
+    if (!song || !planId) return;
+    await onSaveBlocks();
+    const fresh = await window.cp.songs.get(song.id);
+    setSong(fresh);
+    for (const b of fresh.blocks) {
+      await window.cp.plans.addItem({
+        planId,
+        kind: "SONG_BLOCK",
+        title: `${fresh.title} - ${b.title || b.type}`,
+        content: b.content || "",
+        refId: fresh.id,
+        refSubId: b.id,
+      });
+    }
+    alert("Chant ajoute au plan.");
+  }
+
   async function projectAllAsFlow() {
     if (!song) return;
     const text = song.blocks.map((b) => (b.content ?? "").trim()).filter(Boolean).join("\n\n");
@@ -208,9 +256,20 @@ export function SongsPage() {
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           Projeter vers
           <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
-            <option value="A">Écran A</option>
-            <option value="B">Écran B</option>
-            <option value="C">Écran C</option>
+            <option value="A">Ecran A</option>
+            <option value="B">Ecran B</option>
+            <option value="C">Ecran C</option>
+          </select>
+        </label>
+
+        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          Plan
+          <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.title || "Culte"} {p.date ? `(${p.date.slice(0, 10)})` : ""}
+              </option>
+            ))}
           </select>
         </label>
 
@@ -302,6 +361,9 @@ export function SongsPage() {
                 <button onClick={() => addBlock("CHORUS")}>+ Refrain</button>
                 <button onClick={() => addBlock("BRIDGE")}>+ Pont</button>
                 <button onClick={projectAllAsFlow}>Projeter tout</button>
+                <button onClick={addAllBlocksToPlan} disabled={!planId}>
+                  Ajouter tout au plan
+                </button>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -312,6 +374,9 @@ export function SongsPage() {
                         {b.title || b.type} <span style={{ opacity: 0.5, fontWeight: 600 }}>#{idx + 1}</span>
                       </b>
                       <button onClick={() => projectBlock(idx)}>Projeter</button>
+                      <button onClick={() => addBlockToPlan(idx)} disabled={!planId}>
+                        Ajouter au plan
+                      </button>
                       <button onClick={() => removeBlock(idx)}>Supprimer</button>
                     </div>
 
