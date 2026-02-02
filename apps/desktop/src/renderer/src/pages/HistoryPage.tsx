@@ -54,10 +54,11 @@ export function HistoryPage() {
         </button>
         <button
           onClick={async () => {
-            const r = await window.cp.data?.importAll();
+            const mode = window.confirm("Remplacer les donnees existantes ? OK = REPLACE, Annuler = MERGE") ? "REPLACE" : "MERGE";
+            const r = await window.cp.data?.importAll({ mode });
             if (r?.ok) {
               setPlans(await window.cp.plans.list());
-              setMsg("Import global OK");
+              setMsg(`Import global OK (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)`);
             }
           }}
         >

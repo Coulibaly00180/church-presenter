@@ -21,7 +21,7 @@ export function registerDataIpc() {
     return { ok: true, path: res.filePath };
   });
 
-  ipcMain.handle("data:importAll", async () => {
+  ipcMain.handle("data:importAll", async (_evt, payload: { mode: "MERGE" | "REPLACE" }) => {
     const prisma = getPrisma();
     const res = await dialog.showOpenDialog({
       title: "Importer une base",
@@ -33,8 +33,15 @@ export function registerDataIpc() {
     const raw = fs.readFileSync(path, "utf-8");
     const data = JSON.parse(raw);
 
-    // Import: create new records (no overwrite), keeps old data
+    const mode = payload?.mode || "MERGE";
     await prisma.$transaction(async (tx: any) => {
+      if (mode === "REPLACE") {
+        await tx.songBlock.deleteMany({});
+        await tx.song.deleteMany({});
+        await tx.serviceItem.deleteMany({});
+        await tx.servicePlan.deleteMany({});
+      }
+
       for (const s of data.songs || []) {
         const song = await tx.song.create({
           data: {
@@ -82,7 +89,6 @@ export function registerDataIpc() {
       }
     });
 
-    return { ok: true, imported: true };
+    return { ok: true, imported: true, counts: { songs: data.songs?.length || 0, plans: data.plans?.length || 0 } };
   });
 }
-

@@ -153,7 +153,8 @@ export function registerSongsIpc() {
     let title = "Sans titre";
     let artist: string | undefined;
     let album: string | undefined;
-    const lyricsLines: string[] = [];
+    let year: string | undefined;
+    const blocksRaw: string[] = [];
 
     let inLyrics = false;
     for (const l of lines) {
@@ -164,12 +165,16 @@ export function registerSongsIpc() {
         artist = l.split(":").slice(1).join(":").trim() || undefined;
       } else if (lower.startsWith("album")) {
         album = l.split(":").slice(1).join(":").trim() || undefined;
+      } else if (lower.startsWith("annee")) {
+        year = l.split(":").slice(1).join(":").trim() || undefined;
       } else if (lower.startsWith("paroles")) {
         inLyrics = true;
       } else if (inLyrics) {
-        lyricsLines.push(l);
+        blocksRaw.push(l);
       }
     }
+
+    const paragraphBlocks = blocksRaw.join("\n").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
 
     const prisma = getPrisma();
     const created = await prisma.song.create({
@@ -177,15 +182,24 @@ export function registerSongsIpc() {
         title,
         artist,
         album,
+        tags: year,
         blocks: {
-          create: [
-            {
-              order: 1,
-              type: "VERSE",
-              title: "Couplet",
-              content: lyricsLines.join("\n"),
-            },
-          ],
+          create:
+            paragraphBlocks.length > 0
+              ? paragraphBlocks.map((content, idx) => ({
+                  order: idx + 1,
+                  type: idx === 0 ? "VERSE" : "CHORUS",
+                  title: idx === 0 ? "Couplet" : "Refrain",
+                  content,
+                }))
+              : [
+                  {
+                    order: 1,
+                    type: "VERSE",
+                    title: "Couplet",
+                    content: blocksRaw.join("\n"),
+                  },
+                ],
         },
       },
       include: { blocks: { orderBy: { order: "asc" } } },
