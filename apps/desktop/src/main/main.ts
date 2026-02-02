@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
-import { join } from "path";
+import { join, basename } from "path";
+import fs from "fs";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
@@ -291,7 +292,16 @@ ipcMain.handle("files:pickMedia", async () => {
   if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
   const p = res.filePaths[0];
   const isPdf = p.toLowerCase().endsWith(".pdf");
-  return { ok: true, path: p, mediaType: isPdf ? "PDF" : "IMAGE" };
+  const mediaDir = join(app.getPath("userData"), "media");
+  if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+  const target = join(mediaDir, basename(p));
+  try {
+    fs.copyFileSync(p, target);
+    return { ok: true, path: target, mediaType: isPdf ? "PDF" : "IMAGE" };
+  } catch (e) {
+    console.error("copy media failed", e);
+    return { ok: true, path: p, mediaType: isPdf ? "PDF" : "IMAGE" };
+  }
 });
 
 // A-only projection state API (legacy)

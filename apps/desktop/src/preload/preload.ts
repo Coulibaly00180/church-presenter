@@ -105,7 +105,7 @@ contextBridge.exposeInMainWorld("cp", {
 
   data: {
     exportAll: () => ipcRenderer.invoke("data:exportAll"),
-    importAll: () => ipcRenderer.invoke("data:importAll"),
+    importAll: (payload: { mode: "MERGE" | "REPLACE" }) => ipcRenderer.invoke("data:importAll", payload),
   },
 
 

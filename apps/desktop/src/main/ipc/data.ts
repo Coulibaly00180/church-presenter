@@ -34,16 +34,20 @@ export function registerDataIpc() {
     const data = JSON.parse(raw);
 
     const mode = payload?.mode || "MERGE";
-    await prisma.$transaction(async (tx: any) => {
-      if (mode === "REPLACE") {
-        await tx.songBlock.deleteMany({});
-        await tx.song.deleteMany({});
-        await tx.serviceItem.deleteMany({});
-        await tx.servicePlan.deleteMany({});
-      }
+    const errors: Array<{ kind: string; title?: string; message: string }> = [];
+    let songsImported = 0;
+    let plansImported = 0;
 
-      for (const s of data.songs || []) {
-        const song = await tx.song.create({
+    if (mode === "REPLACE") {
+      await prisma.songBlock.deleteMany({});
+      await prisma.song.deleteMany({});
+      await prisma.serviceItem.deleteMany({});
+      await prisma.servicePlan.deleteMany({});
+    }
+
+    for (const s of data.songs || []) {
+      try {
+        const song = await prisma.song.create({
           data: {
             title: s.title,
             artist: s.artist,
@@ -53,7 +57,7 @@ export function registerDataIpc() {
           },
         });
         for (const b of s.blocks || []) {
-          await tx.songBlock.create({
+          await prisma.songBlock.create({
             data: {
               songId: song.id,
               order: b.order,
@@ -63,17 +67,22 @@ export function registerDataIpc() {
             },
           });
         }
+        songsImported += 1;
+      } catch (e: any) {
+        errors.push({ kind: "song", title: s.title, message: e?.message || String(e) });
       }
+    }
 
-      for (const p of data.plans || []) {
-        const plan = await tx.servicePlan.create({
+    for (const p of data.plans || []) {
+      try {
+        const plan = await prisma.servicePlan.create({
           data: {
             date: p.date ? new Date(p.date) : new Date(),
             title: p.title,
           },
         });
         for (const it of p.items || []) {
-          await tx.serviceItem.create({
+          await prisma.serviceItem.create({
             data: {
               planId: plan.id,
               order: it.order,
@@ -86,9 +95,12 @@ export function registerDataIpc() {
             },
           });
         }
+        plansImported += 1;
+      } catch (e: any) {
+        errors.push({ kind: "plan", title: p.title, message: e?.message || String(e) });
       }
-    });
+    }
 
-    return { ok: true, imported: true, counts: { songs: data.songs?.length || 0, plans: data.plans?.length || 0 } };
+    return { ok: true, imported: true, counts: { songs: songsImported, plans: plansImported }, errors };
   });
 }

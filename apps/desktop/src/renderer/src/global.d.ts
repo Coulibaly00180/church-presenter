@@ -72,7 +72,7 @@ declare global {
 
       data?: {
         exportAll: () => Promise<any>;
-        importAll: () => Promise<any>;
+        importAll: (payload: { mode: "MERGE" | "REPLACE" }) => Promise<any>;
       };
 
       live?: {

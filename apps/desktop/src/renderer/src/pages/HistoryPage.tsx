@@ -15,6 +15,7 @@ export function HistoryPage() {
 
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
+  const [importDetail, setImportDetail] = useState<{ counts: { songs: number; plans: number }; errors: any[] } | null>(null);
 
   useEffect(() => {
     if (!canUse) return;
@@ -43,6 +44,36 @@ export function HistoryPage() {
         </div>
       ) : null}
 
+      {importDetail ? (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 12,
+            border: "1px solid #e4e4e7",
+            background: "#fafafa",
+            borderRadius: 12,
+          }}
+        >
+          <div style={{ fontWeight: 800, marginBottom: 6 }}>
+            Récap import : {importDetail.counts.songs} chants, {importDetail.counts.plans} plans
+          </div>
+          {importDetail.errors.length === 0 ? (
+            <div style={{ color: "#166534" }}>Aucune erreur.</div>
+          ) : (
+            <div style={{ maxHeight: 200, overflow: "auto", borderTop: "1px solid #e4e4e7", paddingTop: 6 }}>
+              {importDetail.errors.map((e, idx) => (
+                <div key={idx} style={{ fontSize: 13, marginBottom: 4, color: "#b91c1c" }}>
+                  [{e.kind}] {e.title || "??"} — {e.message}
+                </div>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setImportDetail(null)} style={{ marginTop: 6 }}>
+            Fermer
+          </button>
+        </div>
+      ) : null}
+
       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
         <button
           onClick={async () => {
@@ -54,11 +85,25 @@ export function HistoryPage() {
         </button>
         <button
           onClick={async () => {
-            const mode = window.confirm("Remplacer les donnees existantes ? OK = REPLACE, Annuler = MERGE") ? "REPLACE" : "MERGE";
-            const r = await window.cp.data?.importAll({ mode });
+            const replace = window.confirm("Remplacer les donnees existantes ? OK = REPLACE, Annuler = MERGE");
+            let backupPath: string | undefined;
+            if (replace) {
+              const bk = await window.cp.data?.exportAll();
+              if (bk?.ok) backupPath = bk.path;
+            }
+            const r = await window.cp.data?.importAll({ mode: replace ? "REPLACE" : "MERGE" });
             if (r?.ok) {
               setPlans(await window.cp.plans.list());
-              setMsg(`Import global OK (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)`);
+              setMsg(
+                `Import global OK (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
+                  backupPath ? ` • Backup: ${backupPath}` : ""
+                }`
+              );
+              setImportDetail({ counts: r.counts || { songs: 0, plans: 0 }, errors: r.errors || [] });
+            } else if (r?.canceled) {
+              setMsg("Import annule.");
+            } else {
+              setMsg("Import echoue.");
             }
           }}
         >

@@ -205,6 +205,7 @@ export function PlanPage() {
   const [addKind, setAddKind] = useState<string>("ANNOUNCEMENT_TEXT");
   const [addTitle, setAddTitle] = useState<string>("Annonce");
   const [addContent, setAddContent] = useState<string>("");
+  const [addPdfPage, setAddPdfPage] = useState<string>("1");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -497,15 +498,33 @@ export function PlanPage() {
                     Choisir fichier
                   </button>
                 )}
+                {addKind === "ANNOUNCEMENT_PDF" ? (
+                  <label>
+                    <div style={{ fontWeight: 600 }}>Page PDF</div>
+                    <input
+                      type="number"
+                      min={1}
+                      value={addPdfPage}
+                      onChange={(e) => setAddPdfPage(e.target.value)}
+                      style={{ width: "100%", padding: 10 }}
+                    />
+                  </label>
+                ) : null}
 
                 <button
                   onClick={async () => {
+                    const mediaPath =
+                      addKind === "ANNOUNCEMENT_PDF" && addContent
+                        ? `${addContent}#page=${parseInt(addPdfPage || "1", 10) || 1}`
+                        : addKind === "ANNOUNCEMENT_IMAGE"
+                        ? addContent || undefined
+                        : undefined;
                     await window.cp.plans.addItem({
                       planId: plan.id,
                       kind: addKind,
                       title: addTitle.trim() || undefined,
                       content: addContent || undefined,
-                      mediaPath: addKind === "ANNOUNCEMENT_IMAGE" || addKind === "ANNOUNCEMENT_PDF" ? addContent || undefined : undefined,
+                      mediaPath,
                     });
                     setAddContent("");
                     await loadPlan(plan.id);
