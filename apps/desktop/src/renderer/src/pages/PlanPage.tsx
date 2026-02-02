@@ -226,6 +226,12 @@ export function PlanPage() {
   const livePlanId = live?.planId ?? null;
   const liveCursor = live?.cursor ?? -1;
   const [filterSongsOnly, setFilterSongsOnly] = useState(false);
+  const [toast, setToast] = useState<{ kind: "info" | "success" | "error"; text: string } | null>(null);
+
+  function showToast(kind: "info" | "success" | "error", text: string) {
+    setToast({ kind, text });
+    setTimeout(() => setToast(null), 2600);
+  }
 
   async function refreshPlans() {
     const list = await window.cp.plans.list();
@@ -237,10 +243,18 @@ export function PlanPage() {
     setSongResults(list);
   }
 
+  function isSongDuplicate(pl: Plan | null, refId?: string | null, refSubId?: string | null) {
+    if (!pl?.items) return false;
+    return !!pl.items.find((i) => i.kind === "SONG_BLOCK" && i.refId === refId && i.refSubId === refSubId);
+  }
+
   async function addSongAllBlocksToPlan(songId: string) {
     if (!plan) return;
     const s = await window.cp.songs.get(songId);
+    const current = await window.cp.plans.get(plan.id);
+    let added = 0;
     for (const b of s.blocks || []) {
+      if (isSongDuplicate(current as Plan, s.id, b.id)) continue;
       await window.cp.plans.addItem({
         planId: plan.id,
         kind: "SONG_BLOCK",
@@ -249,8 +263,10 @@ export function PlanPage() {
         refId: s.id,
         refSubId: b.id,
       });
+      added += 1;
     }
     await loadPlan(plan.id);
+    showToast(added > 0 ? "success" : "info", added > 0 ? "Chant ajoute au plan" : "Tous les blocs etaient deja presents");
   }
 
   async function fetchBible() {
@@ -381,6 +397,14 @@ export function PlanPage() {
     await loadPlan(plan.id);
   }
 
+  const panelStyle: React.CSSProperties = {
+    background: "var(--panel)",
+    border: "1px solid var(--border)",
+    borderRadius: 16,
+    padding: 14,
+    boxShadow: "var(--shadow)",
+  };
+
   if (!canUse) {
     return (
       <div style={{ fontFamily: "system-ui", padding: 16 }}>
@@ -391,141 +415,133 @@ export function PlanPage() {
   }
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12 }}>
+    <div style={{ fontFamily: "system-ui", padding: 16, display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0 }}>Plan</h1>
-          <div style={{ opacity: 0.7 }}>Projection: {projOpen ? "OUVERTE" : "FERMEE"}</div>
+          <div style={{ opacity: 0.7 }}>Projection: {projOpen ? "ouverte" : "fermee"}</div>
         </div>
 
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={liveEnabled}
-                onChange={(e) => updateLive({ enabled: e.target.checked })}
-              />
-              Live
-            </label>
-            <div style={{ display: "flex", gap: 6 }}>
-              {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-                <button
-                  key={k}
-                  onClick={() => updateLive({ target: k })}
-                  style={{
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    border: target === k ? "2px solid #111" : "1px solid #ddd",
-                    background: target === k ? "#111" : "white",
-                    color: target === k ? "white" : "#111",
-                    fontWeight: 800,
-                  }}
-                >
-                  {k}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-                <label key={k} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={!!live?.lockedScreens?.[k]}
-                    onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
-                  />
-                  Lock {k}
-                </label>
-              ))}
-            </div>
-            <button onClick={() => window.cp.live?.prev()} style={{ padding: "8px 10px" }}>
-              {"< Prev"}
-            </button>
-            <button onClick={() => window.cp.live?.next()} style={{ padding: "8px 10px" }}>
-              {"Next >"}
-            </button>
-            <button onClick={() => window.cp.live?.resume()} style={{ padding: "8px 10px" }}>
-              Reprendre
-            </button>
-            <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <input type="checkbox" checked={filterSongsOnly} onChange={(e) => setFilterSongsOnly(e.target.checked)} />
-              Chants uniquement
-            </label>
-          </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <span
+            className="badge"
+            style={{
+              background: projOpen ? "#e0f2fe" : "#fee2e2",
+              color: projOpen ? "#075985" : "#991b1b",
+            }}
+          >
+            {projOpen ? "Projection ON" : "Projection OFF"}
+          </span>
+          <button
+            onClick={async () => {
+              if (projOpen) {
+                const r = await window.cp.projectionWindow.close();
+                setProjOpen(!!r?.isOpen);
+              } else {
+                const r = await window.cp.projectionWindow.open();
+                setProjOpen(!!r?.isOpen);
+              }
+            }}
+            style={{ background: "var(--primary)", color: "white", border: "none" }}
+          >
+            {projOpen ? "Fermer" : "Ouvrir"}
+          </button>
+          <button onClick={() => window.cp.live?.resume()}>Reprendre live</button>
         </div>
+      </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 12 }}>
+      {toast ? (
+        <div
+          style={{
+            ...panelStyle,
+            padding: 12,
+            background: toast.kind === "error" ? "#fef2f2" : toast.kind === "success" ? "#ecfdf3" : "#eef2ff",
+            borderColor: toast.kind === "error" ? "#fecdd3" : toast.kind === "success" ? "#bbf7d0" : "#cbd5ff",
+          }}
+        >
+          {toast.text}
+        </div>
+      ) : null}
+
+          <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 0 }}>
             {/* LEFT: list + create */}
-            <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
-          <div style={{ display: "grid", gap: 8 }}>
-            <label>
-              <div style={{ fontWeight: 600 }}>Date</div>
-              <input value={newDate} onChange={(e) => setNewDate(e.target.value)} type="date" style={{ width: "100%", padding: 10 }} />
-            </label>
-            <label>
-              <div style={{ fontWeight: 600 }}>Titre</div>
-              <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} style={{ width: "100%", padding: 10 }} />
-            </label>
-            <button
-              onClick={async () => {
-                const created = await window.cp.plans.create({ dateIso: newDate, title: newTitle.trim() || "Culte" });
-                await refreshPlans();
-                await loadPlan(created.id);
-              }}
-              style={{ padding: "10px 14px" }}
-            >
-              + Creer
-            </button>
-          </div>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={panelStyle}>
+                <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <label>
+                    <div style={{ fontWeight: 600 }}>Date</div>
+                    <input value={newDate} onChange={(e) => setNewDate(e.target.value)} type="date" style={{ width: "100%" }} />
+                  </label>
+                  <label>
+                    <div style={{ fontWeight: 600 }}>Titre</div>
+                    <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} style={{ width: "100%" }} />
+                  </label>
+                  <button
+                    onClick={async () => {
+                      const created = await window.cp.plans.create({ dateIso: newDate, title: newTitle.trim() || "Culte" });
+                      await refreshPlans();
+                      await loadPlan(created.id);
+                    }}
+                    style={{ background: "var(--primary)", color: "white", border: "none" }}
+                  >
+                    + Creer
+                  </button>
+                </div>
+              </div>
 
-          <hr style={{ margin: "14px 0" }} />
-
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Plans</div>
-          <div style={{ display: "grid", gap: 8, maxHeight: "70vh", overflow: "auto" }}>
-            {plans.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => loadPlan(p.id)}
-                style={{
-                  textAlign: "left",
-                  padding: 10,
-                  borderRadius: 10,
-                  border: selectedPlanId === p.id ? "2px solid #111" : "1px solid #ddd",
-                  background: "white",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontWeight: 800 }}>{p.title || "Culte"}</div>
-                <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
-                {livePlanId === p.id ? (
-                  <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: "#0a6847" }}>LIVE</div>
-                ) : null}
-              </button>
-            ))}
-          </div>
-        </div>
+              <div style={panelStyle}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <div style={{ fontWeight: 800 }}>Plans</div>
+                  <span style={{ fontSize: 12, opacity: 0.6 }}>{plans.length} plan(s)</span>
+                </div>
+                <div style={{ display: "grid", gap: 8, maxHeight: "70vh", overflow: "auto" }}>
+                  {plans.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => loadPlan(p.id)}
+                      className="panel"
+                      style={{
+                        textAlign: "left",
+                        padding: 12,
+                        borderRadius: 12,
+                        border: selectedPlanId === p.id ? "2px solid var(--primary)" : "1px solid var(--border)",
+                        background: selectedPlanId === p.id ? "#eef2ff" : "white",
+                        boxShadow: "none",
+                      }}
+                    >
+                      <div style={{ fontWeight: 800 }}>{p.title || "Culte"}</div>
+                      <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
+                      {livePlanId === p.id ? (
+                        <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: "#0a6847" }}>LIVE</div>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
 
         {/* RIGHT: plan detail */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
+        <div style={panelStyle}>
           {!plan ? (
             <div style={{ opacity: 0.75 }}>Selectionne un plan a gauche.</div>
           ) : (
             <>
-              <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
                 <div>
                   <div style={{ fontWeight: 900, fontSize: 18 }}>{plan.title || "Culte"}</div>
                   <div style={{ opacity: 0.75 }}>{isoToYmd(plan.date)}</div>
                   {livePlanId === plan.id ? (
-                    <div style={{ marginTop: 4, fontSize: 12, fontWeight: 800, color: "#0a6847" }}>LIVE (cursor {liveCursor + 1})</div>
+                    <div style={{ marginTop: 4, fontSize: 12, fontWeight: 800, color: "#0a6847" }}>LIVE (curseur {liveCursor + 1})</div>
                   ) : null}
                 </div>
 
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <button
                     onClick={async () => {
                       await updateLive({ planId: plan.id, enabled: true, cursor: Math.max(liveCursor, 0) });
                     }}
-                    style={{ padding: "10px 14px" }}
+                    style={{ background: "var(--primary)", color: "white", border: "none" }}
                   >
                     Utiliser en live
                   </button>
@@ -537,14 +553,62 @@ export function PlanPage() {
                       setSelectedPlanId(null);
                       await refreshPlans();
                     }}
-                    style={{ padding: "10px 14px" }}
                   >
-                    Supprimer Plan
+                    Supprimer
                   </button>
                 </div>
               </div>
 
-              <hr style={{ margin: "14px 0" }} />
+              <div className="panel" style={{ ...panelStyle, marginTop: 12, boxShadow: "none", background: "#f8fafc" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={liveEnabled}
+                      onChange={(e) => updateLive({ enabled: e.target.checked })}
+                    />
+                    Live
+                  </label>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => updateLive({ target: k })}
+                        style={{
+                          padding: "6px 10px",
+                          borderRadius: 10,
+                          border: target === k ? "2px solid var(--primary)" : "1px solid var(--border)",
+                          background: target === k ? "#eef2ff" : "#fff",
+                          color: "#0f172a",
+                          fontWeight: 800,
+                        }}
+                      >
+                        Ecran {k}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                    {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+                      <label key={k} style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 13 }}>
+                        <input
+                          type="checkbox"
+                          checked={!!live?.lockedScreens?.[k]}
+                          onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
+                        />
+                        Lock {k}
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => window.cp.live?.prev()}>{'< Prev'}</button>
+                    <button onClick={() => window.cp.live?.next()}>{'Next >'}</button>
+                  </div>
+                  <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <input type="checkbox" checked={filterSongsOnly} onChange={(e) => setFilterSongsOnly(e.target.checked)} />
+                    Chants uniquement
+                  </label>
+                </div>
+              </div>
 
               {/* Add item + chant + bible */}
               <div style={{ display: "grid", gap: 12 }}>
@@ -616,6 +680,7 @@ export function PlanPage() {
                     });
                     setAddContent("");
                     await loadPlan(plan.id);
+                    showToast("success", "Element ajoute au plan");
                   }}
                   style={{ padding: "10px 14px", width: 220 }}
                 >
@@ -624,28 +689,47 @@ export function PlanPage() {
 
                 <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
                   <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un chant (recherche)</div>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                  <div style={{ position: "relative" }}>
                     <input
                       value={songSearch}
                       onChange={(e) => setSongSearch(e.target.value)}
                       placeholder="Titre, artiste..."
-                      style={{ flex: 1, padding: 10 }}
+                      style={{ width: "100%", padding: 10 }}
                     />
-                    <button onClick={searchSongs} style={{ padding: "10px 12px" }}>
-                      Chercher
-                    </button>
-                  </div>
-                  <div style={{ maxHeight: 160, overflow: "auto", display: "grid", gap: 6 }}>
-                    {songResults.map((s) => (
-                      <button
-                        key={s.id}
-                        onClick={() => addSongAllBlocksToPlan(s.id)}
-                        style={{ textAlign: "left", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                    {songResults.length > 0 ? (
+                      <div
+                        style={{
+                          position: "absolute",
+                          top: "110%",
+                          left: 0,
+                          right: 0,
+                          background: "white",
+                          border: "1px solid var(--border)",
+                          borderRadius: 12,
+                          boxShadow: "var(--shadow)",
+                          zIndex: 5,
+                          maxHeight: 200,
+                          overflow: "auto",
+                        }}
                       >
-                        {s.title}
-                      </button>
-                    ))}
-                    {songResults.length === 0 ? <div style={{ opacity: 0.6, fontSize: 12 }}>Tape puis cherche.</div> : null}
+                        {songResults.map((s) => (
+                          <div
+                            key={s.id}
+                            onClick={() => addSongAllBlocksToPlan(s.id)}
+                            style={{
+                              padding: 10,
+                              cursor: "pointer",
+                              borderBottom: "1px solid #f1f5f9",
+                            }}
+                          >
+                            <div style={{ fontWeight: 700 }}>{s.title}</div>
+                            <div style={{ fontSize: 12, opacity: 0.65 }}>Ajouter tous les blocs</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ opacity: 0.6, fontSize: 12, marginTop: 6 }}>Tape pour chercher un chant.</div>
+                    )}
                   </div>
                 </div>
 

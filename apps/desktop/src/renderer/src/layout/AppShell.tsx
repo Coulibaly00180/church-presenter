@@ -13,7 +13,7 @@ function isTypingTarget(el: EventTarget | null) {
 }
 
 export function AppShell() {
-  const location = useLocation();
+  useLocation(); // keep for potential future route-based effects
   const [projOpen, setProjOpen] = useState(false);
 
   const canUse = !!window.cp?.projectionWindow;
@@ -26,7 +26,7 @@ export function AppShell() {
     return () => off?.();
   }, [canUse]);
 
-  // Raccourci global : Ctrl+P => ouvrir/fermer projection
+  // Ctrl+P toggles projection window
   useEffect(() => {
     async function onKeyDown(e: KeyboardEvent) {
       if (!canUse) return;
@@ -49,59 +49,57 @@ export function AppShell() {
 
   const items = useMemo(
     () => [
-      { to: "/regie", label: "Régie (Live)", desc: "Contrôle, raccourcis, noir/blanc, projection" },
-      { to: "/plan", label: "Plan", desc: "Déroulé du culte : items, ordre, drag&drop" },
-      { to: "/bible", label: "Bible", desc: "Rechercher un passage, ajouter au plan, projeter" },
-      { to: "/songs", label: "Chants", desc: "Bibliothèque (CRUD) + recherche" },
-      { to: "/calendar", label: "Calendrier", desc: "Préparer en avance (plans par date)" },
-      { to: "/history", label: "Historique", desc: "Plans passés, duplication ensuite" },
+      { to: "/regie", label: "Regie (Live)", desc: "Controle, raccourcis, noir/blanc, projection" },
+      { to: "/plan", label: "Plan", desc: "Deroule du culte, ordre, drag & drop" },
+      { to: "/bible", label: "Bible", desc: "Recherche, ajout au plan, projection" },
+      { to: "/songs", label: "Chants", desc: "Bibliotheque, recherche, blocs" },
+      { to: "/calendar", label: "Calendrier", desc: "Plans par date, preparation" },
+      { to: "/history", label: "Historique", desc: "Plans passes, duplication" },
     ],
     []
   );
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", height: "100vh" }}>
-      {/* Sidebar */}
-      <aside
-        style={{
-          borderRight: "1px solid #e6e6e6",
-          padding: 16,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          background: "#fafafa",
-        }}
-      >
-        <div>
-          <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: 0.2 }}>Church Presenter</div>
-          <div style={{ opacity: 0.7, fontSize: 12, marginTop: 2 }}>Régie + Projection</div>
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "grid",
+        gridTemplateColumns: "280px 1fr",
+        gap: 18,
+        padding: 18,
+      }}
+    >
+      <aside className="panel" style={{ display: "flex", flexDirection: "column", gap: 14, padding: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 20 }}>Church Presenter</div>
+            <div style={{ opacity: 0.65, fontSize: 12 }}>Regie • Projection</div>
+          </div>
+          <span
+            className="badge"
+            style={{
+              background: projOpen ? "#e0f2fe" : "#fee2e2",
+              color: projOpen ? "#075985" : "#991b1b",
+              fontSize: 11,
+            }}
+          >
+            {projOpen ? "Projection ouverte" : "Projection fermee"}
+          </span>
         </div>
 
         <div
+          className="panel"
           style={{
-            border: "1px solid #e6e6e6",
-            borderRadius: 12,
             padding: 12,
-            background: "white",
-            display: "grid",
-            gap: 8,
+            boxShadow: "none",
+            background: "#f8fafc",
+            borderStyle: "dashed",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ fontWeight: 800 }}>Projection</div>
-            <span
-              style={{
-                fontSize: 12,
-                padding: "4px 8px",
-                borderRadius: 999,
-                border: "1px solid #e6e6e6",
-                background: projOpen ? "#e8fff1" : "#fff5f5",
-              }}
-            >
-              {projOpen ? "OUVERTE" : "FERMÉE"}
-            </span>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ fontWeight: 700 }}>Projection</div>
+            <div style={{ fontSize: 12, color: "#475569" }}>Ctrl+P pour basculer</div>
           </div>
-
           <button
             disabled={!canUse}
             onClick={async () => {
@@ -115,59 +113,46 @@ export function AppShell() {
               }
             }}
             style={{
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid #111",
-              background: "#111",
+              width: "100%",
+              marginTop: 10,
+              background: "var(--primary)",
               color: "white",
-              cursor: "pointer",
-              fontWeight: 700,
+              border: "none",
             }}
           >
-            {projOpen ? "Fermer projection" : "Ouvrir projection"}
+            {projOpen ? "Fermer la projection" : "Ouvrir la projection"}
           </button>
-
-          <div style={{ fontSize: 12, opacity: 0.75, lineHeight: 1.4 }}>
-            <div><b>Ctrl+P</b> : ouvrir/fermer</div>
-            <div><b>B/W/R</b> : noir/blanc/normal (dans Régie/Plan)</div>
-            <div><b>←/→</b> : précédent/suivant (Plan Live)</div>
+          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8, lineHeight: 1.4 }}>
+            B / W / R pour noir / blanc / normal — Fleches pour naviguer en live.
           </div>
         </div>
 
-        <nav style={{ display: "grid", gap: 6 }}>
+        <nav style={{ display: "grid", gap: 10 }}>
           {items.map((it) => (
             <NavLink
               key={it.to}
               to={it.to}
-              className={({ isActive }) =>
-                cls(
-                  "nav",
-                  isActive && "navActive"
-                )
-              }
+              className={({ isActive }) => cls(isActive && "navActive")}
               style={({ isActive }) => ({
                 display: "block",
                 padding: 12,
                 borderRadius: 12,
                 textDecoration: "none",
-                color: "#111",
-                border: "1px solid " + (isActive ? "#111" : "#e6e6e6"),
-                background: isActive ? "white" : "transparent",
+                color: "#0f172a",
+                border: "1px solid " + (isActive ? "var(--primary)" : "var(--border)"),
+                background: isActive ? "#eef2ff" : "#fff",
+                fontWeight: 700,
+                boxShadow: isActive ? "0 8px 20px rgba(37,99,235,0.15)" : "var(--shadow)",
               })}
             >
-              <div style={{ fontWeight: 900 }}>{it.label}</div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>{it.desc}</div>
+              <div style={{ fontSize: 15 }}>{it.label}</div>
+              <div style={{ fontSize: 12, opacity: 0.65 }}>{it.desc}</div>
             </NavLink>
           ))}
         </nav>
-
-        <div style={{ marginTop: "auto", fontSize: 12, opacity: 0.65 }}>
-          {location.pathname === "/plan" ? "Astuce : active “Plan Live” pour NEXT/PREV." : location.pathname === "/bible" ? "Astuce : tape une référence (ex: Jean 3:16-18) puis ajoute au plan." : " "}
-        </div>
       </aside>
 
-      {/* Main */}
-      <main style={{ height: "100vh", overflow: "auto", background: "white" }}>
+      <main style={{ minHeight: "100vh", overflow: "auto" }}>
         <Outlet />
       </main>
     </div>

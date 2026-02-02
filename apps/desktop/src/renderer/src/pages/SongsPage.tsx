@@ -26,7 +26,7 @@ type SongDetail = {
   blocks: SongBlock[];
 };
 
-type PlanWithItems = { id: string; items?: Array<{ id: string; kind: string; refId?: string | null; refSubId?: string | null }> };
+type PlanWithItems = { id: string; date?: string | Date; title?: string | null; items?: Array<{ id: string; kind: string; refId?: string | null; refSubId?: string | null }> };
 
 function splitBlocks(text: string) {
   return text
@@ -75,7 +75,7 @@ export function SongsPage() {
   const [song, setSong] = useState<SongDetail | null>(null);
 
   const [target, setTarget] = useState<ScreenKey>("A");
-  const [plans, setPlans] = useState<Array<{ id: string; title?: string | null; date?: string }>>([]);
+  const [plans, setPlans] = useState<PlanWithItems[]>([]);
   const [planId, setPlanId] = useState<string>("");
 
   // Meta form
@@ -86,6 +86,13 @@ export function SongsPage() {
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [info, setInfo] = useState<{ kind: "info" | "success"; text: string } | null>(null);
+  const panelStyle: React.CSSProperties = {
+    background: "var(--panel)",
+    border: "1px solid var(--border)",
+    borderRadius: 16,
+    padding: 14,
+    boxShadow: "var(--shadow)",
+  };
 
   async function loadPlanItems(id: string): Promise<PlanWithItems | null> {
     try {
@@ -115,6 +122,12 @@ export function SongsPage() {
     setAlbum(s.album ?? "");
   }
 
+  function formatPlanDate(p: PlanWithItems) {
+    if (!p.date) return "";
+    const d = p.date instanceof Date ? p.date : new Date(p.date);
+    return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+  }
+
   useEffect(() => {
     refresh("").catch((e) => setErr(String(e)));
     window.cp.plans
@@ -127,6 +140,12 @@ export function SongsPage() {
   }, []);
 
   const filtered = useMemo(() => list, [list]);
+
+  // Live search (debounced)
+  useEffect(() => {
+    const t = setTimeout(() => refresh(q).catch((e) => setErr(String(e))), 200);
+    return () => clearTimeout(t);
+  }, [q]);
 
   async function onCreate() {
     setErr(null);
@@ -278,9 +297,12 @@ export function SongsPage() {
   }
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-        <h1 style={{ margin: 0, flex: 1 }}>Chants</h1>
+    <div style={{ fontFamily: "system-ui", padding: 16, display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1 }}>
+          <h1 style={{ margin: 0 }}>Chants</h1>
+          <div style={{ opacity: 0.7 }}>Bibliotheque, projection, ajout au plan</div>
+        </div>
 
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           Projeter vers
@@ -296,7 +318,7 @@ export function SongsPage() {
           <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
             {plans.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.title || "Culte"} {p.date ? `(${p.date.slice(0, 10)})` : ""}
+                {p.title || "Culte"} {formatPlanDate(p) ? `(${formatPlanDate(p)})` : ""}
               </option>
             ))}
           </select>
@@ -348,21 +370,42 @@ export function SongsPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 12, alignItems: "start" }}>
         {/* LEFT list */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: 10, borderBottom: "1px solid #eee" }}>
+        <div style={{ ...panelStyle, padding: 0 }}>
+          <div style={{ padding: 14, borderBottom: "1px solid var(--border)" }}>
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Rechercher (titre, artiste, paroles…)"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+              style={{ width: "100%" }}
             />
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <button onClick={() => refresh(q)}>Rechercher</button>
               <button onClick={() => { setQ(""); refresh(""); }}>Reset</button>
             </div>
+            {filtered.length > 0 && q.trim().length > 0 ? (
+              <div style={{ marginTop: 8, border: "1px solid #eee", borderRadius: 8, maxHeight: 200, overflow: "auto", background: "white" }}>
+                {filtered.slice(0, 8).map((s) => (
+                  <div
+                    key={s.id}
+                    onClick={() => loadSong(s.id)}
+                    style={{
+                      padding: 8,
+                      cursor: "pointer",
+                      borderBottom: "1px solid #f2f2f2",
+                      background: s.id === selectedId ? "#eef6ff" : "transparent",
+                    }}
+                  >
+                    <div style={{ fontWeight: 800 }}>{s.title}</div>
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                      {(s.artist || "—")} {s.album ? `• ${s.album}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
 
-          <div style={{ maxHeight: "70vh", overflow: "auto" }}>
+          <div style={{ maxHeight: "70vh", overflow: "auto", padding: 8 }}>
             {filtered.map((s) => (
               <div
                 key={s.id}
@@ -370,8 +413,10 @@ export function SongsPage() {
                 style={{
                   padding: 10,
                   cursor: "pointer",
-                  borderBottom: "1px solid #f1f1f1",
+                  borderRadius: 10,
+                  border: "1px solid " + (s.id === selectedId ? "var(--primary)" : "var(--border)"),
                   background: s.id === selectedId ? "#eef6ff" : "transparent",
+                  marginBottom: 6,
                 }}
               >
                 <div style={{ fontWeight: 900 }}>{s.title}</div>
@@ -387,7 +432,7 @@ export function SongsPage() {
         </div>
 
         {/* RIGHT editor */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}>
+        <div style={panelStyle}>
           {!song ? (
             <div style={{ opacity: 0.7 }}>Sélectionne un chant à gauche ou crée-en un.</div>
           ) : (
