@@ -113,7 +113,22 @@ function SortableRow(props: {
 
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 800 }}>
-          #{item.order} - {item.title || item.kind}
+          #{item.order} - {item.title || item.kind}{" "}
+          {item.kind === "SONG_BLOCK" ? (
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                padding: "2px 6px",
+                borderRadius: 999,
+                background: "#eef2ff",
+                border: "1px solid #cbd5ff",
+                marginLeft: 6,
+              }}
+            >
+              Chant
+            </span>
+          ) : null}
         </div>
         <div style={{ opacity: 0.75, fontSize: 13 }}>
           {item.kind}
@@ -293,9 +308,9 @@ export function PlanPage() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 12 }}>
-        {/* LEFT: list + create */}
-        <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 12 }}>
+            {/* LEFT: list + create */}
+            <div style={{ border: "1px solid #ddd", borderRadius: 10, padding: 12 }}>
           <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
           <div style={{ display: "grid", gap: 8 }}>
             <label>

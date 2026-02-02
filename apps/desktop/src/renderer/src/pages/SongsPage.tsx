@@ -26,6 +26,8 @@ type SongDetail = {
   blocks: SongBlock[];
 };
 
+type PlanWithItems = { id: string; items?: Array<{ id: string; kind: string; refId?: string | null; refSubId?: string | null }> };
+
 function splitBlocks(text: string) {
   return text
     .split(/\n\s*\n/g)
@@ -83,6 +85,20 @@ export function SongsPage() {
 
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  async function loadPlanItems(id: string): Promise<PlanWithItems | null> {
+    try {
+      const p = await window.cp.plans.get(id);
+      return p as PlanWithItems;
+    } catch {
+      return null;
+    }
+  }
+
+  function isDuplicate(plan: PlanWithItems | null, refId: string, refSubId?: string) {
+    if (!plan?.items) return false;
+    return !!plan.items.find((it) => it.kind === "SONG_BLOCK" && it.refId === refId && it.refSubId === refSubId);
+  }
 
   async function refresh(query?: string) {
     const items = await window.cp.songs.list(query ?? "");
@@ -212,6 +228,11 @@ export function SongsPage() {
       setSong(re);
     }
     const b = (song.blocks[i] as SongBlock) || {};
+    const plan = await loadPlanItems(planId);
+    if (isDuplicate(plan, song.id, b.id)) {
+      alert("Ce bloc est deja dans le plan.");
+      return;
+    }
     const payload = {
       planId,
       kind: "SONG_BLOCK",
@@ -229,7 +250,10 @@ export function SongsPage() {
     await onSaveBlocks();
     const fresh = await window.cp.songs.get(song.id);
     setSong(fresh);
+    const plan = await loadPlanItems(planId);
+    let added = 0;
     for (const b of fresh.blocks) {
+      if (isDuplicate(plan, fresh.id, b.id)) continue;
       await window.cp.plans.addItem({
         planId,
         kind: "SONG_BLOCK",
@@ -238,8 +262,9 @@ export function SongsPage() {
         refId: fresh.id,
         refSubId: b.id,
       });
+      added += 1;
     }
-    alert("Chant ajoute au plan.");
+    alert(added > 0 ? "Chant ajoute au plan." : "Tous les blocs etaient deja presents.");
   }
 
   async function projectAllAsFlow() {
