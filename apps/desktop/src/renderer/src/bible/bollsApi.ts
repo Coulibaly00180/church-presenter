@@ -6,6 +6,7 @@ export type BollsVerse = { pk: number; translation: string; book: number; chapte
 export type BollsFindResult = { total: number; exact_matches: number; results: BollsVerse[] };
 
 const booksCache: Record<string, BollsBook[] | undefined> = {};
+let translationsCache: Array<{ language: string; short_name: string; full_name: string; dir?: string }> | null = null;
 
 function stripHtml(html: string): string {
   if (!html) return "";
@@ -134,4 +135,25 @@ export function buildReferenceLabel(book: BollsBook | undefined, chapter: number
 
 export function versesToText(verses: BollsVerse[]): string {
   return verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n");
+}
+
+export async function listTranslations(): Promise<Array<{ language: string; short_name: string; full_name: string; dir?: string }>> {
+  if (translationsCache) return translationsCache;
+  // Try IPC (main process avoids CORS)
+  if (typeof window !== "undefined" && (window as any).cp?.bible?.listTranslations) {
+    const resp = await (window as any).cp.bible.listTranslations();
+    if (resp?.ok && Array.isArray(resp.data)) {
+      const flat = resp.data.flatMap((l: any) => (l.translations || []).map((t: any) => ({ language: l.language, ...t })));
+      translationsCache = flat;
+      return translationsCache;
+    }
+    if (resp?.error) throw new Error(resp.error);
+  }
+
+  // Fallback direct fetch (may fail if CORS)
+  const r = await fetch("https://bolls.life/static/bolls/app/views/languages.json");
+  if (!r.ok) throw new Error("Impossible de charger les traductions");
+  const json = (await r.json()) as Array<{ language: string; translations: Array<{ short_name: string; full_name: string; dir?: string }> }>;
+  translationsCache = json.flatMap((l) => l.translations.map((t) => ({ language: l.language, ...t })));
+  return translationsCache;
 }

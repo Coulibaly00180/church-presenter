@@ -108,6 +108,10 @@ contextBridge.exposeInMainWorld("cp", {
     importAll: (payload: { mode: "MERGE" | "REPLACE" }) => ipcRenderer.invoke("data:importAll", payload),
   },
 
+  bible: {
+    listTranslations: () => ipcRenderer.invoke("bible:listTranslations"),
+  },
+
 
   // -----------------------
   // Live sync between pages (Regie <-> Plan)

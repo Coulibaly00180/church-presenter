@@ -4,7 +4,7 @@ import fs from "fs";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
-import { registerDataIpc } from "./ipc/data";
+import { registerBibleIpc } from "./ipc/bible";
 
 type ProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 type ScreenKey = "A" | "B" | "C";
@@ -237,6 +237,12 @@ app.whenReady().then(() => {
     registerDataIpc();
   } catch (e) {
     console.error("registerDataIpc failed", e);
+  }
+
+  try {
+    registerBibleIpc();
+  } catch (e) {
+    console.error("registerBibleIpc failed", e);
   }
 
   try {

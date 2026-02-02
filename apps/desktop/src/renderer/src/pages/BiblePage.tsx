@@ -10,6 +10,7 @@ import {
   maxChapter,
   searchVerses,
   versesToText,
+  listTranslations,
 } from "../bible/bollsApi";
 
 type ScreenKey = "A" | "B" | "C";
@@ -22,16 +23,6 @@ type PlanItemPayload = {
   refId?: string | null;
   refSubId?: string | null;
 };
-
-const presetTranslations = [
-  { code: "LSG", label: "LSG (FR)" },
-  { code: "BDS", label: "BDS (FR)" },
-  { code: "S21", label: "Segond 21 (FR)" },
-  { code: "NEG79", label: "NEG 1979 (FR)" },
-  { code: "KJV", label: "KJV (EN)" },
-  { code: "ESV", label: "ESV (EN)" },
-  { code: "WEB", label: "WEB (EN)" },
-];
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, "").trim();
@@ -67,9 +58,12 @@ async function projectText(target: ScreenKey, title: string | undefined, body: s
 }
 
 export function BiblePage() {
-  const [translation, setTranslation] = useState<string>("LSG");
-  const [customTranslation, setCustomTranslation] = useState<string>("");
-  const activeTranslation = customTranslation.trim() || translation;
+  const [translation, setTranslation] = useState<string>(""); // set after API load
+  const activeTranslation = translation;
+  const [availableTranslations, setAvailableTranslations] = useState<
+    Array<{ code: string; label: string; language: string; dir?: string }>
+  >([]);
+  const [translationFilter, setTranslationFilter] = useState("");
 
   const [books, setBooks] = useState<BollsBook[]>([]);
   const [bookId, setBookId] = useState<number | null>(null);
@@ -102,6 +96,24 @@ export function BiblePage() {
 
   const currentBook = useMemo(() => books.find((b) => b.bookid === bookId), [books, bookId]);
 
+  // Load translations once
+  useEffect(() => {
+    listTranslations()
+      .then((ts) => {
+        const mapped = ts.map((t) => ({
+          code: t.short_name,
+          label: `${t.full_name} (${t.short_name})`,
+          language: t.language,
+          dir: t.dir,
+        }));
+        setAvailableTranslations(mapped);
+        if (mapped[0]) setTranslation(mapped[0].code);
+      })
+      .catch((e) => {
+        setErr(e?.message || String(e));
+      });
+  }, []);
+
   // Load plans on mount
   useEffect(() => {
     window.cp.plans
@@ -115,6 +127,7 @@ export function BiblePage() {
 
   // Load books when translation changes
   useEffect(() => {
+    if (!activeTranslation) return;
     (async () => {
       setErr(null);
       setInfo(null);
@@ -308,20 +321,14 @@ export function BiblePage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             Traduction
-            <select value={translation} onChange={(e) => setTranslation(e.target.value)}>
-              {presetTranslations.map((t) => (
+            <select value={translation} onChange={(e) => setTranslation(e.target.value)} style={{ minWidth: 260 }}>
+              {availableTranslations.map((t) => (
                 <option key={t.code} value={t.code}>
-                  {t.label}
+                  {t.label} — {t.language}
                 </option>
               ))}
             </select>
           </label>
-          <input
-            value={customTranslation}
-            onChange={(e) => setCustomTranslation(e.target.value)}
-            placeholder="Code custom (ex: LSG1910) – vide pour utiliser la liste"
-            style={{ minWidth: 200 }}
-          />
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             Plan
             <select value={planId} onChange={(e) => setPlanId(e.target.value)}>

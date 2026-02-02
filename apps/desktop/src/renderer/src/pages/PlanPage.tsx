@@ -221,7 +221,7 @@ export function PlanPage() {
   const [songSearch, setSongSearch] = useState("");
   const [songResults, setSongResults] = useState<Array<{ id: string; title: string }>>([]);
   const [bibleRef, setBibleRef] = useState("Jean 3:16-18");
-  const [bibleTranslation, setBibleTranslation] = useState<"LSG1910" | "LSG" | "WEB">("LSG");
+  const [bibleTranslation, setBibleTranslation] = useState<"LSG1910" | "LSG" | "WEB" | "FRLSG">("FRLSG");
   const [bibleLoading, setBibleLoading] = useState(false);
   const [bibleError, setBibleError] = useState<string | null>(null);
   const [bibleVerses, setBibleVerses] = useState<Array<{ chapter: number; verse: number; text: string }>>([]);
@@ -318,7 +318,7 @@ export function PlanPage() {
     bibleSearchTimer.current = setTimeout(async () => {
       setBibleSearchLoading(true);
       try {
-        const trans = bibleTranslation === "LSG1910" ? "LSG" : bibleTranslation;
+        const trans = bibleTranslation === "LSG1910" ? "FRLSG" : bibleTranslation;
         // ensure books cached for name display
         if (!bibleBooks.current[trans]) {
           bibleBooks.current[trans] = await getBooks(trans);
