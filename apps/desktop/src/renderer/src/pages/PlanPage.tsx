@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { lookupLSG1910 } from "../bible/lookupLSG1910";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -206,6 +207,14 @@ export function PlanPage() {
   const [addTitle, setAddTitle] = useState<string>("Annonce");
   const [addContent, setAddContent] = useState<string>("");
   const [addPdfPage, setAddPdfPage] = useState<string>("1");
+  const [songSearch, setSongSearch] = useState("");
+  const [songResults, setSongResults] = useState<Array<{ id: string; title: string }>>([]);
+  const [bibleRef, setBibleRef] = useState("Jean 3:16-18");
+  const [bibleTranslation, setBibleTranslation] = useState<"LSG1910" | "WEB">("LSG1910");
+  const [bibleLoading, setBibleLoading] = useState(false);
+  const [bibleError, setBibleError] = useState<string | null>(null);
+  const [bibleVerses, setBibleVerses] = useState<Array<{ chapter: number; verse: number; text: string }>>([]);
+  const [bibleReference, setBibleReference] = useState<string>(""); 
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -221,6 +230,85 @@ export function PlanPage() {
   async function refreshPlans() {
     const list = await window.cp.plans.list();
     setPlans(list);
+  }
+
+  async function searchSongs() {
+    const list = await window.cp.songs.list(songSearch.trim());
+    setSongResults(list);
+  }
+
+  async function addSongAllBlocksToPlan(songId: string) {
+    if (!plan) return;
+    const s = await window.cp.songs.get(songId);
+    for (const b of s.blocks || []) {
+      await window.cp.plans.addItem({
+        planId: plan.id,
+        kind: "SONG_BLOCK",
+        title: `${s.title} - ${b.title || b.type}`,
+        content: b.content || "",
+        refId: s.id,
+        refSubId: b.id,
+      });
+    }
+    await loadPlan(plan.id);
+  }
+
+  async function fetchBible() {
+    setBibleLoading(true);
+    setBibleError(null);
+    setBibleVerses([]);
+    try {
+      if (bibleTranslation === "LSG1910") {
+        const r = lookupLSG1910(bibleRef.trim());
+        if (!r) throw new Error("Reference non trouvee (offline mini)");
+        setBibleReference(r.reference);
+        setBibleVerses(r.verses.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
+      } else {
+        const q = encodeURIComponent(bibleRef.trim());
+        const url = `https://bible-api.com/${q}?translation=web`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const json: any = await resp.json();
+        if (!json.verses?.length) throw new Error("Aucun resultat");
+        setBibleReference(json.reference || bibleRef.trim());
+        setBibleVerses(json.verses.map((v: any) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
+      }
+    } catch (e: any) {
+      setBibleError(e?.message || String(e));
+    } finally {
+      setBibleLoading(false);
+    }
+  }
+
+  async function addBibleToPlan(mode: "PASSAGE" | "VERSES") {
+    if (!plan || bibleVerses.length === 0) return;
+    const ref = bibleReference || bibleRef.trim();
+    const label = bibleTranslation === "LSG1910" ? "LSG1910" : "WEB";
+    if (mode === "PASSAGE") {
+      const body = bibleVerses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n");
+      await window.cp.plans.addItem({
+        planId: plan.id,
+        kind: "BIBLE_PASSAGE",
+        title: `${ref} (${label})`,
+        content: body,
+        refId: ref,
+        refSubId: label,
+      });
+    } else {
+      for (const v of bibleVerses) {
+        const verseRef = `${ref.split(":")[0]}:${v.verse}`;
+        const body = `${v.chapter}:${v.verse}  ${v.text.trim()}`;
+        await window.cp.plans.addItem({
+          planId: plan.id,
+          kind: "BIBLE_VERSE",
+          title: `${verseRef} (${label})`,
+          content: body,
+          refId: ref,
+          refSubId: `${v.chapter}:${v.verse}`,
+        });
+      }
+    }
+    await loadPlan(plan.id);
   }
 
   async function loadPlan(id: string) {
@@ -458,8 +546,8 @@ export function PlanPage() {
 
               <hr style={{ margin: "14px 0" }} />
 
-              {/* Add item */}
-              <div style={{ display: "grid", gap: 8 }}>
+              {/* Add item + chant + bible */}
+              <div style={{ display: "grid", gap: 12 }}>
                 <div style={{ fontWeight: 800 }}>Ajouter un element</div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
@@ -533,6 +621,66 @@ export function PlanPage() {
                 >
                   + Ajouter
                 </button>
+
+                <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un chant (recherche)</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    <input
+                      value={songSearch}
+                      onChange={(e) => setSongSearch(e.target.value)}
+                      placeholder="Titre, artiste..."
+                      style={{ flex: 1, padding: 10 }}
+                    />
+                    <button onClick={searchSongs} style={{ padding: "10px 12px" }}>
+                      Chercher
+                    </button>
+                  </div>
+                  <div style={{ maxHeight: 160, overflow: "auto", display: "grid", gap: 6 }}>
+                    {songResults.map((s) => (
+                      <button
+                        key={s.id}
+                        onClick={() => addSongAllBlocksToPlan(s.id)}
+                        style={{ textAlign: "left", padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
+                      >
+                        {s.title}
+                      </button>
+                    ))}
+                    {songResults.length === 0 ? <div style={{ opacity: 0.6, fontSize: 12 }}>Tape puis cherche.</div> : null}
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
+                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un verset/passage</div>
+                  <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+                    <input
+                      value={bibleRef}
+                      onChange={(e) => setBibleRef(e.target.value)}
+                      placeholder="Ex: Jean 3:16-18"
+                      style={{ flex: 1, padding: 10 }}
+                    />
+                    <select value={bibleTranslation} onChange={(e) => setBibleTranslation(e.target.value as any)} style={{ padding: 10 }}>
+                      <option value="LSG1910">LSG1910</option>
+                      <option value="WEB">WEB</option>
+                    </select>
+                    <button onClick={fetchBible} disabled={bibleLoading} style={{ padding: "10px 12px" }}>
+                      {bibleLoading ? "..." : "Chercher"}
+                    </button>
+                  </div>
+                  {bibleError ? <div style={{ color: "crimson", fontSize: 13 }}>{bibleError}</div> : null}
+                  {bibleVerses.length > 0 ? (
+                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
+                      {bibleReference || bibleRef}: {bibleVerses.length} versets
+                    </div>
+                  ) : null}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => addBibleToPlan("PASSAGE")} disabled={bibleVerses.length === 0}>
+                      Ajouter passage
+                    </button>
+                    <button onClick={() => addBibleToPlan("VERSES")} disabled={bibleVerses.length === 0}>
+                      Verset par verset
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <hr style={{ margin: "14px 0" }} />
