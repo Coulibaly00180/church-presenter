@@ -234,6 +234,12 @@ export function PlanPage() {
   const bibleTimer = useRef<NodeJS.Timeout | null>(null);
   const songTimer = useRef<NodeJS.Timeout | null>(null);
 
+  function getBookNameFromCache(bookId: number): string {
+    const books = bibleBooks.current[bibleTranslation];
+    const found = books?.find((b: any) => b.bookid === bookId);
+    return found?.name || `Livre ${bookId}`;
+  }
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const [live, setLive] = useState<LiveState | null>(null);
@@ -312,7 +318,12 @@ export function PlanPage() {
     bibleSearchTimer.current = setTimeout(async () => {
       setBibleSearchLoading(true);
       try {
-        const res = await searchVerses(bibleTranslation === "LSG1910" ? "LSG" : bibleTranslation, bibleSearchText.trim(), { limit: 20 });
+        const trans = bibleTranslation === "LSG1910" ? "LSG" : bibleTranslation;
+        // ensure books cached for name display
+        if (!bibleBooks.current[trans]) {
+          bibleBooks.current[trans] = await getBooks(trans);
+        }
+        const res = await searchVerses(trans, bibleSearchText.trim(), { limit: 20 });
         setBibleSearchResults(res.results.map((r) => ({ book: r.book, chapter: r.chapter, verse: r.verse, text: r.text })));
       } catch (e: any) {
         setBibleError(e?.message || String(e));
@@ -832,35 +843,60 @@ export function PlanPage() {
                     />
                     {bibleSearchLoading ? <div style={{ opacity: 0.7, fontSize: 12 }}>Recherche…</div> : null}
                     <div style={{ maxHeight: 160, overflow: "auto", display: "grid", gap: 6, marginTop: 6 }}>
-                      {bibleSearchResults.map((r, idx) => (
-                        <button
-                          key={`${r.book}-${r.chapter}-${r.verse}-${idx}`}
-                          onClick={async () => {
-                            if (!plan) return;
-                            const refLbl = `Livre ${r.book} ${r.chapter}:${r.verse} (${bibleTranslation})`;
-                            await window.cp.plans.addItem({
-                              planId: plan.id,
-                              kind: "BIBLE_VERSE",
-                              title: refLbl,
-                              content: `${r.chapter}:${r.verse}  ${r.text}`,
-                              refId: refLbl,
-                              refSubId: `${r.chapter}:${r.verse}`,
-                            });
-                            showToast("success", "Verset ajoute au plan");
-                          }}
-                          style={{
-                            textAlign: "left",
-                            padding: 10,
-                            borderRadius: 10,
-                            border: "1px solid var(--border)",
-                          }}
-                        >
-                          <b>
-                            {r.chapter}:{r.verse}
-                          </b>{" "}
-                          <span style={{ opacity: 0.75, fontSize: 12 }}>{r.text}</span>
-                        </button>
-                      ))}
+                      {bibleSearchResults.map((r, idx) => {
+                        const bookName = getBookNameFromCache(r.book);
+                        const refLbl = `${bookName} ${r.chapter}:${r.verse} (${bibleTranslation})`;
+                        return (
+                          <div
+                            key={`${r.book}-${r.chapter}-${r.verse}-${idx}`}
+                            style={{
+                              border: "1px solid var(--border)",
+                              borderRadius: 10,
+                              padding: 10,
+                              display: "grid",
+                              gap: 6,
+                              background: "#fff",
+                            }}
+                          >
+                            <div style={{ fontWeight: 700 }}>{refLbl}</div>
+                            <div style={{ fontSize: 12, opacity: 0.75 }}>{r.text}</div>
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <button
+                                onClick={async () => {
+                                  if (!plan) return;
+                                  await window.cp.plans.addItem({
+                                    planId: plan.id,
+                                    kind: "BIBLE_VERSE",
+                                    title: refLbl,
+                                    content: `${r.chapter}:${r.verse}  ${r.text}`,
+                                    refId: refLbl,
+                                    refSubId: `${r.chapter}:${r.verse}`,
+                                  });
+                                  showToast("success", "Verset ajoute au plan");
+                                }}
+                              >
+                                + Verset
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  if (!plan) return;
+                                  await window.cp.plans.addItem({
+                                    planId: plan.id,
+                                    kind: "BIBLE_PASSAGE",
+                                    title: refLbl,
+                                    content: `${r.chapter}:${r.verse}  ${r.text}`,
+                                    refId: refLbl,
+                                    refSubId: `${r.chapter}:${r.verse}`,
+                                  });
+                                  showToast("success", "Passage ajoute au plan");
+                                }}
+                              >
+                                Passage
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                       {bibleSearchText && !bibleSearchResults.length && !bibleSearchLoading ? (
                         <div style={{ opacity: 0.6, fontSize: 12 }}>Aucun resultat</div>
                       ) : null}
