@@ -52,6 +52,7 @@ export function BiblePage() {
   const [resp, setResp] = useState<BibleApiResp | null>(null);
 
   const [plans, setPlans] = useState<any[]>([]);
+  const [addMode, setAddMode] = useState<"PASSAGE" | "VERSES">("VERSES");
   const [planId, setPlanId] = useState<string>("");
   const [target, setTarget] = useState<ScreenKey>("A");
 
@@ -104,10 +105,74 @@ export function BiblePage() {
   }
 
   async function addToPlan() {
-    if (!planId) {
-      setErr("Choisis d’abord un plan.");
+  if (!planId) {
+    setErr("Choisis d’abord un plan.");
+    return;
+  }
+  if (!resp) {
+    setErr("Fais d’abord une recherche.");
+    return;
+  }
+
+  const reference = resp.reference || ref.trim();
+  const tLabel = translation === "LSG1910" ? "LSG1910" : (resp.translation_id || "WEB");
+
+  const api: any = window.cp.plans as any;
+
+  // Helper: add a single item (supports addItem or setItems fallback)
+  async function addOne(item: any) {
+    if (api.addItem) {
+      await api.addItem({ planId, item });
       return;
     }
+    const p = await api.get(planId);
+    const items = Array.isArray(p?.items) ? p.items.slice() : [];
+    items.push(item);
+    await api.setItems({ id: planId, items });
+  }
+
+  if (addMode === "PASSAGE") {
+    // Cache : on stocke le texte complet dans l’item
+    const body = resp.verses?.length
+      ? resp.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n")
+      : (resp.text || "").trim();
+
+    const item = {
+      kind: "BIBLE_PASSAGE",
+      reference,
+      translation: tLabel,
+      title: `${reference} (${tLabel})`,
+      body,
+      verses: resp.verses || [],
+      createdAt: new Date().toISOString(),
+    };
+
+    await addOne(item);
+    return;
+  }
+
+  // VERSES: on éclate en items (navigation live = plus fluide)
+  const verses = resp.verses || [];
+  if (!verses.length) {
+    setErr("Ce passage ne contient pas de versets structurés (utilise 'Passage (1 item)').");
+    return;
+  }
+
+  for (const v of verses) {
+    const verseRef = `${reference.split(":")[0]}:${v.verse}`;
+    const body = `${v.chapter}:${v.verse}  ${String(v.text || "").trim()}`;
+    const item = {
+      kind: "BIBLE_VERSE",
+      reference: verseRef,
+      translation: tLabel,
+      title: `${verseRef} (${tLabel})`,
+      body,
+      verses: [v],
+      createdAt: new Date().toISOString(),
+    };
+    await addOne(item);
+  }
+}
     if (!resp) {
       setErr("Fais d’abord une recherche.");
       return;
@@ -260,7 +325,7 @@ export function BiblePage() {
 
             {translation === "LSG1910" ? (
               <div style={{ fontSize: 12, opacity: 0.7 }}>
-                Offline: dataset <b>mini</b> pour test. Prochaine étape: importer le dataset complet LSG1910.
+                Offline: dataset <b>mini</b> pour test. Astuce: “Verset par verset” = navigation live super fluide. Prochaine étape: importer le dataset complet LSG1910.
               </div>
             ) : (
               <div style={{ fontSize: 12, opacity: 0.7 }}>

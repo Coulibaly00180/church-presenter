@@ -29,3 +29,8 @@ Ensuite, on remplacera par un dataset complet (JSON) :
 - importer dataset LSG1910 complet
 - ajouter la recherche “Livre + chapitre + versets” (autocomplete)
 - provider “licensed” (YouVersion / API.Bible) pour BDS/PDV si on obtient l’accord
+
+## Mode d’ajout: Verset par verset
+- Option MVP: ajouter un passage sous forme de **plusieurs items** (1 verset = 1 item).
+- Avantage: la navigation live (PREV/NEXT) devient naturelle, sans sous-curseur.
+- On garde aussi le mode “Passage (1 item)” pour projeter d’un bloc.
