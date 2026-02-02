@@ -34,6 +34,31 @@ declare global {
         onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => () => void;
       };
 
+      live?: {
+        get: () => Promise<{
+          enabled: boolean;
+          planId: string | null;
+          cursor: number;
+          target: ScreenKey;
+          black: boolean;
+          white: boolean;
+          lockedScreens: Record<ScreenKey, boolean>;
+          updatedAt: number;
+        }>;
+        set: (payload: { planId?: string | null; cursor?: number | null; enabled?: boolean; target?: ScreenKey; black?: boolean; white?: boolean }) => Promise<any>;
+        next: () => Promise<any>;
+        prev: () => Promise<any>;
+        setCursor: (cursor: number) => Promise<any>;
+        setTarget: (target: ScreenKey) => Promise<any>;
+        toggle: () => Promise<any>;
+        toggleBlack: () => Promise<any>;
+        toggleWhite: () => Promise<any>;
+        resume: () => Promise<any>;
+        setLocked: (key: ScreenKey, locked: boolean) => Promise<any>;
+        onUpdate: (cb: (state: any) => void) => () => void;
+      };
+
+
       devtools?: {
         open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => Promise<any>;
       };

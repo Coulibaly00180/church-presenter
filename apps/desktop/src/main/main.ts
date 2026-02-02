@@ -260,11 +260,6 @@ ipcMain.handle("projectionWindow:isOpen", () => {
   return { isOpen: !!projWins.A };
 });
 
-ipcMain.handle("live:set", async (_evt, payload: { planId?: string | null; cursor?: number; enabled?: boolean; target?: "A" | "B" | "C" }) => {
-  regieWin?.webContents.send("live:update", payload);
-  return { ok: true };
-});
-
 // Devtools opening
 ipcMain.handle("devtools:open", (_evt, target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => {
   if (target === "REGIE") regieWin?.webContents.openDevTools({ mode: "detach" });
@@ -354,6 +349,127 @@ ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title
 ipcMain.handle("screens:setMode", (_evt, key: ScreenKey, mode: ProjectionMode) => {
   // If screen is mirroring, ignore
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
+
+// --------------------
+// LiveState (central) - sync Regie / Plan / Projection targets
+// --------------------
+type LiveState = {
+  enabled: boolean;
+  planId: string | null;
+  cursor: number;
+  target: ScreenKey;
+  black: boolean;
+  white: boolean;
+  lockedScreens: Record<ScreenKey, boolean>;
+  updatedAt: number;
+};
+
+let liveState: LiveState = {
+  enabled: false,
+  planId: null,
+  cursor: 0,
+  target: "A",
+  black: false,
+  white: false,
+  lockedScreens: { A: false, B: false, C: false },
+  updatedAt: Date.now(),
+};
+
+function getAllWindowsForBroadcast(): BrowserWindow[] {
+  const wins: BrowserWindow[] = [];
+  if (regieWin) wins.push(regieWin);
+  (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
+    const w = projWins[k];
+    if (w) wins.push(w);
+  });
+  return wins;
+}
+
+function broadcastLive() {
+  const payload = { ...liveState };
+  getAllWindowsForBroadcast().forEach((w) => {
+    try {
+      w.webContents.send("live:update", payload);
+    } catch {
+      // ignore
+    }
+  });
+}
+
+function applyLiveProjectionMode() {
+  const mode: ProjectionMode = liveState.black ? "BLACK" : liveState.white ? "WHITE" : "NORMAL";
+  const key = liveState.target;
+
+  // If locked -> do not touch that projection mode
+  if (liveState.lockedScreens[key]) return;
+
+  // If screen is mirroring, ignore direct set (safety)
+  if (mirrors[key]?.kind === "MIRROR") return;
+
+  screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
+  sendScreenState(key);
+}
+
+function mergeLive(patch: Partial<LiveState>) {
+  // mutual exclusion
+  const next: LiveState = { ...liveState, ...patch, updatedAt: Date.now() };
+
+  if (patch.black === true) next.white = false;
+  if (patch.white === true) next.black = false;
+
+  if (next.cursor < 0) next.cursor = 0;
+  if (!next.target) next.target = "A";
+
+  liveState = next;
+
+  // apply to target projection mode
+  applyLiveProjectionMode();
+
+  broadcastLive();
+  return liveState;
+}
+
+ipcMain.handle("live:get", () => ({ ...liveState }));
+
+ipcMain.handle(
+  "live:set",
+  async (
+    _evt,
+    payload: { planId?: string | null; cursor?: number | null; enabled?: boolean; target?: ScreenKey; black?: boolean; white?: boolean }
+  ) => {
+    const patch: Partial<LiveState> = {};
+    if ("planId" in payload) patch.planId = payload.planId ?? null;
+    if ("cursor" in payload && typeof payload.cursor === "number") patch.cursor = payload.cursor;
+    if ("enabled" in payload && typeof payload.enabled === "boolean") patch.enabled = payload.enabled;
+    if ("target" in payload && payload.target) patch.target = payload.target;
+    if ("black" in payload && typeof payload.black === "boolean") patch.black = payload.black;
+    if ("white" in payload && typeof payload.white === "boolean") patch.white = payload.white;
+    return mergeLive(patch);
+  }
+);
+
+ipcMain.handle("live:toggle", () => mergeLive({ enabled: !liveState.enabled }));
+
+ipcMain.handle("live:next", () => mergeLive({ cursor: (liveState.cursor ?? 0) + 1, enabled: true }));
+
+ipcMain.handle("live:prev", () => mergeLive({ cursor: Math.max((liveState.cursor ?? 0) - 1, 0), enabled: true }));
+
+ipcMain.handle("live:setCursor", (_evt, cursor: number) => mergeLive({ cursor, enabled: true }));
+
+ipcMain.handle("live:setTarget", (_evt, target: ScreenKey) => mergeLive({ target }));
+
+ipcMain.handle("live:toggleBlack", () => mergeLive({ black: !liveState.black, enabled: true }));
+
+ipcMain.handle("live:toggleWhite", () => mergeLive({ white: !liveState.white, enabled: true }));
+
+ipcMain.handle("live:resume", () => mergeLive({ black: false, white: false, enabled: true }));
+
+ipcMain.handle("live:setLocked", (_evt, payload: { key: ScreenKey; locked: boolean }) => {
+  const next = { ...liveState.lockedScreens, [payload.key]: payload.locked };
+  return mergeLive({ lockedScreens: next });
+});
+
+
 
   screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
   sendScreenState(key);

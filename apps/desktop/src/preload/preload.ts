@@ -64,19 +64,29 @@ contextBridge.exposeInMainWorld("cp", {
     },
   },
 
+
   // -----------------------
   // Live sync between pages (Regie <-> Plan)
   // -----------------------
   live: {
-    set: (payload: { planId?: string | null; cursor?: number; enabled?: boolean; target?: ScreenKey }) =>
+    get: () => ipcRenderer.invoke("live:get"),
+    set: (payload: { planId?: string | null; cursor?: number | null; enabled?: boolean; target?: ScreenKey; black?: boolean; white?: boolean }) =>
       ipcRenderer.invoke("live:set", payload),
-    onUpdate: (cb: (payload: { planId?: string | null; cursor?: number; enabled?: boolean; target?: ScreenKey }) => void) => {
+    next: () => ipcRenderer.invoke("live:next"),
+    prev: () => ipcRenderer.invoke("live:prev"),
+    setCursor: (cursor: number) => ipcRenderer.invoke("live:setCursor", cursor),
+    setTarget: (target: ScreenKey) => ipcRenderer.invoke("live:setTarget", target),
+    toggle: () => ipcRenderer.invoke("live:toggle"),
+    toggleBlack: () => ipcRenderer.invoke("live:toggleBlack"),
+    toggleWhite: () => ipcRenderer.invoke("live:toggleWhite"),
+    resume: () => ipcRenderer.invoke("live:resume"),
+    setLocked: (key: ScreenKey, locked: boolean) => ipcRenderer.invoke("live:setLocked", { key, locked }),
+    onUpdate: (cb: (state: any) => void) => {
       const handler = (_: any, payload: any) => cb(payload);
       ipcRenderer.on("live:update", handler);
       return () => ipcRenderer.removeListener("live:update", handler);
     },
   },
-
 
   devtools: {
     open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") =>
