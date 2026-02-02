@@ -24,11 +24,47 @@ function norm(x: string) {
 }
 
 export async function getBooks(translation: string): Promise<BollsBook[]> {
+  // In-memory cache
   if (booksCache[translation]) return booksCache[translation]!;
+
+  // Try localStorage cache for offline/boot
+  try {
+    const key = `bolls_books_${translation}`;
+    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(key) : null;
+    if (raw) {
+      const parsed = JSON.parse(raw) as BollsBook[];
+      booksCache[translation] = parsed;
+      // do not return yet: attempt background refresh to keep up to date
+      void refreshBooks(translation, key);
+      return parsed;
+    }
+  } catch {
+    // ignore cache errors
+  }
+
+  const books = await fetchBooks(translation);
+  return books;
+}
+
+async function refreshBooks(translation: string, key: string) {
+  try {
+    const fresh = await fetchBooks(translation);
+    if (typeof localStorage !== "undefined") localStorage.setItem(key, JSON.stringify(fresh));
+  } catch {
+    // silent refresh failure
+  }
+}
+
+async function fetchBooks(translation: string): Promise<BollsBook[]> {
   const r = await fetch(`https://bolls.life/get-books/${translation}/`);
   if (!r.ok) throw new Error(`Traduction inconnue ou indispo (${translation})`);
-  const json = await r.json();
+  const json = (await r.json()) as BollsBook[];
   booksCache[translation] = json;
+  try {
+    if (typeof localStorage !== "undefined") localStorage.setItem(`bolls_books_${translation}`, JSON.stringify(json));
+  } catch {
+    // ignore storage issues
+  }
   return json;
 }
 

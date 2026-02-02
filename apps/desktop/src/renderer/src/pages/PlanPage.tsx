@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { lookupLSG1910 } from "../bible/lookupLSG1910";
-import { findBookIdByName, getBooks, getChapter, maxChapter, buildReferenceLabel } from "../bible/bollsApi";
+import { findBookIdByName, getBooks, getChapter, maxChapter, buildReferenceLabel, searchVerses } from "../bible/bollsApi";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -227,6 +227,12 @@ export function PlanPage() {
   const [bibleVerses, setBibleVerses] = useState<Array<{ chapter: number; verse: number; text: string }>>([]);
   const [bibleReference, setBibleReference] = useState<string>(""); 
   const bibleBooks = useRef<Record<string, any[]>>({});
+  const [bibleSearchText, setBibleSearchText] = useState("");
+  const [bibleSearchResults, setBibleSearchResults] = useState<Array<{ book: number; chapter: number; verse: number; text: string }>>([]);
+  const [bibleSearchLoading, setBibleSearchLoading] = useState(false);
+  const bibleSearchTimer = useRef<NodeJS.Timeout | null>(null);
+  const bibleTimer = useRef<NodeJS.Timeout | null>(null);
+  const songTimer = useRef<NodeJS.Timeout | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -280,6 +286,45 @@ export function PlanPage() {
     await loadPlan(plan.id);
     showToast(added > 0 ? "success" : "info", added > 0 ? "Chant ajoute au plan" : "Tous les blocs etaient deja presents");
   }
+
+  // Debounced song search
+  useEffect(() => {
+    if (songTimer.current) clearTimeout(songTimer.current);
+    songTimer.current = setTimeout(() => {
+      if (songSearch.trim().length === 0) {
+        setSongResults([]);
+        return;
+      }
+      searchSongs();
+    }, 250);
+    return () => {
+      if (songTimer.current) clearTimeout(songTimer.current);
+    };
+  }, [songSearch]);
+
+  // Debounced bible text search (bolls find)
+  useEffect(() => {
+    if (bibleSearchTimer.current) clearTimeout(bibleSearchTimer.current);
+    if (!bibleSearchText.trim()) {
+      setBibleSearchResults([]);
+      return;
+    }
+    bibleSearchTimer.current = setTimeout(async () => {
+      setBibleSearchLoading(true);
+      try {
+        const res = await searchVerses(bibleTranslation === "LSG1910" ? "LSG" : bibleTranslation, bibleSearchText.trim(), { limit: 20 });
+        setBibleSearchResults(res.results.map((r) => ({ book: r.book, chapter: r.chapter, verse: r.verse, text: r.text })));
+      } catch (e: any) {
+        setBibleError(e?.message || String(e));
+        setBibleSearchResults([]);
+      } finally {
+        setBibleSearchLoading(false);
+      }
+    }, 350);
+    return () => {
+      if (bibleSearchTimer.current) clearTimeout(bibleSearchTimer.current);
+    };
+  }, [bibleSearchText, bibleTranslation]);
 
   async function fetchBible() {
     setBibleLoading(true);
@@ -768,14 +813,58 @@ export function PlanPage() {
                       placeholder="Ex: Jean 3:16-18"
                       style={{ flex: 1, padding: 10 }}
                     />
-                    <select value={bibleTranslation} onChange={(e) => setBibleTranslation(e.target.value as any)} style={{ padding: 10 }}>
-                      <option value="LSG">LSG (bolls)</option>
+                    <select value={bibleTranslation} onChange={(e) => setBibleTranslation(e.target.value as any)} style={{ padding: 10, minWidth: 180 }}>
+                      <option value="LSG">Traduction preferee : LSG (bolls)</option>
                       <option value="WEB">WEB (bolls)</option>
                       <option value="LSG1910">LSG1910 offline</option>
                     </select>
                     <button onClick={fetchBible} disabled={bibleLoading} style={{ padding: "10px 12px" }}>
                       {bibleLoading ? "..." : "Chercher"}
                     </button>
+                  </div>
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Recherche texte (bolls)</div>
+                    <input
+                      value={bibleSearchText}
+                      onChange={(e) => setBibleSearchText(e.target.value)}
+                      placeholder="Mot ou expression"
+                      style={{ width: "100%" }}
+                    />
+                    {bibleSearchLoading ? <div style={{ opacity: 0.7, fontSize: 12 }}>Recherche…</div> : null}
+                    <div style={{ maxHeight: 160, overflow: "auto", display: "grid", gap: 6, marginTop: 6 }}>
+                      {bibleSearchResults.map((r, idx) => (
+                        <button
+                          key={`${r.book}-${r.chapter}-${r.verse}-${idx}`}
+                          onClick={async () => {
+                            if (!plan) return;
+                            const refLbl = `Livre ${r.book} ${r.chapter}:${r.verse} (${bibleTranslation})`;
+                            await window.cp.plans.addItem({
+                              planId: plan.id,
+                              kind: "BIBLE_VERSE",
+                              title: refLbl,
+                              content: `${r.chapter}:${r.verse}  ${r.text}`,
+                              refId: refLbl,
+                              refSubId: `${r.chapter}:${r.verse}`,
+                            });
+                            showToast("success", "Verset ajoute au plan");
+                          }}
+                          style={{
+                            textAlign: "left",
+                            padding: 10,
+                            borderRadius: 10,
+                            border: "1px solid var(--border)",
+                          }}
+                        >
+                          <b>
+                            {r.chapter}:{r.verse}
+                          </b>{" "}
+                          <span style={{ opacity: 0.75, fontSize: 12 }}>{r.text}</span>
+                        </button>
+                      ))}
+                      {bibleSearchText && !bibleSearchResults.length && !bibleSearchLoading ? (
+                        <div style={{ opacity: 0.6, fontSize: 12 }}>Aucun resultat</div>
+                      ) : null}
+                    </div>
                   </div>
                   {bibleError ? <div style={{ color: "crimson", fontSize: 13 }}>{bibleError}</div> : null}
                   {bibleVerses.length > 0 ? (
