@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld("cp", {
   plans: {
     list: () => ipcRenderer.invoke("plans:list"),
     get: (id: string) => ipcRenderer.invoke("plans:get", id),
+    duplicate: (payload: { planId: string; dateIso?: string; title?: string }) => ipcRenderer.invoke("plans:duplicate", payload),
     create: (payload: { dateIso: string; title?: string }) => ipcRenderer.invoke("plans:create", payload),
     delete: (planId: string) => ipcRenderer.invoke("plans:delete", planId),
     addItem: (payload: {
@@ -93,6 +94,7 @@ contextBridge.exposeInMainWorld("cp", {
     }) => ipcRenderer.invoke("plans:addItem", payload),
     removeItem: (payload: { planId: string; itemId: string }) => ipcRenderer.invoke("plans:removeItem", payload),
     reorder: (payload: { planId: string; orderedItemIds: string[] }) => ipcRenderer.invoke("plans:reorder", payload),
+    export: (payload: { planId: string }) => ipcRenderer.invoke("plans:export", payload),
   },
 
 

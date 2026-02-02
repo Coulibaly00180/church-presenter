@@ -49,6 +49,7 @@ declare global {
       plans?: {
         list: () => Promise<any[]>;
         get: (id: string) => Promise<any>;
+        duplicate: (payload: { planId: string; dateIso?: string; title?: string }) => Promise<any>;
         create: (payload: { dateIso: string; title?: string }) => Promise<any>;
         delete: (planId: string) => Promise<any>;
         addItem: (payload: {
@@ -62,6 +63,7 @@ declare global {
         }) => Promise<any>;
         removeItem: (payload: { planId: string; itemId: string }) => Promise<any>;
         reorder: (payload: { planId: string; orderedItemIds: string[] }) => Promise<any>;
+        export: (payload: { planId: string }) => Promise<any>;
       };
 
       live?: {

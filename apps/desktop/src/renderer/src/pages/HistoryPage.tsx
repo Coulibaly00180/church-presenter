@@ -14,6 +14,7 @@ export function HistoryPage() {
   const canUse = !!window.cp?.plans;
 
   const [plans, setPlans] = useState<PlanListItem[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!canUse) return;
@@ -34,8 +35,14 @@ export function HistoryPage() {
     <div style={{ fontFamily: "system-ui", padding: 16 }}>
       <h1 style={{ margin: 0 }}>Historique</h1>
       <p style={{ opacity: 0.75, marginTop: 8 }}>
-        Plans passés (la duplication/export arrive ensuite).
+        Plans passés (duplication et export JSON).
       </p>
+
+      {msg ? (
+        <div style={{ marginTop: 8, padding: 10, border: "1px solid #cbd5ff", background: "#eef2ff", borderRadius: 10 }}>
+          {msg}
+        </div>
+      ) : null}
 
       <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
         {plans.map((p) => (
@@ -45,8 +52,25 @@ export function HistoryPage() {
           >
             <div style={{ fontWeight: 900 }}>{p.title || "Culte"}</div>
             <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
-            <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12 }}>
-              (Bientôt) Dupliquer • Exporter • Ouvrir
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button
+                onClick={async () => {
+                  const next = await window.cp.plans.duplicate({ planId: p.id, dateIso: isoToYmd(new Date().toISOString()) });
+                  setPlans(await window.cp.plans.list());
+                  setMsg("Plan duplique.");
+                }}
+              >
+                Dupliquer
+              </button>
+              <button
+                onClick={async () => {
+                  const res = await window.cp.plans.export({ planId: p.id });
+                  if (res?.ok) setMsg(`Plan exporte vers ${res.path}`);
+                  else if (!res?.canceled) setMsg("Export echoue.");
+                }}
+              >
+                Exporter JSON
+              </button>
             </div>
           </div>
         ))}

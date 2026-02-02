@@ -85,6 +85,7 @@ export function SongsPage() {
 
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [info, setInfo] = useState<{ kind: "info" | "success"; text: string } | null>(null);
 
   async function loadPlanItems(id: string): Promise<PlanWithItems | null> {
     try {
@@ -230,7 +231,7 @@ export function SongsPage() {
     const b = (song.blocks[i] as SongBlock) || {};
     const plan = await loadPlanItems(planId);
     if (isDuplicate(plan, song.id, b.id)) {
-      alert("Ce bloc est deja dans le plan.");
+      setInfo({ kind: "info", text: "Bloc deja present dans le plan." });
       return;
     }
     const payload = {
@@ -242,7 +243,7 @@ export function SongsPage() {
       refSubId: b.id,
     };
     await window.cp.plans.addItem(payload);
-    alert("Bloc ajoute au plan.");
+    setInfo({ kind: "success", text: "Bloc ajoute au plan." });
   }
 
   async function addAllBlocksToPlan() {
@@ -259,12 +260,15 @@ export function SongsPage() {
         kind: "SONG_BLOCK",
         title: `${fresh.title} - ${b.title || b.type}`,
         content: b.content || "",
-        refId: fresh.id,
-        refSubId: b.id,
-      });
+      refId: fresh.id,
+      refSubId: b.id,
+    });
       added += 1;
     }
-    alert(added > 0 ? "Chant ajoute au plan." : "Tous les blocs etaient deja presents.");
+    setInfo({
+      kind: added > 0 ? "success" : "info",
+      text: added > 0 ? "Chant ajoute au plan." : "Tous les blocs etaient deja presents.",
+    });
   }
 
   async function projectAllAsFlow() {
@@ -304,6 +308,19 @@ export function SongsPage() {
       {err ? (
         <div style={{ background: "#fee", border: "1px solid #f99", padding: 10, borderRadius: 10, marginBottom: 12 }}>
           <b>Erreur :</b> {err}
+        </div>
+      ) : null}
+      {info ? (
+        <div
+          style={{
+            background: info.kind === "success" ? "#e6ffed" : "#eef2ff",
+            border: "1px solid " + (info.kind === "success" ? "#9ae6b4" : "#cbd5ff"),
+            padding: 10,
+            borderRadius: 10,
+            marginBottom: 12,
+          }}
+        >
+          {info.text}
         </div>
       ) : null}
 

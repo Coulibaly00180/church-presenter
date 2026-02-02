@@ -92,8 +92,21 @@ function SortableRow(props: {
     gap: 10,
   };
 
+  const badge = (() => {
+    if (item.kind === "SONG_BLOCK") return { label: "Chant", color: "#eef2ff", border: "#cbd5ff", text: "#303e82" };
+    if (item.kind === "BIBLE_VERSE") return { label: "Verset", color: "#e6fffa", border: "#9ae6b4", text: "#13624d" };
+    if (item.kind === "BIBLE_PASSAGE") return { label: "Passage", color: "#e0f4ff", border: "#a7dcff", text: "#0f4c75" };
+    if (item.kind === "ANNOUNCEMENT_TEXT") return { label: "Annonce", color: "#f4f4f5", border: "#d4d4d8", text: "#3f3f46" };
+    return null;
+  })();
+
+  const titleAttr =
+    item.kind === "SONG_BLOCK" && item.refId
+      ? `Chant source: ${item.title || ""} (id: ${item.refId}${item.refSubId ? " / bloc " + item.refSubId : ""})`
+      : item.kind;
+
   return (
-    <div ref={setNodeRef} style={style}>
+    <div ref={setNodeRef} style={style} title={titleAttr}>
       <div
         {...attributes}
         {...listeners}
@@ -114,19 +127,20 @@ function SortableRow(props: {
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 800 }}>
           #{item.order} - {item.title || item.kind}{" "}
-          {item.kind === "SONG_BLOCK" ? (
+          {badge ? (
             <span
               style={{
                 fontSize: 11,
                 fontWeight: 800,
                 padding: "2px 6px",
                 borderRadius: 999,
-                background: "#eef2ff",
-                border: "1px solid #cbd5ff",
+                background: badge.color,
+                border: "1px solid " + badge.border,
+                color: badge.text,
                 marginLeft: 6,
               }}
             >
-              Chant
+              {badge.label}
             </span>
           ) : null}
         </div>
@@ -170,6 +184,7 @@ export function PlanPage() {
   const liveEnabled = !!live?.enabled;
   const livePlanId = live?.planId ?? null;
   const liveCursor = live?.cursor ?? -1;
+  const [filterSongsOnly, setFilterSongsOnly] = useState(false);
 
   async function refreshPlans() {
     const list = await window.cp.plans.list();
@@ -257,56 +272,60 @@ export function PlanPage() {
           <div style={{ opacity: 0.7 }}>Projection: {projOpen ? "OUVERTE" : "FERMEE"}</div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={liveEnabled}
-              onChange={(e) => updateLive({ enabled: e.target.checked })}
-            />
-            Live
-          </label>
-          <div style={{ display: "flex", gap: 6 }}>
-            {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-              <button
-                key={k}
-                onClick={() => updateLive({ target: k })}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 8,
-                  border: target === k ? "2px solid #111" : "1px solid #ddd",
-                  background: target === k ? "#111" : "white",
-                  color: target === k ? "white" : "#111",
-                  fontWeight: 800,
-                }}
-              >
-                {k}
-              </button>
-            ))}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={liveEnabled}
+                onChange={(e) => updateLive({ enabled: e.target.checked })}
+              />
+              Live
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+                <button
+                  key={k}
+                  onClick={() => updateLive({ target: k })}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    border: target === k ? "2px solid #111" : "1px solid #ddd",
+                    background: target === k ? "#111" : "white",
+                    color: target === k ? "white" : "#111",
+                    fontWeight: 800,
+                  }}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+                <label key={k} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!live?.lockedScreens?.[k]}
+                    onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
+                  />
+                  Lock {k}
+                </label>
+              ))}
+            </div>
+            <button onClick={() => window.cp.live?.prev()} style={{ padding: "8px 10px" }}>
+              {"< Prev"}
+            </button>
+            <button onClick={() => window.cp.live?.next()} style={{ padding: "8px 10px" }}>
+              {"Next >"}
+            </button>
+            <button onClick={() => window.cp.live?.resume()} style={{ padding: "8px 10px" }}>
+              Reprendre
+            </button>
+            <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input type="checkbox" checked={filterSongsOnly} onChange={(e) => setFilterSongsOnly(e.target.checked)} />
+              Chants uniquement
+            </label>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-              <label key={k} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={!!live?.lockedScreens?.[k]}
-                  onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
-                />
-                Lock {k}
-              </label>
-            ))}
-          </div>
-          <button onClick={() => window.cp.live?.prev()} style={{ padding: "8px 10px" }}>
-            {"< Prev"}
-          </button>
-          <button onClick={() => window.cp.live?.next()} style={{ padding: "8px 10px" }}>
-            {"Next >"}
-          </button>
-          <button onClick={() => window.cp.live?.resume()} style={{ padding: "8px 10px" }}>
-            Reprendre
-          </button>
         </div>
-      </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 12 }}>
             {/* LEFT: list + create */}

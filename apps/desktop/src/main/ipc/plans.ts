@@ -25,6 +25,44 @@ export function registerPlansIpc() {
     });
   });
 
+  ipcMain.handle("plans:duplicate", async (_evt, payload: { planId: string; dateIso?: string; title?: string }) => {
+    const prisma = getPrisma();
+    const base = await prisma.servicePlan.findUnique({
+      where: { id: payload.planId },
+      include: { items: { orderBy: { order: "asc" } } },
+    });
+    if (!base) throw new Error("Plan not found");
+
+    const date = normalizeDateToMidnight(payload.dateIso || base.date.toISOString());
+    const title = payload.title?.trim() || base.title || "Culte";
+
+    return prisma.$transaction(async (tx: any) => {
+      const created = await tx.servicePlan.create({
+        data: { date, title },
+      });
+
+      for (const it of base.items) {
+        await tx.serviceItem.create({
+          data: {
+            planId: created.id,
+            order: it.order,
+            kind: it.kind,
+            title: it.title,
+            content: it.content,
+            refId: it.refId,
+            refSubId: it.refSubId,
+            mediaPath: it.mediaPath,
+          },
+        });
+      }
+
+      return tx.servicePlan.findUnique({
+        where: { id: created.id },
+        include: { items: { orderBy: { order: "asc" } } },
+      });
+    });
+  });
+
   ipcMain.handle("plans:create", async (_evt, payload: { dateIso: string; title?: string }) => {
     const prisma = getPrisma();
     const date = normalizeDateToMidnight(payload.dateIso);
@@ -96,5 +134,28 @@ export function registerPlansIpc() {
       payload.orderedItemIds.map((id, idx) => prisma.serviceItem.update({ where: { id }, data: { order: idx + 1 } }))
     );
     return { ok: true };
+  });
+
+  ipcMain.handle("plans:export", async (_evt, payload: { planId: string }) => {
+    const prisma = getPrisma();
+    const plan = await prisma.servicePlan.findUnique({
+      where: { id: payload.planId },
+      include: { items: { orderBy: { order: "asc" } } },
+    });
+    if (!plan) throw new Error("Plan not found");
+
+    const data = JSON.stringify(plan, null, 2);
+
+    const res = await dialog.showSaveDialog({
+      title: "Exporter le plan",
+      defaultPath: `plan-${plan.id}.json`,
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (res.canceled || !res.filePath) return { ok: false, canceled: true };
+
+    const fs = await import("fs");
+    fs.writeFileSync(res.filePath, data, "utf-8");
+
+    return { ok: true, path: res.filePath };
   });
 }

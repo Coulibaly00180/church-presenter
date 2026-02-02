@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
 import { join } from "path";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
