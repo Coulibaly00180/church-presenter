@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { lookupLSG1910 } from "../bible/lookupLSG1910";
+import { findBookIdByName, getBooks, getChapter, maxChapter, buildReferenceLabel } from "../bible/bollsApi";
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -44,6 +45,16 @@ function formatForProjection(item: PlanItem) {
     title: item.title || item.kind,
     body: (item.content ?? "").trim(),
   };
+}
+
+function normalizeBookName(x: string) {
+  return x
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string, live: LiveState | null) {
@@ -210,11 +221,12 @@ export function PlanPage() {
   const [songSearch, setSongSearch] = useState("");
   const [songResults, setSongResults] = useState<Array<{ id: string; title: string }>>([]);
   const [bibleRef, setBibleRef] = useState("Jean 3:16-18");
-  const [bibleTranslation, setBibleTranslation] = useState<"LSG1910" | "WEB">("LSG1910");
+  const [bibleTranslation, setBibleTranslation] = useState<"LSG1910" | "LSG" | "WEB">("LSG");
   const [bibleLoading, setBibleLoading] = useState(false);
   const [bibleError, setBibleError] = useState<string | null>(null);
   const [bibleVerses, setBibleVerses] = useState<Array<{ chapter: number; verse: number; text: string }>>([]);
   const [bibleReference, setBibleReference] = useState<string>(""); 
+  const bibleBooks = useRef<Record<string, any[]>>({});
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -280,14 +292,28 @@ export function PlanPage() {
         setBibleReference(r.reference);
         setBibleVerses(r.verses.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
       } else {
-        const q = encodeURIComponent(bibleRef.trim());
-        const url = `https://bible-api.com/${q}?translation=web`;
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const json: any = await resp.json();
-        if (!json.verses?.length) throw new Error("Aucun resultat");
-        setBibleReference(json.reference || bibleRef.trim());
-        setBibleVerses(json.verses.map((v: any) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
+        // bolls.life
+        const refText = bibleRef.trim();
+        const m = refText.match(/^(.+?)\\s+(\\d+)(?::(\\d+)(?:-(\\d+))?)?$/i);
+        if (!m) throw new Error("Reference non comprise (ex: Jean 3:16-18)");
+        const [, rawBook, chapStr, vStartStr, vEndStr] = m;
+        const books = bibleBooks.current[bibleTranslation] || (await getBooks(bibleTranslation));
+        bibleBooks.current[bibleTranslation] = books;
+        const book = findBookIdByName(books, rawBook);
+        if (!book) throw new Error("Livre non trouve pour cette traduction");
+        const chap = parseInt(chapStr, 10);
+        const max = maxChapter(books, book.bookid);
+        if (max && chap > max) throw new Error(`Ce livre n'a que ${max} chapitres`);
+        const allVerses = await getChapter(bibleTranslation, book.bookid, chap);
+        let filtered = allVerses;
+        if (vStartStr) {
+          const start = parseInt(vStartStr, 10);
+          const end = vEndStr ? parseInt(vEndStr, 10) : start;
+          filtered = allVerses.filter((v) => v.verse >= start && v.verse <= end);
+        }
+        const label = buildReferenceLabel(book, chap, filtered.map((v) => v.verse));
+        setBibleReference(label);
+        setBibleVerses(filtered.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
       }
     } catch (e: any) {
       setBibleError(e?.message || String(e));
@@ -299,7 +325,7 @@ export function PlanPage() {
   async function addBibleToPlan(mode: "PASSAGE" | "VERSES") {
     if (!plan || bibleVerses.length === 0) return;
     const ref = bibleReference || bibleRef.trim();
-    const label = bibleTranslation === "LSG1910" ? "LSG1910" : "WEB";
+    const label = bibleTranslation;
     if (mode === "PASSAGE") {
       const body = bibleVerses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n");
       await window.cp.plans.addItem({
@@ -743,8 +769,9 @@ export function PlanPage() {
                       style={{ flex: 1, padding: 10 }}
                     />
                     <select value={bibleTranslation} onChange={(e) => setBibleTranslation(e.target.value as any)} style={{ padding: 10 }}>
-                      <option value="LSG1910">LSG1910</option>
-                      <option value="WEB">WEB</option>
+                      <option value="LSG">LSG (bolls)</option>
+                      <option value="WEB">WEB (bolls)</option>
+                      <option value="LSG1910">LSG1910 offline</option>
                     </select>
                     <button onClick={fetchBible} disabled={bibleLoading} style={{ padding: "10px 12px" }}>
                       {bibleLoading ? "..." : "Chercher"}
