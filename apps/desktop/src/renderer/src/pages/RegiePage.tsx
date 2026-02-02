@@ -20,6 +20,11 @@ export function RegiePage() {
   const [body, setBody] = useState("Tape ton texte ici, puis clique Afficher.");
   const [state, setState] = useState<any>(null);
   const [projOpen, setProjOpen] = useState<boolean>(false);
+  const [screens, setScreens] = useState<any[]>([]);
+  const [openB, setOpenB] = useState(false);
+  const [openC, setOpenC] = useState(false);
+  const [mirrorB, setMirrorB] = useState(true);
+  const [mirrorC, setMirrorC] = useState(true);
   const [blockCursor, setBlockCursor] = useState<number>(-1);
 
   useEffect(() => {
@@ -27,6 +32,28 @@ export function RegiePage() {
     const offState = window.cp.projection.onState(setState);
 
     window.cp.projectionWindow.isOpen().then((r: any) => setProjOpen(!!r?.isOpen));
+
+    // Multi-screens init
+    if (window.cp.screens?.list) {
+      window.cp.screens.list().then((list: any[]) => {
+        setScreens(list);
+        setOpenB(!!list.find((x) => x.key === "B")?.isOpen);
+        setOpenC(!!list.find((x) => x.key === "C")?.isOpen);
+        const mb = list.find((x) => x.key === "B")?.mirror;
+        const mc = list.find((x) => x.key === "C")?.mirror;
+        setMirrorB(mb?.kind !== "FREE");
+        setMirrorC(mc?.kind !== "FREE");
+      });
+
+      const offB = window.cp.screens.onWindowState("B", (p: any) => setOpenB(!!p.isOpen));
+      const offC = window.cp.screens.onWindowState("C", (p: any) => setOpenC(!!p.isOpen));
+
+      return () => {
+        offB();
+        offC();
+      };
+    }
+
     const offWin = window.cp.projectionWindow.onWindowState((p) => setProjOpen(p.isOpen));
 
     return () => {
@@ -39,11 +66,28 @@ export function RegiePage() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
 
-      if (e.key === "b" || e.key === "B") window.cp.projection.setMode("BLACK");
-      if (e.key === "w" || e.key === "W") window.cp.projection.setMode("WHITE");
-      if (e.key === "r" || e.key === "R") window.cp.projection.setMode("NORMAL");
+      if (e.key === "b" || e.key === "B") window.cp.live?.toggleBlack();
+      if (e.key === "w" || e.key === "W") window.cp.live?.toggleWhite();
+      if (e.key === "r" || e.key === "R") window.cp.live?.resume();
       if (e.key === "l" || e.key === "L") {
         window.cp.projection.setState({ lowerThirdEnabled: !(state?.lowerThirdEnabled ?? false) });
+
+
+// Target screen shortcuts
+if (e.key === "1") window.cp.live?.setTarget("A");
+if (e.key === "2") window.cp.live?.setTarget("B");
+if (e.key === "3") window.cp.live?.setTarget("C");
+
+// Live navigation (Plan cursor)
+if (e.key === "ArrowLeft") {
+  e.preventDefault();
+  window.cp.live?.prev();
+}
+if (e.key === "ArrowRight") {
+  e.preventDefault();
+  window.cp.live?.next();
+}
+
       }
 
       // Navigation blocs (↑ ↓) + Enter
@@ -95,6 +139,76 @@ export function RegiePage() {
 
   return (
     <div style={{ fontFamily: "system-ui", padding: 16 }}>
+      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12, marginBottom: 12 }}>
+        <div style={{ fontWeight: 900, marginBottom: 8 }}>Écrans (A/B/C)</div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <button
+            onClick={async () => {
+              const r = await window.cp.projectionWindow.open();
+              setProjOpen(!!r?.isOpen);
+            }}
+          >
+            Ouvrir A
+          </button>
+
+          <button
+            onClick={async () => {
+              if (!window.cp.screens) return;
+              const r = openB ? await window.cp.screens.close("B") : await window.cp.screens.open("B");
+              setOpenB(!!r?.isOpen);
+            }}
+          >
+            {openB ? "Fermer B" : "Ouvrir B"}
+          </button>
+
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={mirrorB}
+              onChange={async (e) => {
+                const v = e.target.checked;
+                setMirrorB(v);
+                if (!window.cp.screens) return;
+                await window.cp.screens.setMirror("B", v ? { kind: "MIRROR", from: "A" } : { kind: "FREE" });
+              }}
+            />
+            B miroir de A
+          </label>
+
+          <button
+            onClick={async () => {
+              if (!window.cp.screens) return;
+              const r = openC ? await window.cp.screens.close("C") : await window.cp.screens.open("C");
+              setOpenC(!!r?.isOpen);
+            }}
+          >
+            {openC ? "Fermer C" : "Ouvrir C"}
+          </button>
+
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={mirrorC}
+              onChange={async (e) => {
+                const v = e.target.checked;
+                setMirrorC(v);
+                if (!window.cp.screens) return;
+                await window.cp.screens.setMirror("C", v ? { kind: "MIRROR", from: "A" } : { kind: "FREE" });
+              }}
+            />
+            C miroir de A
+          </label>
+
+          <button onClick={() => window.cp.devtools?.open?.("SCREEN_A")}>DevTools A</button>
+          <button onClick={() => window.cp.devtools?.open?.("SCREEN_B")}>DevTools B</button>
+          <button onClick={() => window.cp.devtools?.open?.("SCREEN_C")}>DevTools C</button>
+        </div>
+
+        <div style={{ marginTop: 8, opacity: 0.7, fontSize: 13 }}>
+          Astuce : mets B/C en mode <b>Libre</b> pour afficher autre chose ensuite (versets/chant/plan). En mode miroir, ils suivent A.
+        </div>
+      </div>
+
       <h1 style={{ margin: 0 }}>Régie</h1>
       <p style={{ opacity: 0.75 }}>{status}</p>
 
