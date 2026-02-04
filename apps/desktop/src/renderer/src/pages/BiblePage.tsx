@@ -57,12 +57,16 @@ async function projectText(target: ScreenKey, title: string | undefined, body: s
   }
 }
 
+type TranslationGroup = {
+  language: string;
+  translations: Array<{ code: string; label: string; dir?: string }>;
+};
+
 export function BiblePage() {
-  const [translation, setTranslation] = useState<string>(""); // set after API load
+  const [translationLanguage, setTranslationLanguage] = useState<string>(""); // selected language
+  const [translation, setTranslation] = useState<string>(""); // selected translation code
   const activeTranslation = translation;
-  const [availableTranslations, setAvailableTranslations] = useState<
-    Array<{ code: string; label: string; language: string; dir?: string }>
-  >([]);
+  const [groups, setGroups] = useState<TranslationGroup[]>([]);
   const [translationFilter, setTranslationFilter] = useState("");
 
   const [books, setBooks] = useState<BollsBook[]>([]);
@@ -100,14 +104,20 @@ export function BiblePage() {
   useEffect(() => {
     listTranslations()
       .then((ts) => {
-        const mapped = ts.map((t) => ({
-          code: t.short_name,
-          label: `${t.full_name} (${t.short_name})`,
-          language: t.language,
-          dir: t.dir,
-        }));
-        setAvailableTranslations(mapped);
-        if (mapped[0]) setTranslation(mapped[0].code);
+        const grouped: TranslationGroup[] = [];
+        ts.forEach((t) => {
+          let g = grouped.find((gg) => gg.language === t.language);
+          if (!g) {
+            g = { language: t.language, translations: [] };
+            grouped.push(g);
+          }
+          g.translations.push({ code: t.short_name, label: `${t.full_name} (${t.short_name})`, dir: t.dir });
+        });
+        setGroups(grouped);
+        if (grouped[0]?.translations[0]) {
+          setTranslationLanguage(grouped[0].language);
+          setTranslation(grouped[0].translations[0].code);
+        }
       })
       .catch((e) => {
         setErr(e?.message || String(e));
@@ -320,11 +330,34 @@ export function BiblePage() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            Langue
+            <select
+              value={translationLanguage}
+              onChange={(e) => {
+                const lang = e.target.value;
+                setTranslationLanguage(lang);
+                const g = groups.find((x) => x.language === lang);
+                if (g?.translations[0]) setTranslation(g.translations[0].code);
+              }}
+              style={{ minWidth: 200 }}
+            >
+              {groups.map((g) => (
+                <option key={g.language} value={g.language}>
+                  {g.language}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             Traduction
-            <select value={translation} onChange={(e) => setTranslation(e.target.value)} style={{ minWidth: 260 }}>
-              {availableTranslations.map((t) => (
+            <select
+              value={translation}
+              onChange={(e) => setTranslation(e.target.value)}
+              style={{ minWidth: 260 }}
+            >
+              {(groups.find((g) => g.language === translationLanguage)?.translations || []).map((t) => (
                 <option key={t.code} value={t.code}>
-                  {t.label} — {t.language}
+                  {t.label}
                 </option>
               ))}
             </select>

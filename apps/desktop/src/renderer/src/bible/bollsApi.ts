@@ -72,15 +72,26 @@ async function fetchBooks(translation: string): Promise<BollsBook[]> {
 export async function getChapter(translation: string, bookId: number, chapter: number): Promise<BollsVerse[]> {
   const r = await fetch(`https://bolls.life/get-text/${translation}/${bookId}/${chapter}/`);
   if (!r.ok) throw new Error(`Chapitre introuvable (${translation} ${bookId}:${chapter})`);
-  const json = (await r.json()) as BollsVerse[];
-  return json.map((v) => ({ ...v, text: stripHtml(v.text) }));
+  const json = (await r.json()) as any[];
+  return json.map((v) => ({
+    ...v,
+    book: v.book ?? bookId,
+    chapter: v.chapter ?? chapter,
+    text: stripHtml(v.text),
+  }));
 }
 
 export async function getVerse(translation: string, bookId: number, chapter: number, verse: number): Promise<BollsVerse> {
   const r = await fetch(`https://bolls.life/get-verse/${translation}/${bookId}/${chapter}/${verse}/`);
   if (!r.ok) throw new Error(`Verset introuvable (${translation} ${bookId}:${chapter}:${verse})`);
-  const v = (await r.json()) as BollsVerse;
-  return { ...v, text: stripHtml(v.text) };
+  const v = (await r.json()) as any;
+  return {
+    ...v,
+    book: v.book ?? bookId,
+    chapter: v.chapter ?? chapter,
+    verse: v.verse ?? verse,
+    text: stripHtml(v.text),
+  };
 }
 
 export async function searchVerses(
@@ -112,8 +123,15 @@ export async function getVersesBatch(
     body: JSON.stringify(payload),
   });
   if (!r.ok) throw new Error(`Batch verses KO (${r.status})`);
-  const json = (await r.json()) as BollsVerse[][];
-  return json.map((arr) => arr.map((v) => ({ ...v, text: stripHtml(v.text) })));
+  const json = (await r.json()) as any[][];
+  return json.map((arr, idx) =>
+    arr.map((v) => ({
+      ...v,
+      book: v.book ?? payload[idx]?.book,
+      chapter: v.chapter ?? payload[idx]?.chapter,
+      text: stripHtml(v.text),
+    }))
+  );
 }
 
 export function findBookIdByName(books: BollsBook[], search: string): BollsBook | undefined {
