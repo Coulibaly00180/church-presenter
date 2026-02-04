@@ -86,6 +86,8 @@ export function SongsPage() {
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [info, setInfo] = useState<{ kind: "info" | "success"; text: string } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [newSongTitle, setNewSongTitle] = useState("");
   const panelStyle: React.CSSProperties = {
     background: "var(--panel)",
     border: "1px solid var(--border)",
@@ -149,11 +151,10 @@ export function SongsPage() {
 
   async function onCreate() {
     setErr(null);
-    const baseTitle = prompt("Titre du chant ? (obligatoire)")?.trim();
-    if (!baseTitle) return;
-
+    const baseTitle = newSongTitle.trim() || "Sans titre";
     try {
       const created = await window.cp.songs.create({ title: baseTitle });
+      setNewSongTitle("");
       await refresh(q);
       await loadSong(created.id);
     } catch (e) {
@@ -324,6 +325,12 @@ export function SongsPage() {
           </select>
         </label>
 
+        <input
+          value={newSongTitle}
+          onChange={(e) => setNewSongTitle(e.target.value)}
+          placeholder="Titre du nouveau chant"
+          style={{ minWidth: 180 }}
+        />
         <button onClick={onCreate}>+ Nouveau chant</button>
         <button
           onClick={async () => {
@@ -337,15 +344,40 @@ export function SongsPage() {
         </button>
         <button
           onClick={async () => {
-            const r = await window.cp.songs.importWord();
+            setImporting(true);
+            const r = await window.cp.songs.importWordBatch();
+            setImporting(false);
+            console.log("Import docx/odt result", r);
             if (r?.ok) {
               await refresh(q);
-              if (r.song) await loadSong(r.song.id);
-              setInfo({ kind: "success", text: "Import Word OK" });
+              setInfo({ kind: "success", text: `Import: ${r.imported || 0} chants (docx/odt)` });
+              if (r?.errors?.length) {
+                console.warn("Import errors:", r.errors);
+                setErr(`${r.errors.length} erreurs durant l'import (voir console)`);
+              }
+            } else if (r?.error) {
+              setErr(r.error);
             }
           }}
+          disabled={importing}
         >
-          Importer Word
+          Importer des chants (docx / odt)
+        </button>
+        <button
+          onClick={async () => {
+            setImporting(true);
+            const r = await window.cp.songs.importJson();
+            setImporting(false);
+            if (r?.ok) {
+              await refresh(q);
+              setInfo({ kind: "success", text: `Import JSON : ${r.imported || 0} chants` });
+            } else if (r?.error) {
+              setErr(r.error);
+            }
+          }}
+          disabled={importing}
+        >
+          Importer JSON
         </button>
       </div>
 

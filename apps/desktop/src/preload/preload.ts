@@ -81,6 +81,8 @@ contextBridge.exposeInMainWorld("cp", {
     delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
     exportWord: (id: string) => ipcRenderer.invoke("songs:exportWord", id),
     importWord: () => ipcRenderer.invoke("songs:importWord"),
+    importJson: () => ipcRenderer.invoke("songs:importJson"),
+    importWordBatch: () => ipcRenderer.invoke("songs:importWordBatch"),
   },
 
   plans: {

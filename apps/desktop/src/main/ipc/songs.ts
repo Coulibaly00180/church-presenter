@@ -1,9 +1,11 @@
 import { ipcMain } from "electron";
 import { getPrisma } from "../db";
 import { Document, Packer, Paragraph, TextRun } from "docx";
-import { dialog } from "electron";
+import { dialog, ipcMain } from "electron";
 import mammoth from "mammoth";
 import fs from "fs";
+import path from "path";
+import AdmZip from "adm-zip";
 
 type BlockInput = {
   order: number;
@@ -206,5 +208,108 @@ export function registerSongsIpc() {
     });
 
     return { ok: true, song: created };
+  });
+
+  ipcMain.handle("songs:importJson", async () => {
+    const prisma = getPrisma();
+    const res = await dialog.showOpenDialog({
+      title: "Importer des chants (JSON)",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+      properties: ["openFile"],
+    });
+    if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
+
+    const path = res.filePaths[0];
+    const raw = fs.readFileSync(path, "utf-8");
+    let payload: any[] = [];
+    try {
+      payload = JSON.parse(raw);
+      if (!Array.isArray(payload)) throw new Error("Le fichier doit contenir un tableau de chants.");
+    } catch (e: any) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+
+    let imported = 0;
+    const errors: Array<{ title?: string; message: string }> = [];
+    for (const s of payload) {
+      try {
+        const song = await prisma.song.create({
+          data: {
+            title: s.title || "Sans titre",
+            artist: s.artist,
+            album: s.album,
+            language: s.language,
+            tags: s.tags,
+          },
+        });
+        const blocks = Array.isArray(s.blocks) ? s.blocks : [];
+        for (const b of blocks) {
+          await prisma.songBlock.create({
+            data: {
+              songId: song.id,
+              order: b.order || 1,
+              type: b.type || "VERSE",
+              title: b.title,
+              content: b.content || "",
+            },
+          });
+        }
+        imported += 1;
+      } catch (e: any) {
+        errors.push({ title: s?.title, message: e?.message || String(e) });
+      }
+    }
+
+    return { ok: true, imported, errors, path };
+  });
+
+  ipcMain.handle("songs:importWordBatch", async () => {
+    const res = await dialog.showOpenDialog({
+      title: "Importer des chants (Word/ODT)",
+      filters: [{ name: "Documents", extensions: ["docx", "odt"] }],
+      properties: ["openFile", "multiSelections"],
+    });
+    if (res.canceled || !res.filePaths?.length) return { ok: false, canceled: true };
+
+    const prisma = getPrisma();
+    let imported = 0;
+    const errors: Array<{ path: string; message: string }> = [];
+
+    async function importOne(filePath: string) {
+      const buffer = fs.readFileSync(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      let text = "";
+      if (ext === ".docx") {
+        const { value } = await mammoth.extractRawText({ buffer });
+        text = value || "";
+      } else if (ext === ".odt") {
+        const zip = new AdmZip(buffer);
+        const entry = zip.getEntry("content.xml");
+        if (!entry) throw new Error("content.xml manquant");
+        const xml = entry.getData().toString("utf-8");
+        text = xml
+          .replace(/<\/text:p>/g, "\n\n")
+          .replace(/<[^>]+>/g, "")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      } else {
+        throw new Error("Extension non supportee (docx ou odt)");
+      }
+      const title = filePath.split(/[\\/]/).pop()?.replace(/\.(docx|odt)$/i, "") || "Sans titre";
+      const song = await prisma.song.create({ data: { title } });
+      await prisma.songBlock.create({
+        data: { songId: song.id, order: 1, type: "VERSE", title: "Texte", content: text },
+      });
+      imported += 1;
+    }
+
+    for (const p of res.filePaths) {
+      try {
+        await importOne(p);
+      } catch (e: any) {
+        errors.push({ path: p, message: e?.message || String(e) });
+      }
+    }
+    return { ok: true, imported, errors, files: res.filePaths };
   });
 }
