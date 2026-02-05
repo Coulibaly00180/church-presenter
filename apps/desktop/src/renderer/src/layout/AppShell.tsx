@@ -53,6 +53,7 @@ export function AppShell() {
       { to: "/plan", label: "Plan", desc: "Deroule du culte, ordre, drag & drop" },
       { to: "/bible", label: "Bible", desc: "Recherche, ajout au plan, projection" },
       { to: "/songs", label: "Chants", desc: "Bibliotheque, recherche, blocs" },
+      { to: "/announcements", label: "Annonces", desc: "PDF importes + annonces texte" },
       { to: "/calendar", label: "Calendrier", desc: "Plans par date, preparation" },
       { to: "/history", label: "Historique", desc: "Plans passes, duplication" },
     ],

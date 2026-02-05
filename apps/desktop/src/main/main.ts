@@ -310,6 +310,26 @@ ipcMain.handle("files:pickMedia", async () => {
   }
 });
 
+ipcMain.handle("files:listMedia", async () => {
+  try {
+    const mediaDir = join(app.getPath("userData"), "media");
+    if (!fs.existsSync(mediaDir)) return { ok: true, files: [] };
+    const entries = fs.readdirSync(mediaDir);
+    const files = entries
+      .filter((f) => fs.statSync(join(mediaDir, f)).isFile())
+      .map((name) => {
+        const full = join(mediaDir, name);
+        const lower = name.toLowerCase();
+        const mediaType = lower.endsWith(".pdf") ? "PDF" : "IMAGE";
+        return { name, path: full, mediaType };
+      });
+    return { ok: true, files };
+  } catch (e: any) {
+    console.error("listMedia failed", e);
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
 // A-only projection state API (legacy)
 ipcMain.handle("projection:getState", () => screenStates.A);
 

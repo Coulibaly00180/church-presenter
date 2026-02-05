@@ -9,6 +9,7 @@ import { CalendarPage } from "./pages/CalendarPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { BiblePage } from "./pages/BiblePage";
 import { ProjectionPage } from "./pages/ProjectionPage";
+import { AnnouncementsPage } from "./pages/AnnouncementsPage";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/bible" element={<BiblePage />} />
+          <Route path="/announcements" element={<AnnouncementsPage />} />
           <Route path="/" element={<Navigate to="/regie" replace />} />
           <Route path="*" element={<Navigate to="/regie" replace />} />
         </Route>
