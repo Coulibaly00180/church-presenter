@@ -197,6 +197,8 @@ function createScreenWindow(key: ScreenKey) {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false, // allow file:// media (PDF/images) from renderer served on http(s)
+      allowRunningInsecureContent: true,
     },
   });
 
@@ -300,16 +302,18 @@ ipcMain.handle("devtools:open", (_evt, target: "REGIE" | "PROJECTION" | "SCREEN_
 
 ipcMain.handle("files:pickMedia", async () => {
   const res = await dialog.showOpenDialog({
-    title: "Choisir une image ou un PDF",
+    title: "Choisir un fichier media (image / PDF / Office)",
     filters: [
-      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf"] },
+      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf", "ppt", "pptx", "doc", "docx", "odt"] },
       { name: "All", extensions: ["*"] },
     ],
     properties: ["openFile"],
   });
   if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
   const p = res.filePaths[0];
-  const isPdf = p.toLowerCase().endsWith(".pdf");
+  const lower = p.toLowerCase();
+  const isPdf =
+    lower.endsWith(".pdf") || lower.endsWith(".ppt") || lower.endsWith(".pptx") || lower.endsWith(".doc") || lower.endsWith(".docx") || lower.endsWith(".odt");
   const mediaDir = join(app.getPath("userData"), "media");
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
   const target = join(mediaDir, basename(p));
@@ -332,12 +336,32 @@ ipcMain.handle("files:listMedia", async () => {
       .map((name) => {
         const full = join(mediaDir, name);
         const lower = name.toLowerCase();
-        const mediaType = lower.endsWith(".pdf") ? "PDF" : "IMAGE";
+        const mediaType =
+          lower.endsWith(".pdf") ||
+          lower.endsWith(".ppt") ||
+          lower.endsWith(".pptx") ||
+          lower.endsWith(".doc") ||
+          lower.endsWith(".docx") ||
+          lower.endsWith(".odt")
+            ? "PDF"
+            : "IMAGE";
         return { name, path: full, mediaType };
       });
     return { ok: true, files };
   } catch (e: any) {
     console.error("listMedia failed", e);
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
+ipcMain.handle("files:deleteMedia", async (_evt, payload: { path: string }) => {
+  try {
+    if (payload?.path && fs.existsSync(payload.path)) {
+      fs.unlinkSync(payload.path);
+    }
+    return { ok: true };
+  } catch (e: any) {
+    console.error("deleteMedia failed", e);
     return { ok: false, error: e?.message || String(e) };
   }
 });

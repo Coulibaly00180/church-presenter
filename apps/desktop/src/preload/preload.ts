@@ -149,5 +149,6 @@ contextBridge.exposeInMainWorld("cp", {
   files: {
     pickMedia: () => ipcRenderer.invoke("files:pickMedia"),
     listMedia: () => ipcRenderer.invoke("files:listMedia"),
+    deleteMedia: (payload: { path: string }) => ipcRenderer.invoke("files:deleteMedia", payload),
   },
 });

@@ -16,6 +16,7 @@
     "@prisma/client": "^6.19.2",
     "better-sqlite3": "^12.6.2",
     "docx": "^9.1.0",
+    "pdfjs-dist": "^4.5.136",
     "mammoth": "^1.6.0",
     "adm-zip": "^0.5.10",
     "prisma": "^6.19.2",

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 type MediaItem = { name: string; path: string; mediaType: "PDF" | "IMAGE" };
 type PlanListItem = { id: string; title?: string | null; date?: string | Date };
+type ScreenKey = "A" | "B" | "C";
 
 function formatDate(p: PlanListItem) {
   if (!p.date) return "";
@@ -16,6 +17,7 @@ export function AnnouncementsPage() {
   const [pdfPage, setPdfPage] = useState("1");
   const [manualTitle, setManualTitle] = useState("Annonce");
   const [manualContent, setManualContent] = useState("");
+  const [target, setTarget] = useState<ScreenKey>("A");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -40,6 +42,44 @@ export function AnnouncementsPage() {
       if (list?.length) setPlanId(list[0].id);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function ensureScreenOpen(key: ScreenKey) {
+    if (key === "A") {
+      await window.cp.projectionWindow.open();
+      return;
+    }
+    const list = (await window.cp.screens?.list?.()) || [];
+    const meta = list.find((s: any) => s.key === key);
+    if (!meta?.isOpen) {
+      await window.cp.screens?.open?.(key);
+    }
+  }
+
+  async function projectText(title: string | undefined, body: string) {
+    const dest = target;
+    await ensureScreenOpen(dest);
+    if (dest === "A" || !window.cp.screens) {
+      await window.cp.projection.setContentText({ title, body });
+      return;
+    }
+    const res: any = await window.cp.screens.setContentText(dest, { title, body });
+    if (res?.ok === false && res?.reason === "MIRROR") {
+      await window.cp.projection.setContentText({ title, body });
+    }
+  }
+
+  async function projectPdf(title: string | undefined, mediaPath: string) {
+    const dest = target;
+    await ensureScreenOpen(dest);
+    if (dest === "A" || !window.cp.screens) {
+      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
+      return;
+    }
+    const res: any = await window.cp.screens.setContentMedia(dest, { title, mediaPath, mediaType: "PDF" });
+    if (res?.ok === false && res?.reason === "MIRROR") {
+      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
     }
   }
 
@@ -72,6 +112,14 @@ export function AnnouncementsPage() {
         >
           Importer un PDF
         </button>
+        <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          Projeter vers
+          <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
+            <option value="A">Ecran A</option>
+            <option value="B">Ecran B</option>
+            <option value="C">Ecran C</option>
+          </select>
+        </label>
       </div>
 
       {err ? <div style={{ ...panelStyle, background: "#fef2f2", borderColor: "#fecdd3" }}>{err}</div> : null}
@@ -114,14 +162,21 @@ export function AnnouncementsPage() {
           >
             Ajouter au plan
           </button>
+          <button
+            onClick={() => projectText(manualTitle, manualContent)}
+            style={{ marginTop: 6 }}
+            disabled={!manualContent && !manualTitle}
+          >
+            Projeter maintenant
+          </button>
         </div>
 
         <div style={panelStyle}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>PDF importes ({pdfs.length})</div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Page
-              <input type="number" min={1} value={pdfPage} onChange={(e) => setPdfPage(e.target.value)} style={{ width: 80 }} />
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>PDF importes ({pdfs.length})</div>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            Page
+            <input type="number" min={1} value={pdfPage} onChange={(e) => setPdfPage(e.target.value)} style={{ width: 80 }} />
             </label>
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
               Plan
@@ -142,31 +197,55 @@ export function AnnouncementsPage() {
                   border: "1px solid var(--border)",
                   borderRadius: 12,
                   padding: 10,
-                  display: "flex",
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
                   alignItems: "center",
-                  justifyContent: "space-between",
                   gap: 10,
                 }}
               >
-                <div>
+                <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ fontWeight: 700 }}>{f.name}</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>{f.mediaType}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      onClick={async () => {
+                        if (!planId) return;
+                        const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
+                        await window.cp.plans.addItem({
+                          planId,
+                          kind: "ANNOUNCEMENT_PDF",
+                          title: f.name,
+                          mediaPath,
+                          content: mediaPath,
+                        });
+                        setInfo("PDF ajoute au plan");
+                      }}
+                    >
+                      Ajouter au plan
+                    </button>
+                    <button
+                      onClick={() => {
+                        const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
+                        projectPdf(`${f.name} (p.${pdfPage || "1"})`, mediaPath);
+                      }}
+                    >
+                      Projeter
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    if (!planId) return;
-                    const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
-                    await window.cp.plans.addItem({
-                      planId,
-                      kind: "ANNOUNCEMENT_PDF",
-                      title: f.name,
-                      mediaPath,
-                    });
-                    setInfo("PDF ajoute au plan");
-                  }}
-                >
-                  Ajouter au plan
-                </button>
+                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  <button
+                    style={{ color: "#b91c1c" }}
+                    onClick={async () => {
+                      const ok = window.confirm("Supprimer ce fichier importe ?");
+                      if (!ok) return;
+                      await window.cp.files?.deleteMedia?.({ path: f.path });
+                      await refreshFiles();
+                    }}
+                  >
+                    Supprimer
+                  </button>
+                </div>
               </div>
             ))}
             {pdfs.length === 0 ? <div style={{ opacity: 0.6 }}>Aucun PDF importe pour le moment.</div> : null}

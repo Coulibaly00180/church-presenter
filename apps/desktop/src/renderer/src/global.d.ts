@@ -110,6 +110,8 @@ declare global {
 
       files?: {
         pickMedia: () => Promise<{ ok: boolean; canceled?: boolean; path?: string; mediaType?: "IMAGE" | "PDF" }>;
+        deleteMedia: (payload: { path: string }) => Promise<{ ok: boolean }>;
+        listMedia: () => Promise<{ ok: boolean; files: Array<{ name: string; path: string; mediaType: "PDF" | "IMAGE" }> }>;
       };
 
       [k: string]: any;
