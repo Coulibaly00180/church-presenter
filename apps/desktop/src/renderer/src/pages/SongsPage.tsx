@@ -345,15 +345,17 @@ export function SongsPage() {
         <button
           onClick={async () => {
             setImporting(true);
-            const r = await window.cp.songs.importWordBatch();
+            const r = await window.cp.songs.importAuto();
             setImporting(false);
-            console.log("Import docx/odt result", r);
+            console.log("Import auto result", r);
             if (r?.ok) {
               await refresh(q);
-              setInfo({ kind: "success", text: `Import: ${r.imported || 0} chants (docx/odt)` });
+              const count = r.imported || 0;
+              const detail = `${count} chant${count > 1 ? "s" : ""} importé${count > 1 ? "s" : ""}`;
+              setInfo({ kind: "success", text: `Import OK • ${detail}` });
               if (r?.errors?.length) {
                 console.warn("Import errors:", r.errors);
-                setErr(`${r.errors.length} erreurs durant l'import (voir console)`);
+                setErr(`${r.errors.length} erreur(s) durant l'import (voir console)`);
               }
             } else if (r?.error) {
               setErr(r.error);
@@ -361,23 +363,7 @@ export function SongsPage() {
           }}
           disabled={importing}
         >
-          Importer des chants (docx / odt)
-        </button>
-        <button
-          onClick={async () => {
-            setImporting(true);
-            const r = await window.cp.songs.importJson();
-            setImporting(false);
-            if (r?.ok) {
-              await refresh(q);
-              setInfo({ kind: "success", text: `Import JSON : ${r.imported || 0} chants` });
-            } else if (r?.error) {
-              setErr(r.error);
-            }
-          }}
-          disabled={importing}
-        >
-          Importer JSON
+          Importer des chants (docx / odt / json)
         </button>
       </div>
 

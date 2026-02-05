@@ -13,6 +13,7 @@ declare global {
         setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => Promise<any>;
         setMode: (mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
         onState: (cb: (state: any) => void) => () => void;
+        setAppearance: (payload: { textScale?: number; background?: string; foreground?: string }) => Promise<any>;
       };
 
       projectionWindow?: {
@@ -48,6 +49,9 @@ declare global {
         delete: (id: string) => Promise<any>;
         exportWord: (id: string) => Promise<any>;
         importWord: () => Promise<any>;
+        importJson: () => Promise<any>;
+        importWordBatch: () => Promise<any>;
+        importAuto: () => Promise<any>;
       };
 
       plans?: {

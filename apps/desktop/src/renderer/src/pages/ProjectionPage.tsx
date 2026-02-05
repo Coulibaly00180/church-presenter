@@ -62,9 +62,9 @@ export function ProjectionPage() {
   const current = state?.current ?? { kind: "EMPTY" };
   const lowerThird = !!state?.lowerThirdEnabled;
 
-  const bg = mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : "#050505";
-  const fg =
-    mode === "BLACK" ? "white" : mode === "WHITE" ? "black" : "white";
+  const textScale = state?.textScale ?? 1;
+  const bg = mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : state?.background || "#050505";
+  const fg = mode === "BLACK" ? "white" : mode === "WHITE" ? "black" : state?.foreground || "white";
 
   const containerStyle: React.CSSProperties = {
     width: "100vw",
@@ -89,14 +89,14 @@ export function ProjectionPage() {
   };
 
   const titleStyle: React.CSSProperties = {
-    fontSize: lowerThird ? 32 : 46,
+    fontSize: (lowerThird ? 32 : 46) * textScale,
     fontWeight: 900,
     marginBottom: lowerThird ? 8 : 18,
     letterSpacing: -0.5,
   };
 
   const bodyStyle: React.CSSProperties = {
-    fontSize: lowerThird ? 40 : 56,
+    fontSize: (lowerThird ? 40 : 56) * textScale,
     fontWeight: 800,
     lineHeight: lowerThird ? 1.1 : 1.15,
     whiteSpace: "pre-wrap",

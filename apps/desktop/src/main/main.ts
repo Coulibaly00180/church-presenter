@@ -14,6 +14,9 @@ type ProjectionState = {
   mode: ProjectionMode;
   lowerThirdEnabled: boolean;
   transitionEnabled: boolean;
+  textScale: number;
+  background: string;
+  foreground: string;
   current: {
     kind: "EMPTY" | "TEXT" | "MEDIA";
     title?: string;
@@ -41,6 +44,9 @@ const screenStates: Record<ScreenKey, ProjectionState> = {
     mode: "NORMAL",
     lowerThirdEnabled: false,
     transitionEnabled: false,
+    textScale: 1,
+    background: "#050505",
+    foreground: "#ffffff",
     current: { kind: "EMPTY" },
     updatedAt: Date.now(),
   },
@@ -48,6 +54,9 @@ const screenStates: Record<ScreenKey, ProjectionState> = {
     mode: "NORMAL",
     lowerThirdEnabled: false,
     transitionEnabled: false,
+    textScale: 1,
+    background: "#050505",
+    foreground: "#ffffff",
     current: { kind: "EMPTY" },
     updatedAt: Date.now(),
   },
@@ -55,6 +64,9 @@ const screenStates: Record<ScreenKey, ProjectionState> = {
     mode: "NORMAL",
     lowerThirdEnabled: false,
     transitionEnabled: false,
+    textScale: 1,
+    background: "#050505",
+    foreground: "#ffffff",
     current: { kind: "EMPTY" },
     updatedAt: Date.now(),
   },
@@ -335,6 +347,19 @@ ipcMain.handle("projection:getState", () => screenStates.A);
 
 ipcMain.handle("projection:setState", (_evt, patch: Partial<ProjectionState>) => {
   screenStates.A = { ...screenStates.A, ...patch, updatedAt: Date.now() };
+  sendScreenState("A");
+  applyMirrorsFrom("A");
+  return screenStates.A;
+});
+
+ipcMain.handle("projection:setAppearance", (_evt, patch: { textScale?: number; background?: string; foreground?: string }) => {
+  screenStates.A = {
+    ...screenStates.A,
+    textScale: patch.textScale ?? screenStates.A.textScale ?? 1,
+    background: patch.background ?? screenStates.A.background ?? "#050505",
+    foreground: patch.foreground ?? screenStates.A.foreground ?? "#ffffff",
+    updatedAt: Date.now(),
+  };
   sendScreenState("A");
   applyMirrorsFrom("A");
   return screenStates.A;

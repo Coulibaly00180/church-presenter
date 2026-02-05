@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 
 type ScreenKey = "A" | "B" | "C";
 type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
-type ProjectionState = { mode: string; lowerThirdEnabled: boolean; current: any };
+type ProjectionState = { mode: string; lowerThirdEnabled: boolean; current: any; textScale?: number; background?: string; foreground?: string };
 type ScreenMeta = { key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode };
 type LiveState = {
   enabled: boolean;
@@ -220,7 +220,7 @@ export function RegiePage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <button onClick={() => window.cp.live?.toggleBlack()} style={{ padding: "10px 14px" }}>
             Noir (B)
           </button>
@@ -236,6 +236,44 @@ export function RegiePage() {
           >
             Lower Third (L)
           </button>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontWeight: 700 }}>Taille</span>
+            <button
+              onClick={() =>
+                window.cp.projection.setAppearance({
+                  textScale: Math.max(0.5, (stateA?.textScale ?? 1) - 0.1),
+                })
+              }
+            >
+              -
+            </button>
+            <div style={{ minWidth: 46, textAlign: "center" }}>{Math.round((stateA?.textScale ?? 1) * 100)}%</div>
+            <button
+              onClick={() =>
+                window.cp.projection.setAppearance({
+                  textScale: Math.min(2, (stateA?.textScale ?? 1) + 0.1),
+                })
+              }
+            >
+              +
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontWeight: 700 }}>Fond</span>
+            <input
+              type="color"
+              value={stateA?.background || "#050505"}
+              onChange={(e) => window.cp.projection.setAppearance({ background: e.target.value })}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <span style={{ fontWeight: 700 }}>Texte</span>
+            <input
+              type="color"
+              value={stateA?.foreground || "#ffffff"}
+              onChange={(e) => window.cp.projection.setAppearance({ foreground: e.target.value })}
+            />
+          </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 10 }}>
             {(["A", "B", "C"] as ScreenKey[]).map((k) => (
               <label key={k} style={{ display: "flex", gap: 4, alignItems: "center" }}>

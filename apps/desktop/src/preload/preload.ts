@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("cp", {
   projection: {
     getState: () => ipcRenderer.invoke("projection:getState"),
     setState: (patch: any) => ipcRenderer.invoke("projection:setState", patch),
+    setAppearance: (payload: { textScale?: number; background?: string; foreground?: string }) =>
+      ipcRenderer.invoke("projection:setAppearance", payload),
     setContentText: (payload: { title?: string; body: string }) =>
       ipcRenderer.invoke("projection:setContentText", payload),
     setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) =>
@@ -83,6 +85,7 @@ contextBridge.exposeInMainWorld("cp", {
     importWord: () => ipcRenderer.invoke("songs:importWord"),
     importJson: () => ipcRenderer.invoke("songs:importJson"),
     importWordBatch: () => ipcRenderer.invoke("songs:importWordBatch"),
+    importAuto: () => ipcRenderer.invoke("songs:importAuto"),
   },
 
   plans: {

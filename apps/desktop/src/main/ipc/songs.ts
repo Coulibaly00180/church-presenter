@@ -1,11 +1,110 @@
-import { ipcMain } from "electron";
+import { dialog, ipcMain } from "electron";
 import { getPrisma } from "../db";
 import { Document, Packer, Paragraph, TextRun } from "docx";
-import { dialog, ipcMain } from "electron";
 import mammoth from "mammoth";
 import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
+
+const SUPPORTED_DOC_EXTENSIONS = [".docx", ".odt"];
+
+function splitBlocks(text: string) {
+  return text
+    .split(/\n\s*\n/g)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+async function extractTextFromDoc(buffer: Buffer, ext: string) {
+  if (ext === ".docx") {
+    const { value } = await mammoth.extractRawText({ buffer });
+    return value || "";
+  }
+  if (ext === ".odt") {
+    const zip = new AdmZip(buffer);
+    const entry = zip.getEntry("content.xml");
+    if (!entry) throw new Error("content.xml manquant");
+    const xml = entry.getData().toString("utf-8");
+    return xml
+      .replace(/<\/text:p>/g, "\n\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+  throw new Error("Extension non supportee");
+}
+
+async function importDocSong(prisma: any, filePath: string) {
+  const buffer = fs.readFileSync(filePath);
+  const ext = path.extname(filePath).toLowerCase();
+  if (!SUPPORTED_DOC_EXTENSIONS.includes(ext)) throw new Error("Extension non supportee (docx / odt)");
+
+  const raw = await extractTextFromDoc(buffer, ext);
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const titleLine = lines.find((l) => l.toLowerCase().startsWith("titre")) || lines[0];
+  const title =
+    (titleLine && titleLine.split(":").slice(1).join(":").trim()) ||
+    (filePath.split(/[\\/]/).pop() || "Sans titre").replace(/\.(docx|odt)$/i, "") ||
+    "Sans titre";
+
+  const paragraphs = splitBlocks(raw);
+  const blocks =
+    paragraphs.length > 0
+      ? paragraphs.map((content, idx) => ({
+          order: idx + 1,
+          type: idx === 0 ? "VERSE" : "CHORUS",
+          title: idx === 0 ? "Couplet" : "Refrain",
+          content,
+        }))
+      : [{ order: 1, type: "VERSE", title: "Couplet", content: raw.trim() }];
+
+  const song = await prisma.song.create({
+    data: { title },
+  });
+  await prisma.songBlock.createMany({
+    data: blocks.map((b) => ({ ...b, songId: song.id })),
+  });
+  return song;
+}
+
+async function importJsonFile(prisma: any, filePath: string) {
+  const raw = fs.readFileSync(filePath, "utf-8");
+  let payload: any[] = [];
+  payload = JSON.parse(raw);
+  if (!Array.isArray(payload)) throw new Error("Le fichier doit contenir un tableau de chants.");
+
+  let imported = 0;
+  const errors: Array<{ path: string; title?: string; message: string }> = [];
+  for (const s of payload) {
+    try {
+      const song = await prisma.song.create({
+        data: {
+          title: s.title || "Sans titre",
+          artist: s.artist,
+          album: s.album,
+          language: s.language,
+          tags: s.tags,
+        },
+      });
+      const blocks = Array.isArray(s.blocks) ? s.blocks : [];
+      for (const b of blocks) {
+        await prisma.songBlock.create({
+          data: {
+            songId: song.id,
+            order: b.order || 1,
+            type: b.type || "VERSE",
+            title: b.title,
+            content: b.content || "",
+          },
+        });
+      }
+      imported += 1;
+    } catch (e: any) {
+      errors.push({ path: filePath, title: s?.title, message: e?.message || String(e) });
+    }
+  }
+  return { imported, errors };
+}
 
 type BlockInput = {
   order: number;
@@ -219,48 +318,12 @@ export function registerSongsIpc() {
     });
     if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
 
-    const path = res.filePaths[0];
-    const raw = fs.readFileSync(path, "utf-8");
-    let payload: any[] = [];
     try {
-      payload = JSON.parse(raw);
-      if (!Array.isArray(payload)) throw new Error("Le fichier doit contenir un tableau de chants.");
+      const r = await importJsonFile(prisma, res.filePaths[0]);
+      return { ok: true, imported: r.imported, errors: r.errors, path: res.filePaths[0] };
     } catch (e: any) {
       return { ok: false, error: e?.message || String(e) };
     }
-
-    let imported = 0;
-    const errors: Array<{ title?: string; message: string }> = [];
-    for (const s of payload) {
-      try {
-        const song = await prisma.song.create({
-          data: {
-            title: s.title || "Sans titre",
-            artist: s.artist,
-            album: s.album,
-            language: s.language,
-            tags: s.tags,
-          },
-        });
-        const blocks = Array.isArray(s.blocks) ? s.blocks : [];
-        for (const b of blocks) {
-          await prisma.songBlock.create({
-            data: {
-              songId: song.id,
-              order: b.order || 1,
-              type: b.type || "VERSE",
-              title: b.title,
-              content: b.content || "",
-            },
-          });
-        }
-        imported += 1;
-      } catch (e: any) {
-        errors.push({ title: s?.title, message: e?.message || String(e) });
-      }
-    }
-
-    return { ok: true, imported, errors, path };
   });
 
   ipcMain.handle("songs:importWordBatch", async () => {
@@ -274,42 +337,54 @@ export function registerSongsIpc() {
     const prisma = getPrisma();
     let imported = 0;
     const errors: Array<{ path: string; message: string }> = [];
-
-    async function importOne(filePath: string) {
-      const buffer = fs.readFileSync(filePath);
-      const ext = path.extname(filePath).toLowerCase();
-      let text = "";
-      if (ext === ".docx") {
-        const { value } = await mammoth.extractRawText({ buffer });
-        text = value || "";
-      } else if (ext === ".odt") {
-        const zip = new AdmZip(buffer);
-        const entry = zip.getEntry("content.xml");
-        if (!entry) throw new Error("content.xml manquant");
-        const xml = entry.getData().toString("utf-8");
-        text = xml
-          .replace(/<\/text:p>/g, "\n\n")
-          .replace(/<[^>]+>/g, "")
-          .replace(/\n{3,}/g, "\n\n")
-          .trim();
-      } else {
-        throw new Error("Extension non supportee (docx ou odt)");
-      }
-      const title = filePath.split(/[\\/]/).pop()?.replace(/\.(docx|odt)$/i, "") || "Sans titre";
-      const song = await prisma.song.create({ data: { title } });
-      await prisma.songBlock.create({
-        data: { songId: song.id, order: 1, type: "VERSE", title: "Texte", content: text },
-      });
-      imported += 1;
-    }
-
     for (const p of res.filePaths) {
       try {
-        await importOne(p);
+        await importDocSong(prisma, p);
+        imported += 1;
       } catch (e: any) {
         errors.push({ path: p, message: e?.message || String(e) });
       }
     }
     return { ok: true, imported, errors, files: res.filePaths };
+  });
+
+  ipcMain.handle("songs:importAuto", async () => {
+    const res = await dialog.showOpenDialog({
+      title: "Importer des chants (docx / odt / json)",
+      filters: [
+        { name: "Chants", extensions: ["docx", "odt", "json"] },
+        { name: "Tous", extensions: ["*"] },
+      ],
+      properties: ["openFile", "multiSelections"],
+    });
+    if (res.canceled || !res.filePaths?.length) return { ok: false, canceled: true };
+
+    const prisma = getPrisma();
+    let imported = 0;
+    let jsonFiles = 0;
+    let docFiles = 0;
+    const errors: Array<{ path: string; message: string }> = [];
+
+    for (const p of res.filePaths) {
+      const ext = path.extname(p).toLowerCase();
+      try {
+        if (ext === ".json") {
+          const r = await importJsonFile(prisma, p);
+          imported += r.imported;
+          jsonFiles += 1;
+          if (r.errors.length) errors.push(...r.errors.map((e) => ({ path: e.path, message: e.message })));
+        } else if (SUPPORTED_DOC_EXTENSIONS.includes(ext)) {
+          await importDocSong(prisma, p);
+          imported += 1;
+          docFiles += 1;
+        } else {
+          errors.push({ path: p, message: "Extension non supportee" });
+        }
+      } catch (e: any) {
+        errors.push({ path: p, message: e?.message || String(e) });
+      }
+    }
+
+    return { ok: true, imported, docFiles, jsonFiles, errors, files: res.filePaths };
   });
 }
