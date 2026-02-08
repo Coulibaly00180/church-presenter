@@ -1,4 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import * as pdfjsLib from "pdfjs-dist";
+import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 type MediaItem = { name: string; path: string; mediaType: "PDF" | "IMAGE" };
 type PlanListItem = { id: string; title?: string | null; date?: string | Date };
@@ -21,6 +25,7 @@ export function AnnouncementsPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
 
   const panelStyle: React.CSSProperties = {
     background: "var(--panel)",
@@ -89,6 +94,28 @@ export function AnnouncementsPage() {
   }, []);
 
   const pdfs = useMemo(() => files.filter((f) => f.mediaType === "PDF"), [files]);
+
+  // Load page counts for PDFs
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCounts() {
+      const entries: Record<string, number> = {};
+      for (const f of pdfs) {
+        try {
+          const url = f.path.startsWith("file://") ? f.path : `file:///${f.path.replace(/\\/g, "/")}`;
+          const pdf = await pdfjsLib.getDocument(url).promise;
+          entries[f.path] = pdf.numPages;
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!cancelled) setPageCounts(entries);
+    }
+    loadCounts();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdfs]);
 
   return (
     <div style={{ padding: 16, display: "grid", gap: 12 }}>
@@ -172,11 +199,11 @@ export function AnnouncementsPage() {
         </div>
 
         <div style={panelStyle}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>PDF importes ({pdfs.length})</div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            Page
-            <input type="number" min={1} value={pdfPage} onChange={(e) => setPdfPage(e.target.value)} style={{ width: 80 }} />
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>PDF importes ({pdfs.length})</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
+            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              Page
+              <input type="number" min={1} value={pdfPage} onChange={(e) => setPdfPage(e.target.value)} style={{ width: 80 }} />
             </label>
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
               Plan
@@ -205,14 +232,16 @@ export function AnnouncementsPage() {
               >
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ fontWeight: 700 }}>{f.name}</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>{f.mediaType}</div>
+                  <div style={{ fontSize: 12, opacity: 0.7 }}>
+                    {f.mediaType} {pageCounts[f.path] ? `• ${pageCounts[f.path]} page(s)` : ""}
+                  </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
-                      onClick={async () => {
-                        if (!planId) return;
-                        const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
-                        await window.cp.plans.addItem({
-                          planId,
+                  onClick={async () => {
+                    if (!planId) return;
+                    const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
+                    await window.cp.plans.addItem({
+                      planId,
                           kind: "ANNOUNCEMENT_PDF",
                           title: f.name,
                           mediaPath,

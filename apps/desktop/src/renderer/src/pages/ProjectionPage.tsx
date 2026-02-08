@@ -99,7 +99,7 @@ export function ProjectionPage() {
     } else {
       setPdfPage(1);
     }
-  }, [current.kind, current.mediaType, current.mediaPath, pdfPage]);
+  }, [current.kind, current.mediaType, current.mediaPath]);
 
   // Render PDF page to image for clean display (no viewer UI)
   useEffect(() => {
@@ -143,7 +143,7 @@ export function ProjectionPage() {
     };
   }, [current.kind, current.mediaType, current.mediaPath, pdfPage]);
 
-  // Global key navigation in case container loses focus
+  // Global key navigation in case container loses focus (haut/bas seulement, gauche/droite gérés sur le container)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (current.mediaType !== "PDF") return;
@@ -159,6 +159,11 @@ export function ProjectionPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [current.mediaType, pdfPageCount]);
+
+  // Clamp when page count changes
+  useEffect(() => {
+    if (pdfPage > pdfPageCount) setPdfPage(pdfPageCount || 1);
+  }, [pdfPageCount, pdfPage]);
 
   const containerStyle: React.CSSProperties = {
     width: "100vw",
@@ -216,6 +221,14 @@ export function ProjectionPage() {
             e.preventDefault();
             setPdfPage((p) => Math.max(p - 1, 1));
           }
+          if (e.key === "ArrowRight") {
+            e.preventDefault();
+            setPdfPage((p) => Math.min(p + 1, pdfPageCount || 1));
+          }
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            setPdfPage((p) => Math.max(p - 1, 1));
+          }
         }
       }}
       tabIndex={0}
@@ -252,10 +265,27 @@ export function ProjectionPage() {
             {/* Pas de titre pour les PDF, seulement l'image rendue */}
             {current.mediaType === "PDF" ? (
               pdfImage ? (
-                <img
-                  src={pdfImage}
-                  style={{ width: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 12 }}
-                />
+                <>
+                  <img
+                    src={pdfImage}
+                    style={{ width: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 12 }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 14,
+                      right: 16,
+                      background: "rgba(0,0,0,0.55)",
+                      color: "white",
+                      padding: "6px 10px",
+                      borderRadius: 10,
+                      fontWeight: 800,
+                      fontSize: 14,
+                    }}
+                  >
+                    {pdfPage} / {pdfPageCount || "?"}
+                  </div>
+                </>
               ) : pdfLoading ? (
                 <div style={{ opacity: 0.8 }}>Chargement du PDF...</div>
               ) : pdfError ? (
