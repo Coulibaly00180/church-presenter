@@ -15,6 +15,51 @@ function splitBlocks(text: string) {
     .filter(Boolean);
 }
 
+function parseSongText(raw: string, filename?: string) {
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let title =
+    lines.find((l) => /^titre\s*:/i.test(l))?.split(":").slice(1).join(":").trim() ||
+    filename?.replace(/\.(docx|odt)$/i, "") ||
+    "Sans titre";
+  const artist = lines.find((l) => /^auteur\s*:/i.test(l))?.split(":").slice(1).join(":").trim();
+  const album = lines.find((l) => /^album\s*:/i.test(l))?.split(":").slice(1).join(":").trim();
+  const year =
+    lines.find((l) => /^ann[eé]e/i.test(l))?.split(":").slice(1).join(":").trim() ||
+    lines.find((l) => /^année de parution/i.test(l))?.split(":").slice(1).join(":").trim();
+
+  // Lyrics: everything after a line starting with "Paroles" OR the whole text minus metadata
+  let lyrics = "";
+  const parolesIdx = lines.findIndex((l) => /^paroles\s*:?/i.test(l));
+  if (parolesIdx >= 0) {
+    lyrics = lines.slice(parolesIdx + 1).join("\n");
+  } else {
+    const metaKeys = ["titre", "auteur", "album", "ann", "année", "annee"];
+    lyrics = lines
+      .filter((l) => !metaKeys.some((k) => l.toLowerCase().startsWith(k)))
+      .join("\n");
+  }
+
+  const paragraphs = splitBlocks(lyrics);
+  const blocks =
+    paragraphs.length > 0
+      ? paragraphs.map((content, idx) => ({
+          order: idx + 1,
+          type: idx === 0 ? "VERSE" : "CHORUS",
+          title: idx === 0 ? "Couplet" : "Refrain",
+          content,
+        }))
+      : [
+          {
+            order: 1,
+            type: "VERSE",
+            title: "Couplet",
+            content: lyrics.trim(),
+          },
+        ];
+
+  return { title, artist, album, year, blocks };
+}
+
 async function extractTextFromDoc(buffer: Buffer, ext: string) {
   if (ext === ".docx") {
     const { value } = await mammoth.extractRawText({ buffer });
@@ -40,53 +85,68 @@ async function importDocSong(prisma: any, filePath: string) {
   if (!SUPPORTED_DOC_EXTENSIONS.includes(ext)) throw new Error("Extension non supportee (docx / odt)");
 
   const raw = await extractTextFromDoc(buffer, ext);
-  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const titleLine = lines.find((l) => l.toLowerCase().startsWith("titre")) || lines[0];
-  const title =
-    (titleLine && titleLine.split(":").slice(1).join(":").trim()) ||
-    (filePath.split(/[\\/]/).pop() || "Sans titre").replace(/\.(docx|odt)$/i, "") ||
-    "Sans titre";
-
-  const paragraphs = splitBlocks(raw);
-  const blocks =
-    paragraphs.length > 0
-      ? paragraphs.map((content, idx) => ({
-          order: idx + 1,
-          type: idx === 0 ? "VERSE" : "CHORUS",
-          title: idx === 0 ? "Couplet" : "Refrain",
-          content,
-        }))
-      : [{ order: 1, type: "VERSE", title: "Couplet", content: raw.trim() }];
+  const parsed = parseSongText(raw, path.basename(filePath));
 
   const song = await prisma.song.create({
-    data: { title },
+    data: {
+      title: parsed.title,
+      artist: parsed.artist,
+      album: parsed.album,
+      tags: parsed.year,
+    },
   });
   await prisma.songBlock.createMany({
-    data: blocks.map((b) => ({ ...b, songId: song.id })),
+    data: parsed.blocks.map((b) => ({ ...b, songId: song.id })),
   });
   return song;
 }
 
 async function importJsonFile(prisma: any, filePath: string) {
   const raw = fs.readFileSync(filePath, "utf-8");
-  let payload: any[] = [];
-  payload = JSON.parse(raw);
-  if (!Array.isArray(payload)) throw new Error("Le fichier doit contenir un tableau de chants.");
+  let payload: any = JSON.parse(raw);
+  if (Array.isArray(payload)) {
+    // ok
+  } else if (payload?.songs && Array.isArray(payload.songs)) {
+    payload = payload.songs;
+  } else if (typeof payload === "object") {
+    payload = [payload]; // accepte un seul chant
+  } else {
+    throw new Error("Le fichier doit contenir un tableau de chants ou un objet unique.");
+  }
 
   let imported = 0;
   const errors: Array<{ path: string; title?: string; message: string }> = [];
   for (const s of payload) {
     try {
+      const meta = s.meta || {};
+      // blocs : accepte soit blocks[], soit lyrics (string) qu'on découpe en paragraphes
+      let blocks: any[] = Array.isArray(s.blocks) ? s.blocks : [];
+      const lyrics = s.lyrics || s.paroles || meta.paroles;
+      if ((!blocks || blocks.length === 0) && typeof lyrics === "string") {
+        blocks = splitBlocks(lyrics).map((content, idx) => ({
+          order: idx + 1,
+          type: idx === 0 ? "VERSE" : "CHORUS",
+          title: idx === 0 ? "Couplet" : "Refrain",
+          content,
+        }));
+      }
+      // année dans tags ou year
+      const year = s.year || s.annee || s.published || s.release_year || meta.annee_de_sortie_single;
+      const tags = s.tags || (year != null ? String(year).slice(0, 10) : undefined);
+      const title = s.title || s.titre || meta.titre || "Sans titre";
+      const artist = s.artist || s.auteur || meta.auteur_interprete || meta.auteur || meta.interprete;
+      const album = s.album || meta.album_inclus_dans;
+      const language = s.language || s.lang || meta.langue;
+
       const song = await prisma.song.create({
         data: {
-          title: s.title || "Sans titre",
-          artist: s.artist,
-          album: s.album,
-          language: s.language,
-          tags: s.tags,
+          title,
+          artist,
+          album,
+          language,
+          tags,
         },
       });
-      const blocks = Array.isArray(s.blocks) ? s.blocks : [];
       for (const b of blocks) {
         await prisma.songBlock.create({
           data: {
@@ -94,7 +154,7 @@ async function importJsonFile(prisma: any, filePath: string) {
             order: b.order || 1,
             type: b.type || "VERSE",
             title: b.title,
-            content: b.content || "",
+            content: (b.content || "").trim(),
           },
         });
       }
@@ -249,58 +309,17 @@ export function registerSongsIpc() {
 
     const filePath = res.filePaths[0];
     const { value } = await mammoth.extractRawText({ path: filePath });
-    const lines = value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-
-    let title = "Sans titre";
-    let artist: string | undefined;
-    let album: string | undefined;
-    let year: string | undefined;
-    const blocksRaw: string[] = [];
-
-    let inLyrics = false;
-    for (const l of lines) {
-      const lower = l.toLowerCase();
-      if (lower.startsWith("titre")) {
-        title = l.split(":").slice(1).join(":").trim() || title;
-      } else if (lower.startsWith("auteur")) {
-        artist = l.split(":").slice(1).join(":").trim() || undefined;
-      } else if (lower.startsWith("album")) {
-        album = l.split(":").slice(1).join(":").trim() || undefined;
-      } else if (lower.startsWith("annee")) {
-        year = l.split(":").slice(1).join(":").trim() || undefined;
-      } else if (lower.startsWith("paroles")) {
-        inLyrics = true;
-      } else if (inLyrics) {
-        blocksRaw.push(l);
-      }
-    }
-
-    const paragraphBlocks = blocksRaw.join("\n").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+    const parsed = parseSongText(value || "", path.basename(filePath));
 
     const prisma = getPrisma();
     const created = await prisma.song.create({
       data: {
-        title,
-        artist,
-        album,
-        tags: year,
+        title: parsed.title,
+        artist: parsed.artist,
+        album: parsed.album,
+        tags: parsed.year,
         blocks: {
-          create:
-            paragraphBlocks.length > 0
-              ? paragraphBlocks.map((content, idx) => ({
-                  order: idx + 1,
-                  type: idx === 0 ? "VERSE" : "CHORUS",
-                  title: idx === 0 ? "Couplet" : "Refrain",
-                  content,
-                }))
-              : [
-                  {
-                    order: 1,
-                    type: "VERSE",
-                    title: "Couplet",
-                    content: blocksRaw.join("\n"),
-                  },
-                ],
+          create: parsed.blocks,
         },
       },
       include: { blocks: { orderBy: { order: "asc" } } },

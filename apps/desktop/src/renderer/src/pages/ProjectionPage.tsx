@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
@@ -24,6 +24,7 @@ export function ProjectionPage() {
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [pdfPageCount, setPdfPageCount] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const devtoolsOpened = useRef(false);
 
   function toFileUrl(p?: string) {
     if (!p) return "";
@@ -38,15 +39,19 @@ export function ProjectionPage() {
   }
 
 
-  // Live controls from projection window: arrows + click left/right
+  // Live controls from projection window: arrows/Q/D + click left/right (skip when PDF to avoid conflict with PDF paging)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === " ") {
+      const isPdf = state?.current?.mediaType === "PDF";
+      if (isPdf) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === " " || e.key.toLowerCase() === "d") {
         e.preventDefault();
+        console.log("[projection] key:", e.key, "-> live: next");
         window.cp.live?.next?.();
       }
-      if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp") {
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp" || e.key.toLowerCase() === "q") {
         e.preventDefault();
+        console.log("[projection] key:", e.key, "-> live: prev");
         window.cp.live?.prev?.();
       }
     };
@@ -57,6 +62,11 @@ export function ProjectionPage() {
 
   useEffect(() => {
     const hasScreens = !!window.cp?.screens?.getState && !!window.cp?.screens?.onState;
+
+    if (!devtoolsOpened.current) {
+      window.cp.devtools?.open?.(screenKey === "A" ? "PROJECTION" : screenKey === "B" ? "SCREEN_B" : "SCREEN_C");
+      devtoolsOpened.current = true;
+    }
 
     if (hasScreens) {
       window.cp.screens.getState(screenKey).then(setState);
@@ -143,7 +153,7 @@ export function ProjectionPage() {
     };
   }, [current.kind, current.mediaType, current.mediaPath, pdfPage]);
 
-  // Global key navigation in case container loses focus (haut/bas seulement, gauche/droite gérés sur le container)
+  // Global key navigation in case container loses focus (haut/bas seulement, gauche/droite gÃ©rÃ©s sur le container)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (current.mediaType !== "PDF") return;
@@ -208,26 +218,47 @@ export function ProjectionPage() {
       onWheel={(e) => {
         if (current.mediaType === "PDF") {
           e.preventDefault();
-          setPdfPage((p) => Math.min(Math.max(p + (e.deltaY > 0 ? 1 : -1), 1), pdfPageCount || 1));
+          const delta = e.deltaY > 0 ? 1 : -1;
+          setPdfPage((p) => {
+            const next = Math.min(Math.max(p + delta, 1), pdfPageCount || 1);
+            if (next !== p) console.log("[projection] wheel -> PDF page", next);
+            return next;
+          });
         }
       }}
       onKeyDown={(e) => {
         if (current.mediaType === "PDF") {
           if (e.key === "ArrowDown" || e.key === "PageDown") {
             e.preventDefault();
-            setPdfPage((p) => Math.min(p + 1, pdfPageCount || 1));
+            setPdfPage((p) => {
+              const next = Math.min(p + 1, pdfPageCount || 1);
+              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
+              return next;
+            });
           }
           if (e.key === "ArrowUp" || e.key === "PageUp") {
             e.preventDefault();
-            setPdfPage((p) => Math.max(p - 1, 1));
+            setPdfPage((p) => {
+              const next = Math.max(p - 1, 1);
+              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
+              return next;
+            });
           }
           if (e.key === "ArrowRight") {
             e.preventDefault();
-            setPdfPage((p) => Math.min(p + 1, pdfPageCount || 1));
+            setPdfPage((p) => {
+              const next = Math.min(p + 1, pdfPageCount || 1);
+              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
+              return next;
+            });
           }
           if (e.key === "ArrowLeft") {
             e.preventDefault();
-            setPdfPage((p) => Math.max(p - 1, 1));
+            setPdfPage((p) => {
+              const next = Math.max(p - 1, 1);
+              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
+              return next;
+            });
           }
         }
       }}
@@ -303,11 +334,40 @@ export function ProjectionPage() {
           </>
         ) : (
           <>
-            {current.title ? <div style={titleStyle}>{current.title}</div> : null}
             <div style={bodyStyle}>{current.body ?? ""}</div>
+            {(current.metaSong || current.title) ? (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 20,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  background: "rgba(0,0,0,0.55)",
+                  color: "white",
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  fontSize: 14,
+                  fontWeight: 700,
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                  maxWidth: "90%",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <span>{current.metaSong?.title || current.title || "Chant"}</span>
+                {current.metaSong?.artist ? <span>• {current.metaSong.artist}</span> : null}
+                {current.metaSong?.album ? <span>• {current.metaSong.album}</span> : null}
+                {current.metaSong?.year ? <span>• {current.metaSong.year}</span> : null}
+              </div>
+            ) : null}
           </>
         )}
       </div>
     </div>
   );
 }
+
+
+
+

@@ -233,8 +233,13 @@ export function AnnouncementsPage() {
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ fontWeight: 700 }}>{f.name}</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    {f.mediaType} {pageCounts[f.path] ? `â€¢ ${pageCounts[f.path]} page(s)` : ""}
+                    {f.mediaType} {pageCounts[f.path] ? `• ${pageCounts[f.path]} page(s)` : ""}
                   </div>
+                  {pageCounts[f.path] ? (
+                    <div style={{ fontSize: 12, opacity: 0.65 }}>
+                      Page choisie: {parseInt(pdfPage || "1", 10) || 1} / {pageCounts[f.path]}
+                    </div>
+                  ) : null}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     <button
                   onClick={async () => {
@@ -284,3 +289,6 @@ export function AnnouncementsPage() {
     </div>
   );
 }
+
+
+

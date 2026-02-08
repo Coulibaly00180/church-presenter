@@ -144,11 +144,11 @@ export function RegiePage() {
         window.cp.live?.resume();
       }
 
-      if (e.key === "ArrowLeft") {
+      if (e.key === "ArrowLeft" || e.key.toLowerCase() === "q") {
         e.preventDefault();
         window.cp.live?.prev();
       }
-      if (e.key === "ArrowRight" || e.key === " ") {
+      if (e.key === "ArrowRight" || e.key === " " || e.key.toLowerCase() === "d") {
         e.preventDefault();
         window.cp.live?.next();
       }

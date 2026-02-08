@@ -9,7 +9,7 @@ declare global {
       projection: {
         getState: () => Promise<any>;
         setState: (patch: any) => Promise<any>;
-        setContentText: (payload: { title?: string; body: string }) => Promise<any>;
+        setContentText: (payload: { title?: string; body: string; metaSong?: any }) => Promise<any>;
         setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => Promise<any>;
         setMode: (mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
         onState: (cb: (state: any) => void) => () => void;
@@ -30,7 +30,7 @@ declare global {
         close: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
         setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) => Promise<any>;
         getState: (key: ScreenKey) => Promise<any>;
-        setContentText: (key: ScreenKey, payload: { title?: string; body: string }) => Promise<any>;
+        setContentText: (key: ScreenKey, payload: { title?: string; body: string; metaSong?: any }) => Promise<any>;
         setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => Promise<any>;
         setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
         onState: (key: ScreenKey, cb: (state: any) => void) => () => void;

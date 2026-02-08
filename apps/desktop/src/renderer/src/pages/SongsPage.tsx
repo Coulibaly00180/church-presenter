@@ -23,6 +23,7 @@ type SongDetail = {
   title: string;
   artist?: string;
   album?: string;
+  tags?: string | null;
   blocks: SongBlock[];
 };
 
@@ -35,8 +36,7 @@ function splitBlocks(text: string) {
     .filter(Boolean);
 }
 
-
-async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string) {
+async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string, metaSong?: any) {
   // Always ensure A exists when needed
   const screens = await window.cp.screens.list();
   const meta = screens.find((s) => s.key === target);
@@ -50,20 +50,20 @@ async function projectTextToTarget(target: ScreenKey, title: string | undefined,
 
   // If B/C are mirroring A, projecting to B/C should actually update A (so mirror follows)
   if (target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A") {
-    await window.cp.projection.setContentText({ title, body });
+    await window.cp.projection.setContentText({ title, body, metaSong });
     return;
   }
 
   // Normal cases
   if (target === "A") {
-    await window.cp.projection.setContentText({ title, body });
+    await window.cp.projection.setContentText({ title, body, metaSong });
     return;
   }
 
-  const res: any = await window.cp.screens.setContentText(target, { title, body });
+  const res: any = await window.cp.screens.setContentText(target, { title, body, metaSong });
   if (res?.ok === false && res?.reason === "MIRROR") {
     // safety fallback: update A
-    await window.cp.projection.setContentText({ title, body });
+    await window.cp.projection.setContentText({ title, body, metaSong });
   }
 }
 
@@ -237,7 +237,13 @@ export function SongsPage() {
   async function projectBlock(i: number) {
     if (!song) return;
     const b = song.blocks[i];
-    await projectTextToTarget(target, song.title, b.content || "");
+    const metaSong = {
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      year: song.tags || song.album, // tags often used for year import
+    };
+    await projectTextToTarget(target, song.title, b.content || "", metaSong);
   }
 
   async function addBlockToPlan(i: number) {
@@ -294,7 +300,13 @@ export function SongsPage() {
   async function projectAllAsFlow() {
     if (!song) return;
     const text = song.blocks.map((b) => (b.content ?? "").trim()).filter(Boolean).join("\n\n");
-    await projectTextToTarget(target, song.title, text);
+    const metaSong = {
+      title: song.title,
+      artist: song.artist,
+      album: song.album,
+      year: song.tags || song.album,
+    };
+    await projectTextToTarget(target, song.title, text, metaSong);
   }
 
   return (

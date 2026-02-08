@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld("cp", {
     setState: (patch: any) => ipcRenderer.invoke("projection:setState", patch),
     setAppearance: (payload: { textScale?: number; background?: string; foreground?: string }) =>
       ipcRenderer.invoke("projection:setAppearance", payload),
-    setContentText: (payload: { title?: string; body: string }) =>
+    setContentText: (payload: { title?: string; body: string; metaSong?: any }) =>
       ipcRenderer.invoke("projection:setContentText", payload),
     setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) =>
       ipcRenderer.invoke("projection:setContentMedia", payload),
@@ -48,7 +48,7 @@ contextBridge.exposeInMainWorld("cp", {
     setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) =>
       ipcRenderer.invoke("screens:setMirror", key, mirror),
     getState: (key: ScreenKey) => ipcRenderer.invoke("screens:getState", key),
-    setContentText: (key: ScreenKey, payload: { title?: string; body: string }) =>
+    setContentText: (key: ScreenKey, payload: { title?: string; body: string; metaSong?: any }) =>
       ipcRenderer.invoke("screens:setContentText", key, payload),
     setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) =>
       ipcRenderer.invoke("screens:setContentMedia", key, payload),

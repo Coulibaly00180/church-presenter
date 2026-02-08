@@ -23,6 +23,7 @@ type ProjectionState = {
     body?: string;
     mediaPath?: string;
     mediaType?: "IMAGE" | "PDF";
+    metaSong?: { title?: string; artist?: string; album?: string; year?: string };
   };
   updatedAt: number;
 };
@@ -389,11 +390,11 @@ ipcMain.handle("projection:setAppearance", (_evt, patch: { textScale?: number; b
   return screenStates.A;
 });
 
-ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; body: string }) => {
+ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; body: string; metaSong?: any }) => {
   screenStates.A = {
     ...screenStates.A,
     mode: "NORMAL",
-    current: { kind: "TEXT", title: payload.title, body: payload.body },
+    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong },
     updatedAt: Date.now(),
   };
   sendScreenState("A");
@@ -454,14 +455,14 @@ ipcMain.handle("screens:setMirror", (_evt, key: ScreenKey, mirror: ScreenMirrorM
 
 ipcMain.handle("screens:getState", (_evt, key: ScreenKey) => screenStates[key]);
 
-ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title?: string; body: string }) => {
+ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title?: string; body: string; metaSong?: any }) => {
   // If screen is mirroring, ignore direct set (safety)
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
 
   screenStates[key] = {
     ...screenStates[key],
     mode: "NORMAL",
-    current: { kind: "TEXT", title: payload.title, body: payload.body },
+    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong },
     updatedAt: Date.now(),
   };
   sendScreenState(key);
