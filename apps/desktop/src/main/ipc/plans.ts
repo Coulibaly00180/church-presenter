@@ -1,6 +1,14 @@
 import { dialog, ipcMain } from "electron";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
+import type {
+  CpPlanAddItemPayload,
+  CpPlanCreatePayload,
+  CpPlanDuplicatePayload,
+  CpPlanExportPayload,
+  CpPlanRemoveItemPayload,
+  CpPlanReorderPayload,
+} from "../../shared/ipc";
 
 function normalizeDateToMidnight(dateIso: string) {
   const ymd = dateIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -44,7 +52,7 @@ export function registerPlansIpc() {
     });
   });
 
-  ipcMain.handle("plans:duplicate", async (_evt, payload: { planId: string; dateIso?: string; title?: string }) => {
+  ipcMain.handle("plans:duplicate", async (_evt, payload: CpPlanDuplicatePayload) => {
     const prisma = getPrisma();
     const base = await prisma.servicePlan.findUnique({
       where: { id: payload.planId },
@@ -91,7 +99,7 @@ export function registerPlansIpc() {
     throw new Error("Unable to find an available plan date");
   });
 
-  ipcMain.handle("plans:create", async (_evt, payload: { dateIso: string; title?: string }) => {
+  ipcMain.handle("plans:create", async (_evt, payload: CpPlanCreatePayload) => {
     const prisma = getPrisma();
     let candidateDate = normalizeDateToMidnight(payload.dateIso);
     const title = payload.title ?? "Culte";
@@ -121,15 +129,7 @@ export function registerPlansIpc() {
     "plans:addItem",
     async (
       _evt,
-      payload: {
-        planId: string;
-        kind: string;
-        title?: string;
-        content?: string;
-        refId?: string;
-        refSubId?: string;
-        mediaPath?: string;
-      }
+      payload: CpPlanAddItemPayload
     ) => {
       const prisma = getPrisma();
       const count = await prisma.serviceItem.count({ where: { planId: payload.planId } });
@@ -150,7 +150,7 @@ export function registerPlansIpc() {
     }
   );
 
-  ipcMain.handle("plans:removeItem", async (_evt, payload: { planId: string; itemId: string }) => {
+  ipcMain.handle("plans:removeItem", async (_evt, payload: CpPlanRemoveItemPayload) => {
     const prisma = getPrisma();
     await prisma.serviceItem.delete({ where: { id: payload.itemId } });
 
@@ -166,7 +166,7 @@ export function registerPlansIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("plans:reorder", async (_evt, payload: { planId: string; orderedItemIds: string[] }) => {
+  ipcMain.handle("plans:reorder", async (_evt, payload: CpPlanReorderPayload) => {
     const prisma = getPrisma();
     await prisma.$transaction(
       payload.orderedItemIds.map((id, idx) => prisma.serviceItem.update({ where: { id }, data: { order: idx + 1 } }))
@@ -174,7 +174,7 @@ export function registerPlansIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("plans:export", async (_evt, payload: { planId: string }) => {
+  ipcMain.handle("plans:export", async (_evt, payload: CpPlanExportPayload) => {
     const prisma = getPrisma();
     const plan = await prisma.servicePlan.findUnique({
       where: { id: payload.planId },

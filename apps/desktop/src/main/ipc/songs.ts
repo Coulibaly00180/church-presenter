@@ -6,6 +6,7 @@ import mammoth from "mammoth";
 import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
+import type { CpSongBlockType } from "../../shared/ipc";
 
 const SUPPORTED_DOC_EXTENSIONS = [".docx", ".odt"];
 type PrismaClientType = ReturnType<typeof getPrisma>;
@@ -39,10 +40,52 @@ type ImportSongEntry = {
   meta?: ImportSongMeta;
   songs?: ImportSongEntry[];
 };
+type NormalizedImportSongBlock = { order: number; type: string; title?: string; content: string };
+type NormalizedImportSong = {
+  title: string;
+  artist?: string;
+  album?: string;
+  language?: string;
+  tags?: string;
+  blocks: NormalizedImportSongBlock[];
+};
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function asStringLike(value: unknown): string | undefined {
+  if (typeof value === "string") return asString(value);
+  if (typeof value === "number") return String(value);
+  return undefined;
+}
+
+function asMeta(value: unknown): ImportSongMeta {
+  if (!isRecord(value)) return {};
+  return value as ImportSongMeta;
+}
+
+function normalizeBlock(rawBlock: unknown, idx: number): NormalizedImportSongBlock | null {
+  if (!isRecord(rawBlock)) return null;
+  const content = asStringLike(rawBlock.content) || "";
+  const parsedOrder = typeof rawBlock.order === "number" && Number.isFinite(rawBlock.order) ? Math.floor(rawBlock.order) : idx + 1;
+  return {
+    order: parsedOrder > 0 ? parsedOrder : idx + 1,
+    type: asString(rawBlock.type) || "VERSE",
+    title: asString(rawBlock.title),
+    content: content.trim(),
+  };
 }
 
 function splitBlocks(text: string) {
@@ -146,72 +189,124 @@ async function importDocSong(prisma: PrismaClientType, filePath: string) {
 
 async function importJsonFile(prisma: PrismaClientType, filePath: string) {
   const raw = fs.readFileSync(filePath, "utf-8");
-  let payload = JSON.parse(raw) as unknown;
-  if (Array.isArray(payload)) {
-    // ok
-  } else if (typeof payload === "object" && payload !== null && "songs" in payload && Array.isArray((payload as ImportSongEntry).songs)) {
+  let payload: unknown = JSON.parse(raw);
+
+  if (isRecord(payload) && "songs" in payload) {
     payload = (payload as ImportSongEntry).songs ?? [];
-  } else if (typeof payload === "object" && payload !== null) {
-    payload = [payload as ImportSongEntry]; // accepte un seul chant
-  } else {
+  }
+
+  if (isRecord(payload)) {
+    payload = [payload]; // accepte un seul chant
+  }
+
+  if (!Array.isArray(payload)) {
     throw new Error("Le fichier doit contenir un tableau de chants ou un objet unique.");
   }
 
-  let imported = 0;
+  const normalizedSongs: NormalizedImportSong[] = [];
   const errors: Array<{ path: string; title?: string; message: string }> = [];
-  for (const s of payload as ImportSongEntry[]) {
-    try {
-      const meta = s.meta || {};
-      // blocs : accepte soit blocks[], soit lyrics (string) qu'on decoupe en paragraphes
-      let blocks: ImportSongBlock[] = Array.isArray(s.blocks) ? s.blocks : [];
-      const lyrics = s.lyrics || s.paroles || meta.paroles;
-      if ((!blocks || blocks.length === 0) && typeof lyrics === "string") {
-        blocks = splitBlocks(lyrics).map((content, idx) => ({
-          order: idx + 1,
-          type: idx === 0 ? "VERSE" : "CHORUS",
-          title: idx === 0 ? "Couplet" : "Refrain",
-          content,
-        }));
-      }
-      // annee dans tags ou year
-      const year = s.year || s.annee || s.published || s.release_year || meta.annee_de_sortie_single;
-      const tags = s.tags || (year != null ? String(year).slice(0, 10) : undefined);
-      const title = s.title || s.titre || meta.titre || "Sans titre";
-      const artist = s.artist || s.auteur || meta.auteur_interprete || meta.auteur || meta.interprete;
-      const album = s.album || meta.album_inclus_dans;
-      const language = s.language || s.lang || meta.langue;
 
+  for (const [songIdx, rawSong] of payload.entries()) {
+    if (!isRecord(rawSong)) {
+      errors.push({ path: filePath, message: `Entree #${songIdx + 1}: format invalide (objet attendu)` });
+      continue;
+    }
+
+    const s = rawSong as ImportSongEntry;
+    const meta = asMeta(s.meta);
+    let blocks: NormalizedImportSongBlock[] = [];
+
+    if (Array.isArray(s.blocks)) {
+      blocks = s.blocks
+        .map((b, idx) => normalizeBlock(b, idx))
+        .filter((b): b is NormalizedImportSongBlock => !!b);
+      if (blocks.length !== s.blocks.length) {
+        errors.push({
+          path: filePath,
+          title: asStringLike(s.title) || asStringLike(s.titre),
+          message: `Entree #${songIdx + 1}: certains blocs sont ignores (format invalide)`,
+        });
+      }
+    } else if (s.blocks != null) {
+      errors.push({
+        path: filePath,
+        title: asStringLike(s.title) || asStringLike(s.titre),
+        message: `Entree #${songIdx + 1}: blocks doit etre un tableau`,
+      });
+    }
+
+    const lyrics = asStringLike(s.lyrics) || asStringLike(s.paroles) || asStringLike(meta.paroles);
+    if (blocks.length === 0 && lyrics) {
+      blocks = splitBlocks(lyrics).map((content, idx) => ({
+        order: idx + 1,
+        type: idx === 0 ? "VERSE" : "CHORUS",
+        title: idx === 0 ? "Couplet" : "Refrain",
+        content,
+      }));
+    }
+
+    const year =
+      asStringLike(s.year) ||
+      asStringLike(s.annee) ||
+      asStringLike(s.published) ||
+      asStringLike(s.release_year) ||
+      asStringLike(meta.annee_de_sortie_single);
+    const tags = asStringLike(s.tags) || (year != null ? String(year).slice(0, 10) : undefined);
+    const title = asStringLike(s.title) || asStringLike(s.titre) || asStringLike(meta.titre) || "Sans titre";
+    const artist =
+      asStringLike(s.artist) ||
+      asStringLike(s.auteur) ||
+      asStringLike(meta.auteur_interprete) ||
+      asStringLike(meta.auteur) ||
+      asStringLike(meta.interprete);
+    const album = asStringLike(s.album) || asStringLike(meta.album_inclus_dans);
+    const language = asStringLike(s.language) || asStringLike(s.lang) || asStringLike(meta.langue);
+
+    normalizedSongs.push({
+      title,
+      artist,
+      album,
+      language,
+      tags,
+      blocks,
+    });
+  }
+
+  let imported = 0;
+  for (const songEntry of normalizedSongs) {
+    try {
       const song = await prisma.song.create({
         data: {
-          title,
-          artist,
-          album,
-          language,
-          tags,
+          title: songEntry.title,
+          artist: songEntry.artist,
+          album: songEntry.album,
+          language: songEntry.language,
+          tags: songEntry.tags,
         },
       });
-      for (const b of blocks) {
+      for (const b of songEntry.blocks) {
         await prisma.songBlock.create({
           data: {
             songId: song.id,
-            order: b.order || 1,
+            order: b.order,
             type: b.type || "VERSE",
             title: b.title,
-            content: (b.content || "").trim(),
+            content: b.content.trim(),
           },
         });
       }
       imported += 1;
     } catch (e: unknown) {
-      errors.push({ path: filePath, title: s?.title, message: getErrorMessage(e) });
+      errors.push({ path: filePath, title: songEntry.title, message: getErrorMessage(e) });
     }
   }
+
   return { imported, errors };
 }
 
 type BlockInput = {
   order: number;
-  type: string;
+  type: CpSongBlockType;
   title?: string;
   content: string;
 };

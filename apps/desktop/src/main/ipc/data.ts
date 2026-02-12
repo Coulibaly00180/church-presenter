@@ -2,6 +2,7 @@ import { ipcMain, dialog } from "electron";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
 import fs from "fs";
+import type { CpDataImportError, CpDataImportMode } from "../../shared/ipc";
 
 type ImportedSongBlock = {
   order?: number;
@@ -36,13 +37,179 @@ type ImportedPlan = {
 };
 
 type ImportedDataPayload = {
-  songs?: ImportedSong[];
-  plans?: ImportedPlan[];
+  songs?: unknown;
+  plans?: unknown;
+};
+
+type NormalizedSongBlock = {
+  order: number;
+  type: string;
+  title?: string;
+  content: string;
+};
+
+type NormalizedSong = {
+  title: string;
+  artist?: string;
+  album?: string;
+  language?: string;
+  tags?: string;
+  blocks: NormalizedSongBlock[];
+};
+
+type NormalizedPlanItem = {
+  order: number;
+  kind: string;
+  refId?: string;
+  refSubId?: string;
+  title?: string;
+  content?: string;
+  mediaPath?: string;
+};
+
+type NormalizedPlan = {
+  date?: string | Date;
+  title: string;
+  items: NormalizedPlanItem[];
 };
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asString(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function asStringLike(value: unknown): string | undefined {
+  if (typeof value === "string") return asString(value);
+  if (typeof value === "number") return String(value);
+  return undefined;
+}
+
+function asPositiveInt(value: unknown, fallback: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  const n = Math.floor(value);
+  return n > 0 ? n : fallback;
+}
+
+function pushValidationError(errors: CpDataImportError[], message: string, title?: string) {
+  errors.push({ kind: "validation", title, message });
+}
+
+function normalizeSongs(rawSongs: unknown, errors: CpDataImportError[]): NormalizedSong[] {
+  if (rawSongs == null) return [];
+  if (!Array.isArray(rawSongs)) {
+    pushValidationError(errors, "songs doit etre un tableau");
+    return [];
+  }
+
+  const songs: NormalizedSong[] = [];
+  for (const [songIdx, rawSong] of rawSongs.entries()) {
+    if (!isRecord(rawSong)) {
+      pushValidationError(errors, `songs[${songIdx}] ignore: objet attendu`);
+      continue;
+    }
+    const s = rawSong as ImportedSong;
+    const title = asStringLike(s.title) || "Sans titre";
+
+    const blocksRaw = s.blocks;
+    const blocks: NormalizedSongBlock[] = [];
+    if (blocksRaw != null) {
+      if (!Array.isArray(blocksRaw)) {
+        pushValidationError(errors, `songs[${songIdx}].blocks ignore: tableau attendu`, title);
+      } else {
+        for (const [blockIdx, rawBlock] of blocksRaw.entries()) {
+          if (!isRecord(rawBlock)) {
+            pushValidationError(errors, `songs[${songIdx}].blocks[${blockIdx}] ignore: objet attendu`, title);
+            continue;
+          }
+          const b = rawBlock as ImportedSongBlock;
+          blocks.push({
+            order: asPositiveInt(b.order, blockIdx + 1),
+            type: asStringLike(b.type) || "VERSE",
+            title: asStringLike(b.title),
+            content: asStringLike(b.content) || "",
+          });
+        }
+      }
+    }
+
+    songs.push({
+      title,
+      artist: asStringLike(s.artist),
+      album: asStringLike(s.album),
+      language: asStringLike(s.language),
+      tags: asStringLike(s.tags),
+      blocks,
+    });
+  }
+  return songs;
+}
+
+function normalizePlans(rawPlans: unknown, errors: CpDataImportError[]): NormalizedPlan[] {
+  if (rawPlans == null) return [];
+  if (!Array.isArray(rawPlans)) {
+    pushValidationError(errors, "plans doit etre un tableau");
+    return [];
+  }
+
+  const plans: NormalizedPlan[] = [];
+  for (const [planIdx, rawPlan] of rawPlans.entries()) {
+    if (!isRecord(rawPlan)) {
+      pushValidationError(errors, `plans[${planIdx}] ignore: objet attendu`);
+      continue;
+    }
+    const p = rawPlan as ImportedPlan;
+    const title = asStringLike(p.title) || "Culte";
+
+    if (p.date != null) {
+      const parsedDate = new Date(String(p.date));
+      if (Number.isNaN(parsedDate.getTime())) {
+        pushValidationError(errors, `plans[${planIdx}] ignore: date invalide`, title);
+        continue;
+      }
+    }
+
+    const itemsRaw = p.items;
+    const items: NormalizedPlanItem[] = [];
+    if (itemsRaw != null) {
+      if (!Array.isArray(itemsRaw)) {
+        pushValidationError(errors, `plans[${planIdx}].items ignore: tableau attendu`, title);
+      } else {
+        for (const [itemIdx, rawItem] of itemsRaw.entries()) {
+          if (!isRecord(rawItem)) {
+            pushValidationError(errors, `plans[${planIdx}].items[${itemIdx}] ignore: objet attendu`, title);
+            continue;
+          }
+          const it = rawItem as ImportedPlanItem;
+          items.push({
+            order: asPositiveInt(it.order, itemIdx + 1),
+            kind: asStringLike(it.kind) || "ANNOUNCEMENT_TEXT",
+            refId: asStringLike(it.refId),
+            refSubId: asStringLike(it.refSubId),
+            title: asStringLike(it.title),
+            content: asStringLike(it.content),
+            mediaPath: asStringLike(it.mediaPath),
+          });
+        }
+      }
+    }
+
+    plans.push({
+      date: p.date,
+      title,
+      items,
+    });
+  }
+  return plans;
 }
 
 function normalizeDateToMidnight(dateIso?: string | Date) {
@@ -80,7 +247,7 @@ export function registerDataIpc() {
     return { ok: true, path: res.filePath };
   });
 
-  ipcMain.handle("data:importAll", async (_evt, payload: { mode: "MERGE" | "REPLACE" }) => {
+  ipcMain.handle("data:importAll", async (_evt, payload: { mode: CpDataImportMode }) => {
     const prisma = getPrisma();
     const res = await dialog.showOpenDialog({
       title: "Importer une base",
@@ -93,14 +260,16 @@ export function registerDataIpc() {
     let data: ImportedDataPayload;
     try {
       const parsed = JSON.parse(raw) as unknown;
-      data = typeof parsed === "object" && parsed !== null ? (parsed as ImportedDataPayload) : {};
+      if (!isRecord(parsed)) return { ok: false, error: "Invalid JSON structure (object expected)" };
+      data = parsed as ImportedDataPayload;
     } catch {
       return { ok: false, error: "Invalid JSON file" };
     }
 
     const mode = payload?.mode || "MERGE";
-    const songs = Array.isArray(data.songs) ? data.songs : [];
-    const plans = Array.isArray(data.plans) ? data.plans : [];
+    const validationErrors: CpDataImportError[] = [];
+    const songs = normalizeSongs(data.songs, validationErrors);
+    const plans = normalizePlans(data.plans, validationErrors);
 
     if (mode === "REPLACE") {
       try {
@@ -123,14 +292,14 @@ export function registerDataIpc() {
                 tags: s.tags,
               },
             });
-            for (const b of s.blocks || []) {
+            for (const b of s.blocks) {
               await tx.songBlock.create({
                 data: {
                   songId: song.id,
-                  order: b.order ?? 1,
-                  type: b.type ?? "VERSE",
+                  order: b.order,
+                  type: b.type,
                   title: b.title,
-                  content: b.content ?? "",
+                  content: b.content,
                 },
               });
             }
@@ -144,12 +313,12 @@ export function registerDataIpc() {
                 title: p.title,
               },
             });
-            for (const it of p.items || []) {
+            for (const it of p.items) {
               await tx.serviceItem.create({
                 data: {
                   planId: plan.id,
-                  order: it.order ?? 1,
-                  kind: it.kind ?? "ANNOUNCEMENT_TEXT",
+                  order: it.order,
+                  kind: it.kind,
                   refId: it.refId,
                   refSubId: it.refSubId,
                   title: it.title,
@@ -164,13 +333,13 @@ export function registerDataIpc() {
           return { songs: songsImported, plans: plansImported };
         });
 
-        return { ok: true, imported: true, counts, errors: [] };
+        return { ok: true, imported: true, partial: validationErrors.length > 0, counts, errors: validationErrors };
       } catch (e: unknown) {
         return { ok: false, rolledBack: true, error: getErrorMessage(e) };
       }
     }
 
-    const errors: Array<{ kind: string; title?: string; message: string }> = [];
+    const errors: CpDataImportError[] = [...validationErrors];
     let songsImported = 0;
     let plansImported = 0;
 
@@ -185,14 +354,14 @@ export function registerDataIpc() {
             tags: s.tags,
           },
         });
-        for (const b of s.blocks || []) {
+        for (const b of s.blocks) {
           await prisma.songBlock.create({
             data: {
               songId: song.id,
-              order: b.order ?? 1,
-              type: b.type ?? "VERSE",
+              order: b.order,
+              type: b.type,
               title: b.title,
-              content: b.content ?? "",
+              content: b.content,
             },
           });
         }
@@ -210,12 +379,12 @@ export function registerDataIpc() {
             title: p.title,
           },
         });
-        for (const it of p.items || []) {
+        for (const it of p.items) {
           await prisma.serviceItem.create({
             data: {
               planId: plan.id,
-              order: it.order ?? 1,
-              kind: it.kind ?? "ANNOUNCEMENT_TEXT",
+              order: it.order,
+              kind: it.kind,
               refId: it.refId,
               refSubId: it.refSubId,
               title: it.title,

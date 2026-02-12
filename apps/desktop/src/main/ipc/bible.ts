@@ -1,4 +1,5 @@
 import { ipcMain } from "electron";
+import type { CpBibleLanguageGroup } from "../../shared/ipc";
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) return err.message;
@@ -10,7 +11,7 @@ export function registerBibleIpc() {
     try {
       const r = await fetch("https://bolls.life/static/bolls/app/views/languages.json");
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const json = await r.json();
+      const json = (await r.json()) as CpBibleLanguageGroup[];
       return { ok: true, data: json };
     } catch (e: unknown) {
       return { ok: false, error: getErrorMessage(e) };

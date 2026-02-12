@@ -5,35 +5,25 @@ import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
+import type {
+  CpDevtoolsTarget,
+  CpLiveSetPayload,
+  CpLiveState,
+  CpMediaType,
+  CpProjectionMode,
+  CpProjectionSetAppearancePayload,
+  CpProjectionSetMediaPayload,
+  CpProjectionSetTextPayload,
+  CpProjectionState,
+  CpScreenMeta,
+  ScreenKey,
+  ScreenMirrorMode,
+} from "../shared/ipc";
 
-type ProjectionMode = "NORMAL" | "BLACK" | "WHITE";
-type ScreenKey = "A" | "B" | "C";
-type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
-type SongMeta = { title?: string; artist?: string; album?: string; year?: string };
-
-type ProjectionState = {
-  mode: ProjectionMode;
-  lowerThirdEnabled: boolean;
-  transitionEnabled: boolean;
-  textScale: number;
-  background: string;
-  foreground: string;
-  current: {
-    kind: "EMPTY" | "TEXT" | "MEDIA";
-    title?: string;
-    body?: string;
-    mediaPath?: string;
-    mediaType?: "IMAGE" | "PDF";
-    metaSong?: SongMeta;
-  };
-  updatedAt: number;
-};
-
-type ScreenInfo = {
-  key: ScreenKey;
-  isOpen: boolean;
-  mirror: ScreenMirrorMode;
-};
+type ProjectionMode = CpProjectionMode;
+type ProjectionState = CpProjectionState;
+type ScreenInfo = CpScreenMeta;
+type LiveState = CpLiveState;
 
 let regieWin: BrowserWindow | null = null;
 
@@ -84,7 +74,7 @@ const mirrors: Record<ScreenKey, ScreenMirrorMode> = {
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
 const PDF_EXTENSIONS = new Set([".pdf"]);
 
-function inferMediaType(filePath: string): "IMAGE" | "PDF" | null {
+function inferMediaType(filePath: string): CpMediaType | null {
   const ext = extname(filePath).toLowerCase();
   if (PDF_EXTENSIONS.has(ext)) return "PDF";
   if (IMAGE_EXTENSIONS.has(ext)) return "IMAGE";
@@ -319,7 +309,7 @@ ipcMain.handle("projectionWindow:isOpen", () => {
 });
 
 // Devtools opening
-ipcMain.handle("devtools:open", (_evt, target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => {
+ipcMain.handle("devtools:open", (_evt, target: CpDevtoolsTarget) => {
   if (target === "REGIE") regieWin?.webContents.openDevTools({ mode: "detach" });
   if (target === "PROJECTION" || target === "SCREEN_A") projWins.A?.webContents.openDevTools({ mode: "detach" });
   if (target === "SCREEN_B") projWins.B?.webContents.openDevTools({ mode: "detach" });
@@ -360,13 +350,13 @@ ipcMain.handle("files:listMedia", async () => {
     const entries = fs.readdirSync(mediaDir);
     const files = entries
       .filter((f) => fs.statSync(join(mediaDir, f)).isFile())
-      .map((name): { name: string; path: string; mediaType: "PDF" | "IMAGE" } | null => {
+      .map((name): { name: string; path: string; mediaType: CpMediaType } | null => {
         const full = join(mediaDir, name);
         const mediaType = inferMediaType(name);
         if (!mediaType) return null;
         return { name, path: full, mediaType };
       })
-      .filter((x): x is { name: string; path: string; mediaType: "PDF" | "IMAGE" } => !!x);
+      .filter((x): x is { name: string; path: string; mediaType: CpMediaType } => !!x);
     return { ok: true, files };
   } catch (e: unknown) {
     console.error("listMedia failed", e);
@@ -402,7 +392,7 @@ ipcMain.handle("projection:setState", (_evt, patch: Partial<ProjectionState>) =>
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setAppearance", (_evt, patch: { textScale?: number; background?: string; foreground?: string }) => {
+ipcMain.handle("projection:setAppearance", (_evt, patch: CpProjectionSetAppearancePayload) => {
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
@@ -416,7 +406,7 @@ ipcMain.handle("projection:setAppearance", (_evt, patch: { textScale?: number; b
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; body: string; metaSong?: SongMeta }) => {
+ipcMain.handle("projection:setContentText", (_evt, payload: CpProjectionSetTextPayload) => {
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
@@ -429,7 +419,7 @@ ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; bo
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setContentMedia", (_evt, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => {
+ipcMain.handle("projection:setContentMedia", (_evt, payload: CpProjectionSetMediaPayload) => {
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
@@ -484,7 +474,7 @@ ipcMain.handle("screens:setMirror", (_evt, key: ScreenKey, mirror: ScreenMirrorM
 
 ipcMain.handle("screens:getState", (_evt, key: ScreenKey) => screenStates[key]);
 
-ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title?: string; body: string; metaSong?: SongMeta }) => {
+ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: CpProjectionSetTextPayload) => {
   // If screen is mirroring, ignore direct set (safety)
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
   if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
@@ -501,7 +491,7 @@ ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title
 
 ipcMain.handle(
   "screens:setContentMedia",
-  (_evt, key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => {
+  (_evt, key: ScreenKey, payload: CpProjectionSetMediaPayload) => {
     if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
     if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
     screenStates[key] = {
@@ -528,16 +518,6 @@ ipcMain.handle("screens:setMode", (_evt, key: ScreenKey, mode: ProjectionMode) =
 // --------------------
 // LiveState (central) - sync Regie / Plan / Projection targets
 // --------------------
-type LiveState = {
-  enabled: boolean;
-  planId: string | null;
-  cursor: number;
-  target: ScreenKey;
-  black: boolean;
-  white: boolean;
-  lockedScreens: Record<ScreenKey, boolean>;
-  updatedAt: number;
-};
 
 let liveState: LiveState = {
   enabled: false,
@@ -611,7 +591,7 @@ ipcMain.handle(
   "live:set",
   async (
     _evt,
-    payload: { planId?: string | null; cursor?: number | null; enabled?: boolean; target?: ScreenKey; black?: boolean; white?: boolean }
+    payload: CpLiveSetPayload
   ) => {
     const patch: Partial<LiveState> = {};
     if ("planId" in payload) patch.planId = payload.planId ?? null;
