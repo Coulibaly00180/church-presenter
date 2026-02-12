@@ -92,12 +92,22 @@ export function registerPlansIpc() {
 
   ipcMain.handle("plans:create", async (_evt, payload: { dateIso: string; title?: string }) => {
     const prisma = getPrisma();
-    const date = normalizeDateToMidnight(payload.dateIso);
+    let candidateDate = normalizeDateToMidnight(payload.dateIso);
+    const title = payload.title ?? "Culte";
 
-    return prisma.servicePlan.create({
-      data: { date, title: payload.title ?? "Culte" },
-      include: { items: { orderBy: { order: "asc" } } },
-    });
+    for (let attempt = 0; attempt < 3660; attempt += 1) {
+      try {
+        return await prisma.servicePlan.create({
+          data: { date: candidateDate, title },
+          include: { items: { orderBy: { order: "asc" } } },
+        });
+      } catch (e) {
+        if (!isUniqueConstraintError(e)) throw e;
+        candidateDate = addUtcDays(candidateDate, 1);
+      }
+    }
+
+    throw new Error("Unable to find an available plan date");
   });
 
   ipcMain.handle("plans:delete", async (_evt, planId: string) => {
