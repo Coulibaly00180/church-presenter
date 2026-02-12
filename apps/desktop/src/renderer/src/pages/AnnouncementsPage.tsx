@@ -50,43 +50,46 @@ export function AnnouncementsPage() {
     }
   }
 
-  async function ensureScreenOpen(key: ScreenKey) {
-    if (key === "A") {
-      await window.cp.projectionWindow.open();
-      return;
-    }
-    const list = (await window.cp.screens?.list?.()) || [];
-    const meta = list.find((s: any) => s.key === key);
-    if (!meta?.isOpen) {
-      await window.cp.screens?.open?.(key);
-    }
+async function ensureScreenOpen(key: ScreenKey) {
+  if (key === "A") {
+    await window.cp.projectionWindow.open();
+    return;
   }
+  const list: CpScreenMeta[] = (await window.cp.screens?.list?.()) || [];
+  const meta = list.find((s) => s.key === key);
+  if (!meta?.isOpen) {
+    await window.cp.screens?.open?.(key);
+  }
+}
 
   async function projectText(title: string | undefined, body: string) {
     const dest = target;
     await ensureScreenOpen(dest);
-    if (dest === "A" || !window.cp.screens) {
-      await window.cp.projection.setContentText({ title, body });
-      return;
-    }
-    const res: any = await window.cp.screens.setContentText(dest, { title, body });
-    if (res?.ok === false && res?.reason === "MIRROR") {
-      await window.cp.projection.setContentText({ title, body });
-    }
+  if (dest === "A" || !window.cp.screens) {
+    await window.cp.projection.setContentText({ title, body });
+    return;
   }
+  const res = (await window.cp.screens.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    await window.cp.projection.setContentText({ title, body });
+  }
+}
 
   async function projectPdf(title: string | undefined, mediaPath: string) {
     const dest = target;
     await ensureScreenOpen(dest);
-    if (dest === "A" || !window.cp.screens) {
-      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
-      return;
-    }
-    const res: any = await window.cp.screens.setContentMedia(dest, { title, mediaPath, mediaType: "PDF" });
-    if (res?.ok === false && res?.reason === "MIRROR") {
-      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
-    }
+  if (dest === "A" || !window.cp.screens) {
+    await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
+    return;
   }
+  const res = (await window.cp.screens.setContentMedia(dest, { title, mediaPath, mediaType: "PDF" })) as {
+    ok?: boolean;
+    reason?: string;
+  };
+  if (res?.ok === false && res?.reason === "MIRROR") {
+    await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
+  }
+}
 
   useEffect(() => {
     refreshFiles();
@@ -233,7 +236,7 @@ export function AnnouncementsPage() {
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ fontWeight: 700 }}>{f.name}</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    {f.mediaType} {pageCounts[f.path] ? `• ${pageCounts[f.path]} page(s)` : ""}
+                    {f.mediaType} {pageCounts[f.path] ? `â€¢ ${pageCounts[f.path]} page(s)` : ""}
                   </div>
                   {pageCounts[f.path] ? (
                     <div style={{ fontSize: 12, opacity: 0.65 }}>

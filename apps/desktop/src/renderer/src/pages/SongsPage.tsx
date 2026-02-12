@@ -36,9 +36,9 @@ function splitBlocks(text: string) {
     .filter(Boolean);
 }
 
-async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string, metaSong?: any) {
+async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string, metaSong?: CpSongMeta) {
   // Always ensure A exists when needed
-  const screens = await window.cp.screens.list();
+  const screens: CpScreenMeta[] = await window.cp.screens.list();
   const meta = screens.find((s) => s.key === target);
 
   // If target is not open, open it (A via legacy, others via screens)
@@ -60,7 +60,7 @@ async function projectTextToTarget(target: ScreenKey, title: string | undefined,
     return;
   }
 
-  const res: any = await window.cp.screens.setContentText(target, { title, body, metaSong });
+  const res = (await window.cp.screens.setContentText(target, { title, body, metaSong })) as { ok?: boolean; reason?: string };
   if (res?.ok === false && res?.reason === "MIRROR") {
     // safety fallback: update A
     await window.cp.projection.setContentText({ title, body, metaSong });
@@ -134,7 +134,7 @@ export function SongsPage() {
     refresh("").catch((e) => setErr(String(e)));
     window.cp.plans
       ?.list?.()
-      .then((ps: any[]) => {
+      .then((ps: PlanWithItems[]) => {
         setPlans(ps || []);
         if ((ps || []).length > 0) setPlanId(ps[0].id);
       })

@@ -14,6 +14,7 @@ import {
 } from "../bible/bollsApi";
 
 type ScreenKey = "A" | "B" | "C";
+type PlanListItem = { id: string; title?: string | null; date?: string | Date };
 
 type PlanItemPayload = {
   planId: string;
@@ -32,10 +33,22 @@ function verseKey(v: BollsVerse) {
   return `${v.book}-${v.chapter}-${v.verse}`;
 }
 
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function formatPlanLabel(plan: PlanListItem) {
+  if (plan.title && plan.title.trim()) return plan.title;
+  if (typeof plan.date === "string") return plan.date;
+  if (plan.date instanceof Date && !Number.isNaN(plan.date.getTime())) return plan.date.toISOString().slice(0, 10);
+  return plan.id;
+}
+
 async function projectText(target: ScreenKey, title: string | undefined, body: string) {
   const screens = window.cp.screens;
-  const list = screens ? await screens.list() : [];
-  const meta = list.find((s: any) => s.key === target);
+  const list: CpScreenMeta[] = screens ? await screens.list() : [];
+  const meta = list.find((s) => s.key === target);
 
   if (target === "A") {
     await window.cp.projectionWindow.open();
@@ -51,7 +64,7 @@ async function projectText(target: ScreenKey, title: string | undefined, body: s
     return;
   }
 
-  const res: any = await screens.setContentText(dest, { title, body });
+  const res = (await screens.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
   if (res?.ok === false && res?.reason === "MIRROR") {
     await window.cp.projection.setContentText({ title, body });
   }
@@ -75,7 +88,7 @@ export function BiblePage() {
   const [verses, setVerses] = useState<BollsVerse[]>([]);
   const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
 
-  const [plans, setPlans] = useState<any[]>([]);
+  const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [planId, setPlanId] = useState<string>("");
   const [addMode, setAddMode] = useState<"PASSAGE" | "VERSES">("VERSES");
   const [target, setTarget] = useState<ScreenKey>("A");
@@ -135,7 +148,7 @@ export function BiblePage() {
   useEffect(() => {
     window.cp.plans
       ?.list?.()
-      .then((ps: any[]) => {
+      .then((ps: PlanListItem[]) => {
         setPlans(ps || []);
         if (ps?.length) setPlanId(ps[0].id);
       })
@@ -157,8 +170,8 @@ export function BiblePage() {
         setVerses([]);
         setSelectedVerses(new Set());
         setInfo(`Traduction ${activeTranslation} chargee (${list.length} livres)`);
-      } catch (e: any) {
-        setErr(e?.message || String(e));
+      } catch (e: unknown) {
+        setErr(getErrorMessage(e));
         setBooks([]);
         setBookId(null);
       } finally {
@@ -181,8 +194,8 @@ export function BiblePage() {
       setVerses(vs);
       setChapter(chap);
       setSelectedVerses(new Set());
-    } catch (e: any) {
-      setErr(e?.message || String(e));
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     } finally {
       setLoadingChapter(false);
     }
@@ -271,8 +284,8 @@ export function BiblePage() {
       try {
         const res = await searchVerses(activeTranslation, searchText.trim(), { limit: 30 });
         setSearchResults(res.results);
-      } catch (e: any) {
-        setErr(e?.message || String(e));
+      } catch (e: unknown) {
+        setErr(getErrorMessage(e));
         setSearchResults([]);
       } finally {
         setSearchLoading(false);
@@ -292,8 +305,8 @@ export function BiblePage() {
       setBookId(v.book);
       await loadChapter(v.book, v.chapter);
       setSelectedVerses(new Set([v.verse]));
-    } catch (e: any) {
-      setErr(e?.message || String(e));
+    } catch (e: unknown) {
+      setErr(getErrorMessage(e));
     }
   }
 
@@ -374,7 +387,7 @@ export function BiblePage() {
             <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.title || p.date || p.id}
+                  {formatPlanLabel(p)}
                 </option>
               ))}
             </select>
@@ -514,7 +527,7 @@ export function BiblePage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 Mode ajout
-                <select value={addMode} onChange={(e) => setAddMode(e.target.value as any)}>
+                <select value={addMode} onChange={(e) => setAddMode(e.target.value === "PASSAGE" ? "PASSAGE" : "VERSES")}>
                   <option value="PASSAGE">Passage</option>
                   <option value="VERSES">Verset par verset</option>
                 </select>
