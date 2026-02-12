@@ -27,14 +27,6 @@ export function AnnouncementsPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [pageCounts, setPageCounts] = useState<Record<string, number>>({});
 
-  const panelStyle: React.CSSProperties = {
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: 14,
-    boxShadow: "var(--shadow)",
-  };
-
   async function refreshFiles() {
     const res = await window.cp.files?.listMedia?.();
     if (res?.ok) setFiles(res.files || []);
@@ -44,52 +36,52 @@ export function AnnouncementsPage() {
     try {
       const list = await window.cp.plans.list();
       setPlans(list || []);
-      if (list?.length) setPlanId(list[0].id);
+      if (list?.length) setPlanId((prev) => prev || list[0].id);
     } catch {
-      /* ignore */
+      // ignore
     }
   }
 
-async function ensureScreenOpen(key: ScreenKey) {
-  if (key === "A") {
-    await window.cp.projectionWindow.open();
-    return;
+  async function ensureScreenOpen(key: ScreenKey) {
+    if (key === "A") {
+      await window.cp.projectionWindow.open();
+      return;
+    }
+    const list: CpScreenMeta[] = (await window.cp.screens?.list?.()) || [];
+    const meta = list.find((s) => s.key === key);
+    if (!meta?.isOpen) {
+      await window.cp.screens?.open?.(key);
+    }
   }
-  const list: CpScreenMeta[] = (await window.cp.screens?.list?.()) || [];
-  const meta = list.find((s) => s.key === key);
-  if (!meta?.isOpen) {
-    await window.cp.screens?.open?.(key);
-  }
-}
 
   async function projectText(title: string | undefined, body: string) {
     const dest = target;
     await ensureScreenOpen(dest);
-  if (dest === "A" || !window.cp.screens) {
-    await window.cp.projection.setContentText({ title, body });
-    return;
+    if (dest === "A" || !window.cp.screens) {
+      await window.cp.projection.setContentText({ title, body });
+      return;
+    }
+    const res = (await window.cp.screens.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
+    if (res?.ok === false && res?.reason === "MIRROR") {
+      await window.cp.projection.setContentText({ title, body });
+    }
   }
-  const res = (await window.cp.screens.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
-  if (res?.ok === false && res?.reason === "MIRROR") {
-    await window.cp.projection.setContentText({ title, body });
-  }
-}
 
   async function projectPdf(title: string | undefined, mediaPath: string) {
     const dest = target;
     await ensureScreenOpen(dest);
-  if (dest === "A" || !window.cp.screens) {
-    await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
-    return;
+    if (dest === "A" || !window.cp.screens) {
+      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
+      return;
+    }
+    const res = (await window.cp.screens.setContentMedia(dest, { title, mediaPath, mediaType: "PDF" })) as {
+      ok?: boolean;
+      reason?: string;
+    };
+    if (res?.ok === false && res?.reason === "MIRROR") {
+      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
+    }
   }
-  const res = (await window.cp.screens.setContentMedia(dest, { title, mediaPath, mediaType: "PDF" })) as {
-    ok?: boolean;
-    reason?: string;
-  };
-  if (res?.ok === false && res?.reason === "MIRROR") {
-    await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
-  }
-}
 
   useEffect(() => {
     refreshFiles();
@@ -109,7 +101,7 @@ async function ensureScreenOpen(key: ScreenKey) {
           const pdf = await pdfjsLib.getDocument(url).promise;
           entries[f.path] = pdf.numPages;
         } catch {
-          /* ignore */
+          // ignore
         }
       }
       if (!cancelled) setPageCounts(entries);
@@ -121,13 +113,14 @@ async function ensureScreenOpen(key: ScreenKey) {
   }, [pdfs]);
 
   return (
-    <div style={{ padding: 16, display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "space-between", flexWrap: "wrap" }}>
+    <div className="cp-page">
+      <div className="cp-page-header">
         <div>
-          <h1 style={{ margin: 0 }}>Annonces</h1>
-          <div style={{ opacity: 0.7 }}>Importer des PDF ou saisir une annonce texte puis ajouter au plan.</div>
+          <h1 className="cp-page-title">Annonces</h1>
+          <div className="cp-page-subtitle">Importer des PDF ou saisir une annonce texte puis ajouter au plan.</div>
         </div>
         <button
+          className="btn-primary"
           onClick={async () => {
             setLoading(true);
             setErr(null);
@@ -152,23 +145,23 @@ async function ensureScreenOpen(key: ScreenKey) {
         </label>
       </div>
 
-      {err ? <div style={{ ...panelStyle, background: "#fef2f2", borderColor: "#fecdd3" }}>{err}</div> : null}
-      {info ? <div style={{ ...panelStyle, background: "#ecfdf3", borderColor: "#bbf7d0" }}>{info}</div> : null}
+      {err ? <div className="cp-alert cp-alert--error">{err}</div> : null}
+      {info ? <div className="cp-alert cp-alert--success">{info}</div> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, alignItems: "start" }}>
-        <div style={panelStyle}>
+      <div className="cp-grid-main">
+        <div className="panel cp-panel">
           <div style={{ fontWeight: 800, marginBottom: 8 }}>Annonce texte</div>
           <label>
             Titre
-            <input value={manualTitle} onChange={(e) => setManualTitle(e.target.value)} style={{ width: "100%" }} />
+            <input value={manualTitle} onChange={(e) => setManualTitle(e.target.value)} className="cp-input-full" />
           </label>
           <label>
             Contenu
-            <textarea value={manualContent} onChange={(e) => setManualContent(e.target.value)} rows={6} style={{ width: "100%" }} />
+            <textarea value={manualContent} onChange={(e) => setManualContent(e.target.value)} rows={6} className="cp-input-full" />
           </label>
           <label>
             Plan
-            <select value={planId} onChange={(e) => setPlanId(e.target.value)} style={{ width: "100%" }}>
+            <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="cp-input-full">
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.title || "Culte"} {formatDate(p)}
@@ -177,6 +170,7 @@ async function ensureScreenOpen(key: ScreenKey) {
             </select>
           </label>
           <button
+            className="btn-primary"
             onClick={async () => {
               if (!planId) return;
               await window.cp.plans.addItem({
@@ -192,16 +186,12 @@ async function ensureScreenOpen(key: ScreenKey) {
           >
             Ajouter au plan
           </button>
-          <button
-            onClick={() => projectText(manualTitle, manualContent)}
-            style={{ marginTop: 6 }}
-            disabled={!manualContent && !manualTitle}
-          >
+          <button onClick={() => projectText(manualTitle, manualContent)} style={{ marginTop: 6 }} disabled={!manualContent && !manualTitle}>
             Projeter maintenant
           </button>
         </div>
 
-        <div style={panelStyle}>
+        <div className="panel cp-panel">
           <div style={{ fontWeight: 800, marginBottom: 8 }}>PDF importes ({pdfs.length})</div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -219,6 +209,7 @@ async function ensureScreenOpen(key: ScreenKey) {
               </select>
             </label>
           </div>
+
           <div style={{ maxHeight: "65vh", overflow: "auto", display: "grid", gap: 8 }}>
             {pdfs.map((f) => (
               <div
@@ -236,20 +227,21 @@ async function ensureScreenOpen(key: ScreenKey) {
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ fontWeight: 700 }}>{f.name}</div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    {f.mediaType} {pageCounts[f.path] ? `• ${pageCounts[f.path]} page(s)` : ""}
+                    {f.mediaType} {pageCounts[f.path] ? `- ${pageCounts[f.path]} page(s)` : ""}
                   </div>
                   {pageCounts[f.path] ? (
                     <div style={{ fontSize: 12, opacity: 0.65 }}>
                       Page choisie: {parseInt(pdfPage || "1", 10) || 1} / {pageCounts[f.path]}
                     </div>
                   ) : null}
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div className="cp-actions">
                     <button
-                  onClick={async () => {
-                    if (!planId) return;
-                    const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
-                    await window.cp.plans.addItem({
-                      planId,
+                      className="btn-primary"
+                      onClick={async () => {
+                        if (!planId) return;
+                        const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
+                        await window.cp.plans.addItem({
+                          planId,
                           kind: "ANNOUNCEMENT_PDF",
                           title: f.name,
                           mediaPath,
@@ -292,6 +284,3 @@ async function ensureScreenOpen(key: ScreenKey) {
     </div>
   );
 }
-
-
-

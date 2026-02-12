@@ -9,6 +9,12 @@ import { PlanSidebarSection } from "./plan/PlanSidebarSection";
 import { projectPlanItemToTarget } from "./plan/projection";
 import { LiveState, Plan, PlanListItem } from "./plan/types";
 
+function toastClass(kind: "info" | "success" | "error") {
+  if (kind === "error") return "cp-alert cp-alert--error";
+  if (kind === "success") return "cp-alert cp-alert--success";
+  return "cp-alert";
+}
+
 export function PlanPage() {
   const canUse = !!window.cp?.plans && !!window.cp?.projection && !!window.cp?.projectionWindow;
 
@@ -108,42 +114,27 @@ export function PlanPage() {
     await loadPlan(plan.id);
   }
 
-  const panelStyle: React.CSSProperties = {
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: 14,
-    boxShadow: "var(--shadow)",
-  };
-
   if (!canUse) {
     return (
-      <div style={{ fontFamily: "system-ui", padding: 16 }}>
-        <h1 style={{ margin: 0 }}>Plan</h1>
-        <p style={{ color: "crimson" }}>Preload non charge (window.cp.plans indisponible).</p>
+      <div className="cp-page">
+        <h1 className="cp-page-title">Plan</h1>
+        <p style={{ color: "crimson", margin: 0 }}>Preload non charge (window.cp.plans indisponible).</p>
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16, display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div className="cp-page">
+      <div className="cp-page-header">
         <div>
-          <h1 style={{ margin: 0 }}>Plan</h1>
-          <div style={{ opacity: 0.7 }}>Projection: {projOpen ? "ouverte" : "fermee"}</div>
+          <h1 className="cp-page-title">Plan</h1>
+          <div className="cp-page-subtitle">Projection: {projOpen ? "ouverte" : "fermee"}</div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <span
-            className="badge"
-            style={{
-              background: projOpen ? "#e0f2fe" : "#fee2e2",
-              color: projOpen ? "#075985" : "#991b1b",
-            }}
-          >
-            {projOpen ? "Projection ON" : "Projection OFF"}
-          </span>
+        <div className="cp-actions">
+          <span className={`badge ${projOpen ? "cp-badge-open" : "cp-badge-closed"}`}>{projOpen ? "Projection ON" : "Projection OFF"}</span>
           <button
+            className="btn-primary"
             onClick={async () => {
               if (projOpen) {
                 const r = await window.cp.projectionWindow.close();
@@ -153,7 +144,6 @@ export function PlanPage() {
                 setProjOpen(!!r?.isOpen);
               }
             }}
-            style={{ background: "var(--primary)", color: "white", border: "none" }}
           >
             {projOpen ? "Fermer" : "Ouvrir"}
           </button>
@@ -161,23 +151,10 @@ export function PlanPage() {
         </div>
       </div>
 
-      {toast ? (
-        <div
-          style={{
-            ...panelStyle,
-            padding: 12,
-            background: toast.kind === "error" ? "#fef2f2" : toast.kind === "success" ? "#ecfdf3" : "#eef2ff",
-            borderColor: toast.kind === "error" ? "#fecdd3" : toast.kind === "success" ? "#bbf7d0" : "#cbd5ff",
-          }}
-        >
-          {toast.text}
-        </div>
-      ) : null}
+      {toast ? <div className={toastClass(toast.kind)}>{toast.text}</div> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 0 }}>
-        {/* LEFT: list + create */}
+      <div className="cp-grid-main">
         <PlanSidebarSection
-          panelStyle={panelStyle}
           newDate={newDate}
           newTitle={newTitle}
           plans={plans}
@@ -193,8 +170,7 @@ export function PlanPage() {
           onSelectPlan={loadPlan}
         />
 
-        {/* RIGHT: plan detail */}
-        <div style={panelStyle}>
+        <div className="panel cp-panel">
           {!plan ? (
             <div style={{ opacity: 0.75 }}>Selectionne un plan a gauche.</div>
           ) : (
@@ -208,12 +184,12 @@ export function PlanPage() {
                   ) : null}
                 </div>
 
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="cp-actions">
                   <button
+                    className="btn-primary"
                     onClick={async () => {
                       await updateLive({ planId: plan.id, enabled: true, cursor: Math.max(liveCursor, 0) });
                     }}
-                    style={{ background: "var(--primary)", color: "white", border: "none" }}
                   >
                     Utiliser en live
                   </button>
@@ -232,7 +208,6 @@ export function PlanPage() {
               </div>
 
               <PlanLiveToolbar
-                panelStyle={panelStyle}
                 liveEnabled={liveEnabled}
                 target={target}
                 live={live}

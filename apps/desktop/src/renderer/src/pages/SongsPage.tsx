@@ -88,14 +88,6 @@ export function SongsPage() {
   const [info, setInfo] = useState<{ kind: "info" | "success"; text: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [newSongTitle, setNewSongTitle] = useState("");
-  const panelStyle: React.CSSProperties = {
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: 14,
-    boxShadow: "var(--shadow)",
-  };
-
   async function loadPlanItems(id: string): Promise<PlanWithItems | null> {
     try {
       const p = await window.cp.plans.get(id);
@@ -330,11 +322,11 @@ export function SongsPage() {
   }
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16, display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+    <div className="cp-page">
+      <div className="cp-page-header" style={{ justifyContent: "flex-start" }}>
         <div style={{ flex: 1 }}>
-          <h1 style={{ margin: 0 }}>Chants</h1>
-          <div style={{ opacity: 0.7 }}>Bibliotheque, projection, ajout au plan</div>
+          <h1 className="cp-page-title">Chants</h1>
+          <div className="cp-page-subtitle">Bibliotheque, projection, ajout au plan</div>
         </div>
 
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -363,7 +355,9 @@ export function SongsPage() {
           placeholder="Titre du nouveau chant"
           style={{ minWidth: 180 }}
         />
-        <button onClick={onCreate}>+ Nouveau chant</button>
+        <button className="btn-primary" onClick={onCreate}>
+          + Nouveau chant
+        </button>
         <button
           onClick={async () => {
             if (!selectedId) return;
@@ -400,27 +394,15 @@ export function SongsPage() {
       </div>
 
       {err ? (
-        <div style={{ background: "#fee", border: "1px solid #f99", padding: 10, borderRadius: 10, marginBottom: 12 }}>
+        <div className="cp-alert cp-alert--error">
           <b>Erreur :</b> {err}
         </div>
       ) : null}
-      {info ? (
-        <div
-          style={{
-            background: info.kind === "success" ? "#e6ffed" : "#eef2ff",
-            border: "1px solid " + (info.kind === "success" ? "#9ae6b4" : "#cbd5ff"),
-            padding: 10,
-            borderRadius: 10,
-            marginBottom: 12,
-          }}
-        >
-          {info.text}
-        </div>
-      ) : null}
+      {info ? <div className={`cp-alert ${info.kind === "success" ? "cp-alert--success" : ""}`}>{info.text}</div> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "340px 1fr", gap: 12, alignItems: "start" }}>
+      <div className="cp-grid-main cp-grid-main--songs">
         {/* LEFT list */}
-        <div style={{ ...panelStyle, padding: 0 }}>
+        <div className="panel cp-panel" style={{ padding: 0 }}>
           <div style={{ padding: 14, borderBottom: "1px solid var(--border)" }}>
             <input
               value={q}
@@ -482,7 +464,7 @@ export function SongsPage() {
         </div>
 
         {/* RIGHT editor */}
-        <div style={panelStyle}>
+        <div className="panel cp-panel">
           {!song ? (
             <div style={{ opacity: 0.7 }}>Sélectionne un chant à gauche ou crée-en un.</div>
           ) : (

@@ -1,6 +1,9 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import "./styles/tokens.css";
+import "./styles/base.css";
+import "./styles/ui.css";
 import { AppShell } from "./layout/AppShell";
 import { RegiePage } from "./pages/RegiePage";
 import { PlanPage } from "./pages/PlanPage";

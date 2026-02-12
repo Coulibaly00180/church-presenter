@@ -61,47 +61,25 @@ export function AppShell() {
   );
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        gridTemplateColumns: "280px 1fr",
-        gap: 18,
-        padding: 18,
-      }}
-    >
-      <aside className="panel" style={{ display: "flex", flexDirection: "column", gap: 14, padding: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div className="cp-shell">
+      <aside className="panel cp-shell-sidebar">
+        <div className="cp-shell-brand">
           <div>
-            <div style={{ fontWeight: 800, fontSize: 20 }}>Church Presenter</div>
-            <div style={{ opacity: 0.65, fontSize: 12 }}>Regie • Projection</div>
+            <div className="cp-shell-title">Church Presenter</div>
+            <div className="cp-shell-subtitle">Regie / Projection</div>
           </div>
-          <span
-            className="badge"
-            style={{
-              background: projOpen ? "#e0f2fe" : "#fee2e2",
-              color: projOpen ? "#075985" : "#991b1b",
-              fontSize: 11,
-            }}
-          >
+          <span className={cls("badge", projOpen ? "cp-badge-open" : "cp-badge-closed")} style={{ fontSize: 11 }}>
             {projOpen ? "Projection ouverte" : "Projection fermee"}
           </span>
         </div>
 
-        <div
-          className="panel"
-          style={{
-            padding: 12,
-            boxShadow: "none",
-            background: "#f8fafc",
-            borderStyle: "dashed",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div className="panel cp-panel cp-panel-soft cp-shell-projection-card">
+          <div className="cp-page-header" style={{ alignItems: "center", gap: 8 }}>
             <div style={{ fontWeight: 700 }}>Projection</div>
             <div style={{ fontSize: 12, color: "#475569" }}>Ctrl+P pour basculer</div>
           </div>
           <button
+            className="btn-primary"
             disabled={!canUse}
             onClick={async () => {
               if (!canUse) return;
@@ -113,47 +91,26 @@ export function AppShell() {
                 setProjOpen(!!r?.isOpen);
               }
             }}
-            style={{
-              width: "100%",
-              marginTop: 10,
-              background: "var(--primary)",
-              color: "white",
-              border: "none",
-            }}
+            style={{ width: "100%", marginTop: 10 }}
           >
             {projOpen ? "Fermer la projection" : "Ouvrir la projection"}
           </button>
           <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8, lineHeight: 1.4 }}>
-            B / W / R pour noir / blanc / normal — Fleches pour naviguer en live.
+            B / W / R pour noir / blanc / normal. Fleches pour naviguer en live.
           </div>
         </div>
 
-        <nav style={{ display: "grid", gap: 10 }}>
+        <nav className="cp-nav-list">
           {items.map((it) => (
-            <NavLink
-              key={it.to}
-              to={it.to}
-              className={({ isActive }) => cls(isActive && "navActive")}
-              style={({ isActive }) => ({
-                display: "block",
-                padding: 12,
-                borderRadius: 12,
-                textDecoration: "none",
-                color: "#0f172a",
-                border: "1px solid " + (isActive ? "var(--primary)" : "var(--border)"),
-                background: isActive ? "#eef2ff" : "#fff",
-                fontWeight: 700,
-                boxShadow: isActive ? "0 8px 20px rgba(37,99,235,0.15)" : "var(--shadow)",
-              })}
-            >
-              <div style={{ fontSize: 15 }}>{it.label}</div>
-              <div style={{ fontSize: 12, opacity: 0.65 }}>{it.desc}</div>
+            <NavLink key={it.to} to={it.to} className={({ isActive }) => cls("cp-nav-link", isActive && "is-active")}>
+              <div className="cp-nav-label">{it.label}</div>
+              <div className="cp-nav-desc">{it.desc}</div>
             </NavLink>
           ))}
         </nav>
       </aside>
 
-      <main style={{ minHeight: "100vh", overflow: "auto" }}>
+      <main className="cp-shell-main">
         <Outlet />
       </main>
     </div>

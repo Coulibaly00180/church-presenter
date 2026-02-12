@@ -1,0 +1,179 @@
+.cp-page {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  font-family: var(--font-body);
+}
+
+.cp-page-title {
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.cp-page-subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.cp-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cp-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cp-grid-main {
+  display: grid;
+  gap: 12px;
+  align-items: start;
+  grid-template-columns: 360px minmax(0, 1fr);
+}
+
+.cp-grid-main--songs {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+
+.cp-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.cp-panel {
+  padding: 14px;
+  border-radius: 16px;
+}
+
+.cp-panel-soft {
+  background: var(--panel-soft);
+  border-style: dashed;
+  box-shadow: none;
+}
+
+.cp-input-full {
+  width: 100%;
+}
+
+.cp-alert {
+  border: 1px solid var(--info-border);
+  border-radius: 14px;
+  padding: 12px;
+  background: var(--info-bg);
+}
+
+.cp-alert--success {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
+.cp-alert--error {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+.cp-chip-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cp-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+}
+
+.cp-shell-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+}
+
+.cp-shell-brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.cp-shell-title {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.cp-shell-subtitle {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cp-badge-open {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.cp-badge-closed {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.cp-shell-projection-card {
+  padding: 12px;
+}
+
+.cp-nav-list {
+  display: grid;
+  gap: 10px;
+}
+
+.cp-nav-link {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.cp-nav-link.is-active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: var(--shadow-md);
+}
+
+.cp-nav-label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.cp-nav-desc {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.cp-shell-main {
+  min-height: 100vh;
+  overflow: auto;
+}
+
+@media (max-width: 1180px) {
+  .cp-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .cp-grid-main,
+  .cp-grid-main--songs {
+    grid-template-columns: 1fr;
+  }
+}

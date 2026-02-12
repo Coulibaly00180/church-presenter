@@ -1,0 +1,27 @@
+:root {
+  --font-body: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --bg: #f4f7ff;
+  --text: #0f172a;
+  --text-soft: #334155;
+  --muted: #64748b;
+
+  --panel: #ffffff;
+  --panel-soft: #f8fafc;
+  --border: #dbe2ee;
+
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --primary-soft: #eef2ff;
+
+  --info-bg: #eef2ff;
+  --info-border: #cbd5ff;
+  --success-bg: #ecfdf3;
+  --success-border: #bbf7d0;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecdd3;
+
+  --shadow-sm: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 14px 36px rgba(15, 23, 42, 0.12);
+  --shadow: var(--shadow-sm);
+}

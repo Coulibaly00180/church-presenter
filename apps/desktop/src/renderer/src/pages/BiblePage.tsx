@@ -103,14 +103,6 @@ export function BiblePage() {
   const [searchLoading, setSearchLoading] = useState(false);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
 
-  const panelStyle: React.CSSProperties = {
-    background: "var(--panel)",
-    border: "1px solid var(--border)",
-    borderRadius: 16,
-    padding: 14,
-    boxShadow: "var(--shadow)",
-  };
-
   const currentBook = useMemo(() => books.find((b) => b.bookid === bookId), [books, bookId]);
 
   // Load translations once
@@ -341,14 +333,14 @@ export function BiblePage() {
   }
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16, display: "grid", gap: 12 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div className="cp-page">
+      <div className="cp-page-header">
         <div>
-          <h1 style={{ margin: 0 }}>Bible</h1>
-          <div style={{ opacity: 0.7 }}>Rechercher, projeter et envoyer vers le plan (bolls.life).</div>
+          <h1 className="cp-page-title">Bible</h1>
+          <div className="cp-page-subtitle">Rechercher, projeter et envoyer vers le plan (bolls.life).</div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <div className="cp-actions">
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             Langue
             <select
@@ -403,14 +395,12 @@ export function BiblePage() {
         </div>
       </div>
 
-      {err ? (
-        <div style={{ ...panelStyle, background: "#fef2f2", borderColor: "#fecdd3" }}>Erreur : {err}</div>
-      ) : null}
-      {info ? <div style={{ ...panelStyle, background: "#ecfdf3", borderColor: "#bbf7d0" }}>{info}</div> : null}
+      {err ? <div className="cp-alert cp-alert--error">Erreur : {err}</div> : null}
+      {info ? <div className="cp-alert cp-alert--success">{info}</div> : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, alignItems: "start" }}>
-        <div style={{ display: "grid", gap: 12 }}>
-          <div style={panelStyle}>
+      <div className="cp-grid-main">
+        <div className="cp-stack">
+          <div className="panel cp-panel">
             <div style={{ fontWeight: 800, marginBottom: 8 }}>Naviguer</div>
             <div style={{ display: "grid", gap: 8 }}>
             <label>
@@ -487,7 +477,7 @@ export function BiblePage() {
             </div>
           </div>
 
-          <div style={panelStyle}>
+          <div className="panel cp-panel">
             <div style={{ fontWeight: 800, marginBottom: 6 }}>Recherche texte (API bolls)</div>
             <input
               value={searchText}
@@ -516,7 +506,7 @@ export function BiblePage() {
           </div>
         </div>
 
-        <div style={panelStyle}>
+        <div className="panel cp-panel">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 900 }}>{currentBook?.name ?? "—"}</div>

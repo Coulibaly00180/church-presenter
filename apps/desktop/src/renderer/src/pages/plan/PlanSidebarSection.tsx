@@ -3,7 +3,6 @@ import { isoToYmd } from "./date";
 import { PlanListItem } from "./types";
 
 type PlanSidebarSectionProps = {
-  panelStyle: React.CSSProperties;
   newDate: string;
   newTitle: string;
   plans: PlanListItem[];
@@ -16,29 +15,28 @@ type PlanSidebarSectionProps = {
 };
 
 export function PlanSidebarSection(props: PlanSidebarSectionProps) {
-  const { panelStyle, newDate, newTitle, plans, selectedPlanId, livePlanId, onSetNewDate, onSetNewTitle, onCreatePlan, onSelectPlan } =
-    props;
+  const { newDate, newTitle, plans, selectedPlanId, livePlanId, onSetNewDate, onSetNewTitle, onCreatePlan, onSelectPlan } = props;
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={panelStyle}>
+    <div className="cp-stack">
+      <div className="panel cp-panel">
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
         <div style={{ display: "grid", gap: 8 }}>
           <label>
             <div style={{ fontWeight: 600 }}>Date</div>
-            <input value={newDate} onChange={(e) => onSetNewDate(e.target.value)} type="date" style={{ width: "100%" }} />
+            <input value={newDate} onChange={(e) => onSetNewDate(e.target.value)} type="date" className="cp-input-full" />
           </label>
           <label>
             <div style={{ fontWeight: 600 }}>Titre</div>
-            <input value={newTitle} onChange={(e) => onSetNewTitle(e.target.value)} style={{ width: "100%" }} />
+            <input value={newTitle} onChange={(e) => onSetNewTitle(e.target.value)} className="cp-input-full" />
           </label>
-          <button onClick={() => onCreatePlan()} style={{ background: "var(--primary)", color: "white", border: "none" }}>
+          <button onClick={() => onCreatePlan()} className="btn-primary">
             + Creer
           </button>
         </div>
       </div>
 
-      <div style={panelStyle}>
+      <div className="panel cp-panel">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <div style={{ fontWeight: 800 }}>Plans</div>
           <span style={{ fontSize: 12, opacity: 0.6 }}>{plans.length} plan(s)</span>
@@ -54,7 +52,7 @@ export function PlanSidebarSection(props: PlanSidebarSectionProps) {
                 padding: 12,
                 borderRadius: 12,
                 border: selectedPlanId === p.id ? "2px solid var(--primary)" : "1px solid var(--border)",
-                background: selectedPlanId === p.id ? "#eef2ff" : "white",
+                background: selectedPlanId === p.id ? "var(--primary-soft)" : "white",
                 boxShadow: "none",
               }}
             >
