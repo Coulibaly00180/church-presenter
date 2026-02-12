@@ -163,9 +163,10 @@ export function HistoryPage() {
               <button
                 onClick={async () => {
                   try {
-                    await window.cp.plans.duplicate({ planId: p.id, dateIso: localNowYmd() });
+                    const duplicated = await window.cp.plans.duplicate({ planId: p.id, dateIso: localNowYmd() });
                     setPlans(await window.cp.plans.list());
-                    setMsg("Plan duplique.");
+                    const duplicatedDate = duplicated?.date ? isoToYmd(duplicated.date) : null;
+                    setMsg(duplicatedDate ? `Plan duplique au ${duplicatedDate}.` : "Plan duplique.");
                   } catch (e) {
                     setMsg(`Duplication echouee: ${getErrorMessage(e)}`);
                   }

@@ -17,6 +17,14 @@ function normalizeDateToMidnight(dateIso: string) {
   return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 0, 0, 0, 0));
 }
 
+function addUtcDays(date: Date, days: number) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days, 0, 0, 0, 0));
+}
+
+function isUniqueConstraintError(err: unknown) {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "P2002";
+}
+
 export function registerPlansIpc() {
   ipcMain.handle("plans:list", async () => {
     const prisma = getPrisma();
@@ -43,34 +51,43 @@ export function registerPlansIpc() {
     });
     if (!base) throw new Error("Plan not found");
 
-    const date = normalizeDateToMidnight(payload.dateIso || base.date.toISOString());
+    let candidateDate = normalizeDateToMidnight(payload.dateIso || base.date.toISOString());
     const title = payload.title?.trim() || base.title || "Culte";
 
-    return prisma.$transaction(async (tx: any) => {
-      const created = await tx.servicePlan.create({
-        data: { date, title },
-      });
+    for (let attempt = 0; attempt < 3660; attempt += 1) {
+      try {
+        return await prisma.$transaction(async (tx: any) => {
+          const created = await tx.servicePlan.create({
+            data: { date: candidateDate, title },
+          });
 
-      for (const it of base.items) {
-        await tx.serviceItem.create({
-          data: {
-            planId: created.id,
-            order: it.order,
-            kind: it.kind,
-            title: it.title,
-            content: it.content,
-            refId: it.refId,
-            refSubId: it.refSubId,
-            mediaPath: it.mediaPath,
-          },
+          for (const it of base.items) {
+            await tx.serviceItem.create({
+              data: {
+                planId: created.id,
+                order: it.order,
+                kind: it.kind,
+                title: it.title,
+                content: it.content,
+                refId: it.refId,
+                refSubId: it.refSubId,
+                mediaPath: it.mediaPath,
+              },
+            });
+          }
+
+          return tx.servicePlan.findUnique({
+            where: { id: created.id },
+            include: { items: { orderBy: { order: "asc" } } },
+          });
         });
+      } catch (e) {
+        if (!isUniqueConstraintError(e)) throw e;
+        candidateDate = addUtcDays(candidateDate, 1);
       }
+    }
 
-      return tx.servicePlan.findUnique({
-        where: { id: created.id },
-        include: { items: { orderBy: { order: "asc" } } },
-      });
-    });
+    throw new Error("Unable to find an available plan date");
   });
 
   ipcMain.handle("plans:create", async (_evt, payload: { dateIso: string; title?: string }) => {
