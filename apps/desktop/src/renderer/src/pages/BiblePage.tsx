@@ -63,8 +63,8 @@ type TranslationGroup = {
 };
 
 export function BiblePage() {
-  const [translationLanguage, setTranslationLanguage] = useState<string>(""); // selected language
-  const [translation, setTranslation] = useState<string>(""); // selected translation code
+  const [translationLanguage, setTranslationLanguage] = useState<string>("French Français"); // default language
+  const [translation, setTranslation] = useState<string>("FRLSG"); // default translation code
   const activeTranslation = translation;
   const [groups, setGroups] = useState<TranslationGroup[]>([]);
   const [translationFilter, setTranslationFilter] = useState("");
@@ -114,7 +114,14 @@ export function BiblePage() {
           g.translations.push({ code: t.short_name, label: `${t.full_name} (${t.short_name})`, dir: t.dir });
         });
         setGroups(grouped);
-        if (grouped[0]?.translations[0]) {
+        const defaultLang = "French Français";
+        const defaultCode = "FRLSG";
+        const langExists = grouped.find((g) => g.language === defaultLang);
+        if (langExists) {
+          setTranslationLanguage(defaultLang);
+          const found = langExists.translations.find((t) => t.code === defaultCode) || langExists.translations[0];
+          if (found) setTranslation(found.code);
+        } else if (grouped[0]?.translations[0]) {
           setTranslationLanguage(grouped[0].language);
           setTranslation(grouped[0].translations[0].code);
         }

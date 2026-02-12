@@ -25,6 +25,7 @@ export function ProjectionPage() {
   const [pdfPageCount, setPdfPageCount] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
   const devtoolsOpened = useRef(false);
+  const [blockCursor, setBlockCursor] = useState<number>(0);
 
   function toFileUrl(p?: string) {
     if (!p) return "";
@@ -44,12 +45,28 @@ export function ProjectionPage() {
     const onKeyDown = (e: KeyboardEvent) => {
       const isPdf = state?.current?.mediaType === "PDF";
       if (isPdf) return;
-      if (e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === " " || e.key.toLowerCase() === "d") {
+      const isText = state?.current?.kind === "TEXT";
+      const isNext = e.key === "ArrowRight" || e.key === "ArrowDown" || e.key === "PageDown" || e.key === " " || e.key.toLowerCase() === "d";
+      const isPrev = e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp" || e.key.toLowerCase() === "q";
+
+      if (isText && (isNext || isPrev)) {
+        e.preventDefault();
+        const parts = (state?.current?.body || "").split(/\n\s*\n/g).map((s) => s.trim()).filter(Boolean);
+        const max = Math.max(parts.length - 1, 0);
+        setBlockCursor((idx) => {
+          const next = Math.min(Math.max(idx + (isNext ? 1 : -1), 0), max);
+          if (next !== idx) console.log("[projection] key:", e.key, "-> text block", next + 1, "/", max + 1);
+          return next;
+        });
+        return;
+      }
+
+      if (isNext) {
         e.preventDefault();
         console.log("[projection] key:", e.key, "-> live: next");
         window.cp.live?.next?.();
       }
-      if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp" || e.key.toLowerCase() === "q") {
+      if (isPrev) {
         e.preventDefault();
         console.log("[projection] key:", e.key, "-> live: prev");
         window.cp.live?.prev?.();
@@ -87,6 +104,7 @@ export function ProjectionPage() {
   // Declenche une transition douce a chaque changement de "current"
   useEffect(() => {
     setAnimKey((k) => k + 1);
+    setBlockCursor(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.current?.kind, state?.current?.title, state?.current?.body]);
 
