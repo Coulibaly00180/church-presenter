@@ -16,14 +16,14 @@ declare global {
         setAppearance: (payload: { textScale?: number; background?: string; foreground?: string }) => Promise<any>;
       };
 
-      projectionWindow?: {
+      projectionWindow: {
         open: () => Promise<{ isOpen: boolean }>;
         close: () => Promise<{ isOpen: boolean }>;
         isOpen: () => Promise<{ isOpen: boolean }>;
         onWindowState: (cb: (payload: { isOpen: boolean }) => void) => () => void;
       };
 
-      screens?: {
+      screens: {
         list: () => Promise<Array<{ key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode }>>;
         isOpen: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
         open: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
@@ -37,7 +37,7 @@ declare global {
         onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => () => void;
       };
 
-      songs?: {
+      songs: {
         list: (q?: string) => Promise<any[]>;
         get: (id: string) => Promise<any>;
         create: (payload: { title: string; artist?: string; album?: string }) => Promise<any>;
@@ -54,7 +54,7 @@ declare global {
         importAuto: () => Promise<any>;
       };
 
-      plans?: {
+      plans: {
         list: () => Promise<any[]>;
         get: (id: string) => Promise<any>;
         duplicate: (payload: { planId: string; dateIso?: string; title?: string }) => Promise<any>;
@@ -74,12 +74,12 @@ declare global {
         export: (payload: { planId: string }) => Promise<any>;
       };
 
-      data?: {
+      data: {
         exportAll: () => Promise<any>;
         importAll: (payload: { mode: "MERGE" | "REPLACE" }) => Promise<any>;
       };
 
-      live?: {
+      live: {
         get: () => Promise<{
           enabled: boolean;
           planId: string | null;
@@ -104,14 +104,14 @@ declare global {
       };
 
 
-      devtools?: {
+      devtools: {
         open: (target: "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C") => Promise<any>;
       };
 
-      files?: {
-        pickMedia: () => Promise<{ ok: boolean; canceled?: boolean; path?: string; mediaType?: "IMAGE" | "PDF" }>;
-        deleteMedia: (payload: { path: string }) => Promise<{ ok: boolean }>;
-        listMedia: () => Promise<{ ok: boolean; files: Array<{ name: string; path: string; mediaType: "PDF" | "IMAGE" }> }>;
+      files: {
+        pickMedia: () => Promise<{ ok: boolean; canceled?: boolean; path?: string; mediaType?: "IMAGE" | "PDF"; error?: string }>;
+        deleteMedia: (payload: { path: string }) => Promise<{ ok: boolean; error?: string }>;
+        listMedia: () => Promise<{ ok: boolean; files: Array<{ name: string; path: string; mediaType: "PDF" | "IMAGE" }>; error?: string }>;
       };
 
       [k: string]: any;

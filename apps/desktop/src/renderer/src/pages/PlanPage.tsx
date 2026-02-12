@@ -33,7 +33,18 @@ type LiveState = {
 type ScreenMeta = { key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode };
 
 function isoToYmd(iso: string) {
+  const fromIso = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (fromIso) return `${fromIso[1]}-${fromIso[2]}-${fromIso[3]}`;
   const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function localNowYmd() {
+  const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -113,6 +124,19 @@ async function projectMediaToTarget(
   if (res?.ok === false && res?.reason === "MIRROR") {
     await window.cp.projection.setContentMedia({ title, mediaPath, mediaType });
   }
+}
+
+async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem, live: LiveState | null) {
+  const { title, body } = formatForProjection(item);
+  if (item.kind === "ANNOUNCEMENT_IMAGE" && item.mediaPath) {
+    await projectMediaToTarget(target, title, item.mediaPath, "IMAGE", live);
+    return;
+  }
+  if (item.kind === "ANNOUNCEMENT_PDF" && item.mediaPath) {
+    await projectMediaToTarget(target, title, item.mediaPath, "PDF", live);
+    return;
+  }
+  await projectTextToTarget(target, title, body, live);
 }
 
 function SortableRow(props: {
@@ -211,7 +235,7 @@ export function PlanPage() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
 
-  const [newDate, setNewDate] = useState<string>(() => isoToYmd(new Date().toISOString()));
+  const [newDate, setNewDate] = useState<string>(() => localNowYmd());
   const [newTitle, setNewTitle] = useState<string>("Culte");
 
   const [addKind, setAddKind] = useState<string>("ANNOUNCEMENT_TEXT");
@@ -451,7 +475,7 @@ export function PlanPage() {
     if (lastProjectionKey.current === key) return;
     lastProjectionKey.current = key;
 
-    void projectTextToTarget(live.target, formatForProjection(item).title, formatForProjection(item).body, live);
+    void projectPlanItemToTarget(live.target, item, live);
   }, [live?.updatedAt, plan]);
 
   const visibleItems = useMemo(() => {
@@ -927,20 +951,15 @@ export function PlanPage() {
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                 <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
                   <div style={{ display: "grid", gap: 10 }}>
-                    {visibleItems.map((it, idx) => (
+                    {visibleItems.map((it) => (
                       <SortableRow
                         key={it.id}
                         item={it}
                         onProject={async () => {
-                          const { title, body } = formatForProjection(it);
-                          const next = (await updateLive({ planId: plan.id, cursor: idx, enabled: true, target })) || live;
-                          if (it.kind === "ANNOUNCEMENT_IMAGE" && it.mediaPath) {
-                            await projectMediaToTarget(target, title, it.mediaPath, "IMAGE", next);
-                          } else if (it.kind === "ANNOUNCEMENT_PDF" && it.mediaPath) {
-                            await projectMediaToTarget(target, title, it.mediaPath, "PDF", next);
-                          } else {
-                            await projectTextToTarget(target, title, body, next);
-                          }
+                          const cursor = plan.items.findIndex((x) => x.id === it.id);
+                          if (cursor < 0) return;
+                          const next = (await updateLive({ planId: plan.id, cursor, enabled: true, target })) || live;
+                          await projectPlanItemToTarget(target, it, next);
                         }}
                         onRemove={async () => {
                           await window.cp.plans.removeItem({ planId: plan.id, itemId: it.id });

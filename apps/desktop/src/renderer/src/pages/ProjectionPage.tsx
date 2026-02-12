@@ -24,7 +24,6 @@ export function ProjectionPage() {
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [pdfPageCount, setPdfPageCount] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
-  const devtoolsOpened = useRef(false);
   const [blockCursor, setBlockCursor] = useState<number>(0);
 
   function toFileUrl(p?: string) {
@@ -51,7 +50,10 @@ export function ProjectionPage() {
 
       if (isText && (isNext || isPrev)) {
         e.preventDefault();
-        const parts = (state?.current?.body || "").split(/\n\s*\n/g).map((s) => s.trim()).filter(Boolean);
+        const parts = String(state?.current?.body || "")
+          .split(/\n\s*\n/g)
+          .map((part: string) => part.trim())
+          .filter(Boolean);
         const max = Math.max(parts.length - 1, 0);
         setBlockCursor((idx) => {
           const next = Math.min(Math.max(idx + (isNext ? 1 : -1), 0), max);
@@ -75,15 +77,10 @@ export function ProjectionPage() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [screenKey]);
+  }, [state?.current?.kind, state?.current?.mediaType, state?.current?.body]);
 
   useEffect(() => {
     const hasScreens = !!window.cp?.screens?.getState && !!window.cp?.screens?.onState;
-
-    if (!devtoolsOpened.current) {
-      window.cp.devtools?.open?.(screenKey === "A" ? "PROJECTION" : screenKey === "B" ? "SCREEN_B" : "SCREEN_C");
-      devtoolsOpened.current = true;
-    }
 
     if (hasScreens) {
       window.cp.screens.getState(screenKey).then(setState);
@@ -111,6 +108,16 @@ export function ProjectionPage() {
   const mode = state?.mode ?? "NORMAL";
   const current = state?.current ?? { kind: "EMPTY" };
   const lowerThird = !!state?.lowerThirdEnabled;
+  const textBlocks = useMemo(
+    () =>
+      String(current.body || "")
+        .split(/\n\s*\n/g)
+        .map((part) => part.trim())
+        .filter(Boolean),
+    [current.body]
+  );
+  const projectedBody =
+    textBlocks.length > 0 ? textBlocks[Math.max(0, Math.min(blockCursor, textBlocks.length - 1))] : String(current.body ?? "");
 
   const textScale = state?.textScale ?? 1;
   const bg = mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : state?.background || "#050505";
@@ -352,7 +359,7 @@ export function ProjectionPage() {
           </>
         ) : (
           <>
-            <div style={bodyStyle}>{current.body ?? ""}</div>
+            <div style={bodyStyle}>{projectedBody}</div>
             {(current.metaSong || current.title) ? (
               <div
                 style={{

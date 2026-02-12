@@ -1,10 +1,20 @@
-import { ipcMain } from "electron";
+import { dialog, ipcMain } from "electron";
 import { getPrisma } from "../db";
 
 function normalizeDateToMidnight(dateIso: string) {
-  const d = new Date(dateIso);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  const ymd = dateIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymd) {
+    const y = Number(ymd[1]);
+    const m = Number(ymd[2]);
+    const d = Number(ymd[3]);
+    return new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0));
+  }
+
+  const parsed = new Date(dateIso);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Invalid date");
+  }
+  return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 0, 0, 0, 0));
 }
 
 export function registerPlansIpc() {
@@ -122,7 +132,7 @@ export function registerPlansIpc() {
     });
 
     await prisma.$transaction(
-      items.map((it, idx) => prisma.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } }))
+      items.map((it: any, idx: number) => prisma.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } }))
     );
 
     return { ok: true };

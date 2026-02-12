@@ -2,6 +2,22 @@ import { ipcMain, dialog } from "electron";
 import { getPrisma } from "../db";
 import fs from "fs";
 
+function normalizeDateToMidnight(dateIso?: string) {
+  if (!dateIso) {
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  }
+  const ymd = String(dateIso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) {
+    return new Date(Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 0, 0, 0, 0));
+  }
+  const parsed = new Date(dateIso);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Invalid plan date");
+  }
+  return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 0, 0, 0, 0));
+}
+
 export function registerDataIpc() {
   ipcMain.handle("data:exportAll", async () => {
     const prisma = getPrisma();
@@ -77,7 +93,7 @@ export function registerDataIpc() {
       try {
         const plan = await prisma.servicePlan.create({
           data: {
-            date: p.date ? new Date(p.date) : new Date(),
+            date: normalizeDateToMidnight(p.date),
             title: p.title,
           },
         });

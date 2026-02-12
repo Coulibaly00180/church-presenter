@@ -20,8 +20,8 @@ type PlanItemPayload = {
   kind: "BIBLE_PASSAGE" | "BIBLE_VERSE";
   title?: string;
   content?: string;
-  refId?: string | null;
-  refSubId?: string | null;
+  refId?: string;
+  refSubId?: string;
 };
 
 function stripHtml(html: string) {

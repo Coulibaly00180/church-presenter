@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
-import { join, basename } from "path";
+import { join, basename, extname, resolve, sep } from "path";
 import fs from "fs";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
@@ -79,6 +79,26 @@ const mirrors: Record<ScreenKey, ScreenMirrorMode> = {
   B: { kind: "MIRROR", from: "A" }, // sensible default
   C: { kind: "MIRROR", from: "A" }, // sensible default
 };
+
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+const PDF_EXTENSIONS = new Set([".pdf"]);
+
+function inferMediaType(filePath: string): "IMAGE" | "PDF" | null {
+  const ext = extname(filePath).toLowerCase();
+  if (PDF_EXTENSIONS.has(ext)) return "PDF";
+  if (IMAGE_EXTENSIONS.has(ext)) return "IMAGE";
+  return null;
+}
+
+function getMediaDir() {
+  return join(app.getPath("userData"), "media");
+}
+
+function isPathInDir(baseDir: string, candidatePath: string) {
+  const base = (resolve(baseDir) + sep).toLowerCase();
+  const candidate = resolve(candidatePath).toLowerCase();
+  return candidate.startsWith(base);
+}
 
 function getPreloadPath() {
   // IMPORTANT: preload CommonJS généré par electron-vite => out/preload/index.cjs en dev
@@ -303,51 +323,44 @@ ipcMain.handle("devtools:open", (_evt, target: "REGIE" | "PROJECTION" | "SCREEN_
 
 ipcMain.handle("files:pickMedia", async () => {
   const res = await dialog.showOpenDialog({
-    title: "Choisir un fichier media (image / PDF / Office)",
+    title: "Choisir un fichier media (image / PDF)",
     filters: [
-      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf", "ppt", "pptx", "doc", "docx", "odt"] },
+      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf"] },
       { name: "All", extensions: ["*"] },
     ],
     properties: ["openFile"],
   });
   if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
   const p = res.filePaths[0];
-  const lower = p.toLowerCase();
-  const isPdf =
-    lower.endsWith(".pdf") || lower.endsWith(".ppt") || lower.endsWith(".pptx") || lower.endsWith(".doc") || lower.endsWith(".docx") || lower.endsWith(".odt");
-  const mediaDir = join(app.getPath("userData"), "media");
+  const mediaType = inferMediaType(p);
+  if (!mediaType) return { ok: false, error: "Unsupported media extension" };
+
+  const mediaDir = getMediaDir();
   if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
   const target = join(mediaDir, basename(p));
   try {
     fs.copyFileSync(p, target);
-    return { ok: true, path: target, mediaType: isPdf ? "PDF" : "IMAGE" };
+    return { ok: true, path: target, mediaType };
   } catch (e) {
     console.error("copy media failed", e);
-    return { ok: true, path: p, mediaType: isPdf ? "PDF" : "IMAGE" };
+    return { ok: true, path: p, mediaType };
   }
 });
 
 ipcMain.handle("files:listMedia", async () => {
   try {
-    const mediaDir = join(app.getPath("userData"), "media");
+    const mediaDir = getMediaDir();
     if (!fs.existsSync(mediaDir)) return { ok: true, files: [] };
     const entries = fs.readdirSync(mediaDir);
     const files = entries
       .filter((f) => fs.statSync(join(mediaDir, f)).isFile())
-      .map((name) => {
+      .map((name): { name: string; path: string; mediaType: "PDF" | "IMAGE" } | null => {
         const full = join(mediaDir, name);
-        const lower = name.toLowerCase();
-        const mediaType =
-          lower.endsWith(".pdf") ||
-          lower.endsWith(".ppt") ||
-          lower.endsWith(".pptx") ||
-          lower.endsWith(".doc") ||
-          lower.endsWith(".docx") ||
-          lower.endsWith(".odt")
-            ? "PDF"
-            : "IMAGE";
+        const mediaType = inferMediaType(name);
+        if (!mediaType) return null;
         return { name, path: full, mediaType };
-      });
+      })
+      .filter((x): x is { name: string; path: string; mediaType: "PDF" | "IMAGE" } => !!x);
     return { ok: true, files };
   } catch (e: any) {
     console.error("listMedia failed", e);
@@ -357,7 +370,12 @@ ipcMain.handle("files:listMedia", async () => {
 
 ipcMain.handle("files:deleteMedia", async (_evt, payload: { path: string }) => {
   try {
-    if (payload?.path && fs.existsSync(payload.path)) {
+    if (!payload?.path) return { ok: false, error: "Missing media path" };
+    const mediaDir = getMediaDir();
+    if (!isPathInDir(mediaDir, payload.path)) {
+      return { ok: false, error: "Path outside media directory" };
+    }
+    if (fs.existsSync(payload.path)) {
       fs.unlinkSync(payload.path);
     }
     return { ok: true };
@@ -371,13 +389,15 @@ ipcMain.handle("files:deleteMedia", async (_evt, payload: { path: string }) => {
 ipcMain.handle("projection:getState", () => screenStates.A);
 
 ipcMain.handle("projection:setState", (_evt, patch: Partial<ProjectionState>) => {
+  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = { ...screenStates.A, ...patch, updatedAt: Date.now() };
   sendScreenState("A");
   applyMirrorsFrom("A");
-  return screenStates.A;
+  return { ok: true, state: screenStates.A };
 });
 
 ipcMain.handle("projection:setAppearance", (_evt, patch: { textScale?: number; background?: string; foreground?: string }) => {
+  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
     textScale: patch.textScale ?? screenStates.A.textScale ?? 1,
@@ -387,10 +407,11 @@ ipcMain.handle("projection:setAppearance", (_evt, patch: { textScale?: number; b
   };
   sendScreenState("A");
   applyMirrorsFrom("A");
-  return screenStates.A;
+  return { ok: true, state: screenStates.A };
 });
 
 ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; body: string; metaSong?: any }) => {
+  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
     mode: "NORMAL",
@@ -399,10 +420,11 @@ ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; bo
   };
   sendScreenState("A");
   applyMirrorsFrom("A");
-  return screenStates.A;
+  return { ok: true, state: screenStates.A };
 });
 
 ipcMain.handle("projection:setContentMedia", (_evt, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => {
+  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
     mode: "NORMAL",
@@ -411,14 +433,15 @@ ipcMain.handle("projection:setContentMedia", (_evt, payload: { title?: string; m
   };
   sendScreenState("A");
   applyMirrorsFrom("A");
-  return screenStates.A;
+  return { ok: true, state: screenStates.A };
 });
 
 ipcMain.handle("projection:setMode", (_evt, mode: ProjectionMode) => {
+  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = { ...screenStates.A, mode, updatedAt: Date.now() };
   sendScreenState("A");
   applyMirrorsFrom("A");
-  return screenStates.A;
+  return { ok: true, state: screenStates.A };
 });
 
 // --------------------
@@ -458,6 +481,7 @@ ipcMain.handle("screens:getState", (_evt, key: ScreenKey) => screenStates[key]);
 ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title?: string; body: string; metaSong?: any }) => {
   // If screen is mirroring, ignore direct set (safety)
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
+  if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
 
   screenStates[key] = {
     ...screenStates[key],
@@ -473,6 +497,7 @@ ipcMain.handle(
   "screens:setContentMedia",
   (_evt, key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => {
     if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
+    if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
     screenStates[key] = {
       ...screenStates[key],
       mode: "NORMAL",
@@ -487,6 +512,7 @@ ipcMain.handle(
 ipcMain.handle("screens:setMode", (_evt, key: ScreenKey, mode: ProjectionMode) => {
   // If screen is mirroring, ignore
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
+  if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
 
   screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
   sendScreenState(key);

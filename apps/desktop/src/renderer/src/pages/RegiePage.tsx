@@ -322,8 +322,7 @@ export function RegiePage() {
                     type="checkbox"
                     checked={isMirror}
                     onChange={async (e) => {
-                      if (!window.cp.screens) return;
-                      const mirror = e.target.checked ? { kind: "MIRROR", from: "A" } : { kind: "FREE" };
+                      const mirror: ScreenMirrorMode = e.target.checked ? { kind: "MIRROR", from: "A" } : { kind: "FREE" };
                       await window.cp.screens.setMirror(k, mirror);
                       setScreens((prev) => prev.map((s) => (s.key === k ? { ...s, mirror } : s)));
                     }}

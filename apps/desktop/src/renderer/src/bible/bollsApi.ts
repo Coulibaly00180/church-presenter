@@ -163,7 +163,7 @@ export async function listTranslations(): Promise<Array<{ language: string; shor
     if (resp?.ok && Array.isArray(resp.data)) {
       const flat = resp.data.flatMap((l: any) => (l.translations || []).map((t: any) => ({ language: l.language, ...t })));
       translationsCache = flat;
-      return translationsCache;
+      return flat;
     }
     if (resp?.error) throw new Error(resp.error);
   }
@@ -172,6 +172,7 @@ export async function listTranslations(): Promise<Array<{ language: string; shor
   const r = await fetch("https://bolls.life/static/bolls/app/views/languages.json");
   if (!r.ok) throw new Error("Impossible de charger les traductions");
   const json = (await r.json()) as Array<{ language: string; translations: Array<{ short_name: string; full_name: string; dir?: string }> }>;
-  translationsCache = json.flatMap((l) => l.translations.map((t) => ({ language: l.language, ...t })));
-  return translationsCache;
+  const flat = json.flatMap((l) => l.translations.map((t) => ({ language: l.language, ...t })));
+  translationsCache = flat;
+  return flat;
 }

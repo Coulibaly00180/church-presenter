@@ -16,8 +16,9 @@ function splitBlocks(text: string) {
 }
 
 function parseSongText(raw: string, filename?: string) {
-  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  let title =
+  const rawLines = raw.split(/\r?\n/);
+  const lines = rawLines.map((l) => l.trim()).filter(Boolean);
+  const title =
     lines.find((l) => /^titre\s*:/i.test(l))?.split(":").slice(1).join(":").trim() ||
     filename?.replace(/\.(docx|odt)$/i, "") ||
     "Sans titre";
@@ -27,16 +28,21 @@ function parseSongText(raw: string, filename?: string) {
     lines.find((l) => /^ann[eé]e/i.test(l))?.split(":").slice(1).join(":").trim() ||
     lines.find((l) => /^année de parution/i.test(l))?.split(":").slice(1).join(":").trim();
 
-  // Lyrics: everything after a line starting with "Paroles" OR the whole text minus metadata
+  // Keep empty lines to preserve stanza boundaries.
   let lyrics = "";
-  const parolesIdx = lines.findIndex((l) => /^paroles\s*:?/i.test(l));
+  const parolesIdx = rawLines.findIndex((l) => /^paroles\s*:?/i.test(l.trim()));
   if (parolesIdx >= 0) {
-    lyrics = lines.slice(parolesIdx + 1).join("\n");
+    lyrics = rawLines.slice(parolesIdx + 1).join("\n").trim();
   } else {
     const metaKeys = ["titre", "auteur", "album", "ann", "année", "annee"];
-    lyrics = lines
-      .filter((l) => !metaKeys.some((k) => l.toLowerCase().startsWith(k)))
-      .join("\n");
+    lyrics = rawLines
+      .filter((l) => {
+        const trimmed = l.trim().toLowerCase();
+        if (!trimmed) return true;
+        return !metaKeys.some((k) => trimmed.startsWith(k));
+      })
+      .join("\n")
+      .trim();
   }
 
   const paragraphs = splitBlocks(lyrics);
@@ -119,7 +125,7 @@ async function importJsonFile(prisma: any, filePath: string) {
   for (const s of payload) {
     try {
       const meta = s.meta || {};
-      // blocs : accepte soit blocks[], soit lyrics (string) qu'on découpe en paragraphes
+      // blocs : accepte soit blocks[], soit lyrics (string) qu'on decoupe en paragraphes
       let blocks: any[] = Array.isArray(s.blocks) ? s.blocks : [];
       const lyrics = s.lyrics || s.paroles || meta.paroles;
       if ((!blocks || blocks.length === 0) && typeof lyrics === "string") {
@@ -130,7 +136,7 @@ async function importJsonFile(prisma: any, filePath: string) {
           content,
         }));
       }
-      // année dans tags ou year
+      // annee dans tags ou year
       const year = s.year || s.annee || s.published || s.release_year || meta.annee_de_sortie_single;
       const tags = s.tags || (year != null ? String(year).slice(0, 10) : undefined);
       const title = s.title || s.titre || meta.titre || "Sans titre";
@@ -269,7 +275,7 @@ export function registerSongsIpc() {
     const song = await prisma.song.findUnique({ where: { id: songId }, include: { blocks: { orderBy: { order: "asc" } } } });
     if (!song) throw new Error("Song not found");
 
-    const lyrics = (song.blocks || []).map((b) => (b.content || "").trim()).filter(Boolean).join("\n\n");
+    const lyrics = (song.blocks || []).map((b: any) => (b.content || "").trim()).filter(Boolean).join("\n\n");
     const doc = new Document({
       sections: [
         {
@@ -277,11 +283,11 @@ export function registerSongsIpc() {
           children: [
             new Paragraph({ children: [new TextRun({ text: `Titre : ${song.title}`, bold: true })] }),
             new Paragraph(`Auteur : ${song.artist || ""}`),
-            new Paragraph(`Année de parution : ${""}`),
+            new Paragraph(`Annee de parution : ${""}`),
             new Paragraph(`Album : ${song.album || ""}`),
             new Paragraph(""),
             new Paragraph({ children: [new TextRun({ text: "Paroles :", bold: true })] }),
-            ...lyrics.split("\n").map((line) => new Paragraph(line)),
+            ...lyrics.split("\n").map((line: string) => new Paragraph(line)),
           ],
         },
       ],
