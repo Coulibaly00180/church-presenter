@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { lookupLSG1910 } from "../bible/lookupLSG1910";
-import { findBookIdByName, getBooks, getChapter, maxChapter, buildReferenceLabel, searchVerses } from "../bible/bollsApi";
-import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { DragEndEvent } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 import { isoToYmd, localNowYmd } from "./plan/date";
-import { SortableRow } from "./plan/SortableRow";
+import { PlanComposerSection } from "./plan/PlanComposerSection";
+import { PlanItemsOrderSection } from "./plan/PlanItemsOrderSection";
+import { PlanLiveToolbar } from "./plan/PlanLiveToolbar";
+import { PlanSidebarSection } from "./plan/PlanSidebarSection";
 import { projectPlanItemToTarget } from "./plan/projection";
-import { LiveState, Plan, PlanItem, PlanListItem, ScreenKey } from "./plan/types";
+import { LiveState, Plan, PlanListItem } from "./plan/types";
 
 export function PlanPage() {
   const canUse = !!window.cp?.plans && !!window.cp?.projection && !!window.cp?.projectionWindow;
@@ -18,34 +19,6 @@ export function PlanPage() {
 
   const [newDate, setNewDate] = useState<string>(() => localNowYmd());
   const [newTitle, setNewTitle] = useState<string>("Culte");
-
-  const [addKind, setAddKind] = useState<string>("ANNOUNCEMENT_TEXT");
-  const [addTitle, setAddTitle] = useState<string>("Annonce");
-  const [addContent, setAddContent] = useState<string>("");
-  const [addPdfPage, setAddPdfPage] = useState<string>("1");
-  const [songSearch, setSongSearch] = useState("");
-  const [songResults, setSongResults] = useState<Array<{ id: string; title: string }>>([]);
-  const [bibleRef, setBibleRef] = useState("Jean 3:16-18");
-  const [bibleTranslation, setBibleTranslation] = useState<"LSG1910" | "LSG" | "WEB" | "FRLSG">("FRLSG");
-  const [bibleLoading, setBibleLoading] = useState(false);
-  const [bibleError, setBibleError] = useState<string | null>(null);
-  const [bibleVerses, setBibleVerses] = useState<Array<{ chapter: number; verse: number; text: string }>>([]);
-  const [bibleReference, setBibleReference] = useState<string>(""); 
-  const bibleBooks = useRef<Record<string, any[]>>({});
-  const [bibleSearchText, setBibleSearchText] = useState("");
-  const [bibleSearchResults, setBibleSearchResults] = useState<Array<{ book: number; chapter: number; verse: number; text: string }>>([]);
-  const [bibleSearchLoading, setBibleSearchLoading] = useState(false);
-  const bibleSearchTimer = useRef<NodeJS.Timeout | null>(null);
-  const bibleTimer = useRef<NodeJS.Timeout | null>(null);
-  const songTimer = useRef<NodeJS.Timeout | null>(null);
-
-  function getBookNameFromCache(bookId: number): string {
-    const books = bibleBooks.current[bibleTranslation];
-    const found = books?.find((b: any) => b.bookid === bookId);
-    return found?.name || `Livre ${bookId}`;
-  }
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const [live, setLive] = useState<LiveState | null>(null);
   const lastProjectionKey = useRef<string | null>(null);
@@ -65,153 +38,6 @@ export function PlanPage() {
   async function refreshPlans() {
     const list = await window.cp.plans.list();
     setPlans(list);
-  }
-
-  async function searchSongs() {
-    const list = await window.cp.songs.list(songSearch.trim());
-    setSongResults(list);
-  }
-
-  function isSongDuplicate(pl: Plan | null, refId?: string | null, refSubId?: string | null) {
-    if (!pl?.items) return false;
-    return !!pl.items.find((i) => i.kind === "SONG_BLOCK" && i.refId === refId && i.refSubId === refSubId);
-  }
-
-  async function addSongAllBlocksToPlan(songId: string) {
-    if (!plan) return;
-    const s = await window.cp.songs.get(songId);
-    const current = await window.cp.plans.get(plan.id);
-    let added = 0;
-    for (const b of s.blocks || []) {
-      if (isSongDuplicate(current as Plan, s.id, b.id)) continue;
-      await window.cp.plans.addItem({
-        planId: plan.id,
-        kind: "SONG_BLOCK",
-        title: `${s.title} - ${b.title || b.type}`,
-        content: b.content || "",
-        refId: s.id,
-        refSubId: b.id,
-      });
-      added += 1;
-    }
-    await loadPlan(plan.id);
-    showToast(added > 0 ? "success" : "info", added > 0 ? "Chant ajoute au plan" : "Tous les blocs etaient deja presents");
-  }
-
-  // Debounced song search
-  useEffect(() => {
-    if (songTimer.current) clearTimeout(songTimer.current);
-    songTimer.current = setTimeout(() => {
-      if (songSearch.trim().length === 0) {
-        setSongResults([]);
-        return;
-      }
-      searchSongs();
-    }, 250);
-    return () => {
-      if (songTimer.current) clearTimeout(songTimer.current);
-    };
-  }, [songSearch]);
-
-  // Debounced bible text search (bolls find)
-  useEffect(() => {
-    if (bibleSearchTimer.current) clearTimeout(bibleSearchTimer.current);
-    if (!bibleSearchText.trim()) {
-      setBibleSearchResults([]);
-      return;
-    }
-    bibleSearchTimer.current = setTimeout(async () => {
-      setBibleSearchLoading(true);
-      try {
-        const trans = bibleTranslation === "LSG1910" ? "FRLSG" : bibleTranslation;
-        // ensure books cached for name display
-        if (!bibleBooks.current[trans]) {
-          bibleBooks.current[trans] = await getBooks(trans);
-        }
-        const res = await searchVerses(trans, bibleSearchText.trim(), { limit: 20 });
-        setBibleSearchResults(res.results.map((r) => ({ book: r.book, chapter: r.chapter, verse: r.verse, text: r.text })));
-      } catch (e: any) {
-        setBibleError(e?.message || String(e));
-        setBibleSearchResults([]);
-      } finally {
-        setBibleSearchLoading(false);
-      }
-    }, 350);
-    return () => {
-      if (bibleSearchTimer.current) clearTimeout(bibleSearchTimer.current);
-    };
-  }, [bibleSearchText, bibleTranslation]);
-
-  async function fetchBible() {
-    setBibleLoading(true);
-    setBibleError(null);
-    setBibleVerses([]);
-    try {
-      if (bibleTranslation === "LSG1910") {
-        const r = lookupLSG1910(bibleRef.trim());
-        if (!r) throw new Error("Reference non trouvee (offline mini)");
-        setBibleReference(r.reference);
-        setBibleVerses(r.verses.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
-      } else {
-        // bolls.life
-        const refText = bibleRef.trim();
-        const m = refText.match(/^(.+?)\\s+(\\d+)(?::(\\d+)(?:-(\\d+))?)?$/i);
-        if (!m) throw new Error("Reference non comprise (ex: Jean 3:16-18)");
-        const [, rawBook, chapStr, vStartStr, vEndStr] = m;
-        const books = bibleBooks.current[bibleTranslation] || (await getBooks(bibleTranslation));
-        bibleBooks.current[bibleTranslation] = books;
-        const book = findBookIdByName(books, rawBook);
-        if (!book) throw new Error("Livre non trouve pour cette traduction");
-        const chap = parseInt(chapStr, 10);
-        const max = maxChapter(books, book.bookid);
-        if (max && chap > max) throw new Error(`Ce livre n'a que ${max} chapitres`);
-        const allVerses = await getChapter(bibleTranslation, book.bookid, chap);
-        let filtered = allVerses;
-        if (vStartStr) {
-          const start = parseInt(vStartStr, 10);
-          const end = vEndStr ? parseInt(vEndStr, 10) : start;
-          filtered = allVerses.filter((v) => v.verse >= start && v.verse <= end);
-        }
-        const label = buildReferenceLabel(book, chap, filtered.map((v) => v.verse));
-        setBibleReference(label);
-        setBibleVerses(filtered.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
-      }
-    } catch (e: any) {
-      setBibleError(e?.message || String(e));
-    } finally {
-      setBibleLoading(false);
-    }
-  }
-
-  async function addBibleToPlan(mode: "PASSAGE" | "VERSES") {
-    if (!plan || bibleVerses.length === 0) return;
-    const ref = bibleReference || bibleRef.trim();
-    const label = bibleTranslation;
-    if (mode === "PASSAGE") {
-      const body = bibleVerses.map((v) => `${v.chapter}:${v.verse}  ${v.text.trim()}`).join("\n\n");
-      await window.cp.plans.addItem({
-        planId: plan.id,
-        kind: "BIBLE_PASSAGE",
-        title: `${ref} (${label})`,
-        content: body,
-        refId: ref,
-        refSubId: label,
-      });
-    } else {
-      for (const v of bibleVerses) {
-        const verseRef = `${ref.split(":")[0]}:${v.verse}`;
-        const body = `${v.chapter}:${v.verse}  ${v.text.trim()}`;
-        await window.cp.plans.addItem({
-          planId: plan.id,
-          kind: "BIBLE_VERSE",
-          title: `${verseRef} (${label})`,
-          content: body,
-          refId: ref,
-          refSubId: `${v.chapter}:${v.verse}`,
-        });
-      }
-    }
-    await loadPlan(plan.id);
   }
 
   async function loadPlan(id: string) {
@@ -264,8 +90,6 @@ export function PlanPage() {
     if (!filterSongsOnly) return plan.items;
     return plan.items.filter((i) => i.kind === "SONG_BLOCK");
   }, [plan, filterSongsOnly]);
-
-  const orderedIds = useMemo(() => visibleItems.map((i) => i.id), [visibleItems]);
 
   async function onDragEnd(event: DragEndEvent) {
     if (!plan) return;
@@ -350,63 +174,24 @@ export function PlanPage() {
         </div>
       ) : null}
 
-          <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 0 }}>
-            {/* LEFT: list + create */}
-            <div style={{ display: "grid", gap: 12 }}>
-              <div style={panelStyle}>
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  <label>
-                    <div style={{ fontWeight: 600 }}>Date</div>
-                    <input value={newDate} onChange={(e) => setNewDate(e.target.value)} type="date" style={{ width: "100%" }} />
-                  </label>
-                  <label>
-                    <div style={{ fontWeight: 600 }}>Titre</div>
-                    <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} style={{ width: "100%" }} />
-                  </label>
-                  <button
-                    onClick={async () => {
-                      const created = await window.cp.plans.create({ dateIso: newDate, title: newTitle.trim() || "Culte" });
-                      await refreshPlans();
-                      await loadPlan(created.id);
-                    }}
-                    style={{ background: "var(--primary)", color: "white", border: "none" }}
-                  >
-                    + Creer
-                  </button>
-                </div>
-              </div>
-
-              <div style={panelStyle}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                  <div style={{ fontWeight: 800 }}>Plans</div>
-                  <span style={{ fontSize: 12, opacity: 0.6 }}>{plans.length} plan(s)</span>
-                </div>
-                <div style={{ display: "grid", gap: 8, maxHeight: "70vh", overflow: "auto" }}>
-                  {plans.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => loadPlan(p.id)}
-                      className="panel"
-                      style={{
-                        textAlign: "left",
-                        padding: 12,
-                        borderRadius: 12,
-                        border: selectedPlanId === p.id ? "2px solid var(--primary)" : "1px solid var(--border)",
-                        background: selectedPlanId === p.id ? "#eef2ff" : "white",
-                        boxShadow: "none",
-                      }}
-                    >
-                      <div style={{ fontWeight: 800 }}>{p.title || "Culte"}</div>
-                      <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
-                      {livePlanId === p.id ? (
-                        <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: "#0a6847" }}>LIVE</div>
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+      <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 12, marginTop: 0 }}>
+        {/* LEFT: list + create */}
+        <PlanSidebarSection
+          panelStyle={panelStyle}
+          newDate={newDate}
+          newTitle={newTitle}
+          plans={plans}
+          selectedPlanId={selectedPlanId}
+          livePlanId={livePlanId}
+          onSetNewDate={setNewDate}
+          onSetNewTitle={setNewTitle}
+          onCreatePlan={async () => {
+            const created = await window.cp.plans.create({ dateIso: newDate, title: newTitle.trim() || "Culte" });
+            await refreshPlans();
+            await loadPlan(created.id);
+          }}
+          onSelectPlan={loadPlan}
+        />
 
         {/* RIGHT: plan detail */}
         <div style={panelStyle}>
@@ -446,311 +231,37 @@ export function PlanPage() {
                 </div>
               </div>
 
-              <div className="panel" style={{ ...panelStyle, marginTop: 12, boxShadow: "none", background: "#f8fafc" }}>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input
-                      type="checkbox"
-                      checked={liveEnabled}
-                      onChange={(e) => updateLive({ enabled: e.target.checked })}
-                    />
-                    Live
-                  </label>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-                      <button
-                        key={k}
-                        onClick={() => updateLive({ target: k })}
-                        style={{
-                          padding: "6px 10px",
-                          borderRadius: 10,
-                          border: target === k ? "2px solid var(--primary)" : "1px solid var(--border)",
-                          background: target === k ? "#eef2ff" : "#fff",
-                          color: "#0f172a",
-                          fontWeight: 800,
-                        }}
-                      >
-                        Ecran {k}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                    {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-                      <label key={k} style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 13 }}>
-                        <input
-                          type="checkbox"
-                          checked={!!live?.lockedScreens?.[k]}
-                          onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
-                        />
-                        Lock {k}
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => window.cp.live?.prev()}>{'< Prev'}</button>
-                    <button onClick={() => window.cp.live?.next()}>{'Next >'}</button>
-                  </div>
-                  <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <input type="checkbox" checked={filterSongsOnly} onChange={(e) => setFilterSongsOnly(e.target.checked)} />
-                    Chants uniquement
-                  </label>
-                </div>
-              </div>
+              <PlanLiveToolbar
+                panelStyle={panelStyle}
+                liveEnabled={liveEnabled}
+                target={target}
+                live={live}
+                filterSongsOnly={filterSongsOnly}
+                onUpdateLive={updateLive}
+                onSetLocked={(screen, locked) => window.cp.live?.setLocked(screen, locked)}
+                onPrev={() => window.cp.live?.prev()}
+                onNext={() => window.cp.live?.next()}
+                onSetFilterSongsOnly={setFilterSongsOnly}
+              />
 
-              {/* Add item + chant + bible */}
-              <div style={{ display: "grid", gap: 12 }}>
-                <div style={{ fontWeight: 800 }}>Ajouter un element</div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
-                  <label>
-                    <div style={{ fontWeight: 600 }}>Type</div>
-                    <select value={addKind} onChange={(e) => setAddKind(e.target.value)} style={{ width: "100%", padding: 10 }}>
-                      <option value="ANNOUNCEMENT_TEXT">ANNOUNCEMENT_TEXT</option>
-                      <option value="VERSE_MANUAL">VERSE_MANUAL</option>
-                      <option value="BIBLE_VERSE">BIBLE_VERSE</option>
-                      <option value="BIBLE_PASSAGE">BIBLE_PASSAGE</option>
-                      <option value="ANNOUNCEMENT_IMAGE">ANNOUNCEMENT_IMAGE</option>
-                      <option value="ANNOUNCEMENT_PDF">ANNOUNCEMENT_PDF</option>
-                    </select>
-                  </label>
-                  <label>
-                    <div style={{ fontWeight: 600 }}>Titre</div>
-                    <input value={addTitle} onChange={(e) => setAddTitle(e.target.value)} style={{ width: "100%", padding: 10 }} />
-                  </label>
-                </div>
-
-                <label>
-                  <div style={{ fontWeight: 600 }}>Contenu</div>
-                  <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} style={{ width: "100%", padding: 10 }} />
-                </label>
-
-                {(addKind === "ANNOUNCEMENT_IMAGE" || addKind === "ANNOUNCEMENT_PDF") && (
-                  <button
-                    onClick={async () => {
-                      const res = await window.cp.files?.pickMedia?.();
-                      if (res?.ok && res.path) {
-                        setAddContent(res.path);
-                      }
-                    }}
-                    style={{ padding: "8px 10px", width: 220 }}
-                  >
-                    Choisir fichier
-                  </button>
-                )}
-                {addKind === "ANNOUNCEMENT_PDF" ? (
-                  <label>
-                    <div style={{ fontWeight: 600 }}>Page PDF</div>
-                    <input
-                      type="number"
-                      min={1}
-                      value={addPdfPage}
-                      onChange={(e) => setAddPdfPage(e.target.value)}
-                      style={{ width: "100%", padding: 10 }}
-                    />
-                  </label>
-                ) : null}
-
-                <button
-                  onClick={async () => {
-                    const mediaPath =
-                      addKind === "ANNOUNCEMENT_PDF" && addContent
-                        ? `${addContent}#page=${parseInt(addPdfPage || "1", 10) || 1}`
-                        : addKind === "ANNOUNCEMENT_IMAGE"
-                        ? addContent || undefined
-                        : undefined;
-                    await window.cp.plans.addItem({
-                      planId: plan.id,
-                      kind: addKind,
-                      title: addTitle.trim() || undefined,
-                      content: addContent || undefined,
-                      mediaPath,
-                    });
-                    setAddContent("");
-                    await loadPlan(plan.id);
-                    showToast("success", "Element ajoute au plan");
-                  }}
-                  style={{ padding: "10px 14px", width: 220 }}
-                >
-                  + Ajouter
-                </button>
-
-                <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
-                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un chant (recherche)</div>
-                  <div style={{ position: "relative" }}>
-                    <input
-                      value={songSearch}
-                      onChange={(e) => setSongSearch(e.target.value)}
-                      placeholder="Titre, artiste..."
-                      style={{ width: "100%", padding: 10 }}
-                    />
-                    {songResults.length > 0 ? (
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: "110%",
-                          left: 0,
-                          right: 0,
-                          background: "white",
-                          border: "1px solid var(--border)",
-                          borderRadius: 12,
-                          boxShadow: "var(--shadow)",
-                          zIndex: 5,
-                          maxHeight: 200,
-                          overflow: "auto",
-                        }}
-                      >
-                        {songResults.map((s) => (
-                          <div
-                            key={s.id}
-                            onClick={() => addSongAllBlocksToPlan(s.id)}
-                            style={{
-                              padding: 10,
-                              cursor: "pointer",
-                              borderBottom: "1px solid #f1f5f9",
-                            }}
-                          >
-                            <div style={{ fontWeight: 700 }}>{s.title}</div>
-                            <div style={{ fontSize: 12, opacity: 0.65 }}>Ajouter tous les blocs</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ opacity: 0.6, fontSize: 12, marginTop: 6 }}>Tape pour chercher un chant.</div>
-                    )}
-                  </div>
-                </div>
-
-                <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
-                  <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un verset/passage</div>
-                  <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
-                    <input
-                      value={bibleRef}
-                      onChange={(e) => setBibleRef(e.target.value)}
-                      placeholder="Ex: Jean 3:16-18"
-                      style={{ flex: 1, padding: 10 }}
-                    />
-                    <select value={bibleTranslation} onChange={(e) => setBibleTranslation(e.target.value as any)} style={{ padding: 10, minWidth: 180 }}>
-                      <option value="LSG">Traduction preferee : LSG (bolls)</option>
-                      <option value="WEB">WEB (bolls)</option>
-                      <option value="LSG1910">LSG1910 offline</option>
-                    </select>
-                    <button onClick={fetchBible} disabled={bibleLoading} style={{ padding: "10px 12px" }}>
-                      {bibleLoading ? "..." : "Chercher"}
-                    </button>
-                  </div>
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontWeight: 700, marginBottom: 4 }}>Recherche texte (bolls)</div>
-                    <input
-                      value={bibleSearchText}
-                      onChange={(e) => setBibleSearchText(e.target.value)}
-                      placeholder="Mot ou expression"
-                      style={{ width: "100%" }}
-                    />
-                    {bibleSearchLoading ? <div style={{ opacity: 0.7, fontSize: 12 }}>Recherche…</div> : null}
-                    <div style={{ maxHeight: 160, overflow: "auto", display: "grid", gap: 6, marginTop: 6 }}>
-                      {bibleSearchResults.map((r, idx) => {
-                        const bookName = getBookNameFromCache(r.book);
-                        const refLbl = `${bookName} ${r.chapter}:${r.verse} (${bibleTranslation})`;
-                        return (
-                          <div
-                            key={`${r.book}-${r.chapter}-${r.verse}-${idx}`}
-                            style={{
-                              border: "1px solid var(--border)",
-                              borderRadius: 10,
-                              padding: 10,
-                              display: "grid",
-                              gap: 6,
-                              background: "#fff",
-                            }}
-                          >
-                            <div style={{ fontWeight: 700 }}>{refLbl}</div>
-                            <div style={{ fontSize: 12, opacity: 0.75 }}>{r.text}</div>
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                              <button
-                                onClick={async () => {
-                                  if (!plan) return;
-                                  await window.cp.plans.addItem({
-                                    planId: plan.id,
-                                    kind: "BIBLE_VERSE",
-                                    title: refLbl,
-                                    content: `${r.chapter}:${r.verse}  ${r.text}`,
-                                    refId: refLbl,
-                                    refSubId: `${r.chapter}:${r.verse}`,
-                                  });
-                                  showToast("success", "Verset ajoute au plan");
-                                }}
-                              >
-                                + Verset
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  if (!plan) return;
-                                  await window.cp.plans.addItem({
-                                    planId: plan.id,
-                                    kind: "BIBLE_PASSAGE",
-                                    title: refLbl,
-                                    content: `${r.chapter}:${r.verse}  ${r.text}`,
-                                    refId: refLbl,
-                                    refSubId: `${r.chapter}:${r.verse}`,
-                                  });
-                                  showToast("success", "Passage ajoute au plan");
-                                }}
-                              >
-                                Passage
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {bibleSearchText && !bibleSearchResults.length && !bibleSearchLoading ? (
-                        <div style={{ opacity: 0.6, fontSize: 12 }}>Aucun resultat</div>
-                      ) : null}
-                    </div>
-                  </div>
-                  {bibleError ? <div style={{ color: "crimson", fontSize: 13 }}>{bibleError}</div> : null}
-                  {bibleVerses.length > 0 ? (
-                    <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
-                      {bibleReference || bibleRef}: {bibleVerses.length} versets
-                    </div>
-                  ) : null}
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => addBibleToPlan("PASSAGE")} disabled={bibleVerses.length === 0}>
-                      Ajouter passage
-                    </button>
-                    <button onClick={() => addBibleToPlan("VERSES")} disabled={bibleVerses.length === 0}>
-                      Verset par verset
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <PlanComposerSection plan={plan} reloadPlan={loadPlan} showToast={showToast} />
 
               <hr style={{ margin: "14px 0" }} />
 
-              {/* DnD list */}
-              <div style={{ fontWeight: 800, marginBottom: 8 }}>Ordre</div>
-
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-                <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-                  <div style={{ display: "grid", gap: 10 }}>
-                    {visibleItems.map((it) => (
-                      <SortableRow
-                        key={it.id}
-                        item={it}
-                        onProject={async () => {
-                          const cursor = plan.items.findIndex((x) => x.id === it.id);
-                          if (cursor < 0) return;
-                          const next = (await updateLive({ planId: plan.id, cursor, enabled: true, target })) || live;
-                          await projectPlanItemToTarget(target, it, next);
-                        }}
-                        onRemove={async () => {
-                          await window.cp.plans.removeItem({ planId: plan.id, itemId: it.id });
-                          await loadPlan(plan.id);
-                        }}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
+              <PlanItemsOrderSection
+                items={visibleItems}
+                onDragEnd={onDragEnd}
+                onProject={async (it) => {
+                  const cursor = plan.items.findIndex((x) => x.id === it.id);
+                  if (cursor < 0) return;
+                  const next = (await updateLive({ planId: plan.id, cursor, enabled: true, target })) || live;
+                  await projectPlanItemToTarget(target, it, next);
+                }}
+                onRemove={async (it) => {
+                  await window.cp.plans.removeItem({ planId: plan.id, itemId: it.id });
+                  await loadPlan(plan.id);
+                }}
+              />
             </>
           )}
         </div>
