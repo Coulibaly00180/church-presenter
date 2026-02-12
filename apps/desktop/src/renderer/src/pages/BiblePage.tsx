@@ -400,47 +400,77 @@ export function BiblePage() {
           <div style={panelStyle}>
             <div style={{ fontWeight: 800, marginBottom: 8 }}>Naviguer</div>
             <div style={{ display: "grid", gap: 8 }}>
-              <label>
-                Livre
-                <select
-                  value={bookId ?? ""}
-                  onChange={(e) => setBookId(Number(e.target.value))}
-                  disabled={loadingBooks || !books.length}
-                  style={{ width: "100%" }}
+            <label>
+              Livre
+              <select
+                value={bookId ?? ""}
+                onChange={(e) => setBookId(Number(e.target.value))}
+                disabled={loadingBooks || !books.length}
+                style={{ width: "100%" }}
+              >
+                {books.map((b) => (
+                  <option key={b.bookid} value={b.bookid}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Chapitre
+              <input
+                type="number"
+                min={1}
+                max={currentBook?.chapters || 150}
+                value={chapter}
+                onChange={(e) => setChapter(Math.max(1, Number(e.target.value)))}
+                style={{ width: "100%" }}
+              />
+            </label>
+            {currentBook?.chapters ? (
+              <div style={{ display: "grid", gap: 6 }}>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>Chapitres de {currentBook.name}</div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(48px, 1fr))",
+                    gap: 6,
+                    maxHeight: 220,
+                    overflow: "auto",
+                    padding: 4,
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    background: "#f8fafc",
+                  }}
                 >
-                  {books.map((b) => (
-                    <option key={b.bookid} value={b.bookid}>
-                      {b.name}
-                    </option>
+                  {Array.from({ length: currentBook.chapters }, (_, i) => i + 1).map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => loadChapter(currentBook.bookid, c)}
+                      style={{
+                        padding: "6px 4px",
+                        borderRadius: 8,
+                        border: c === chapter ? "2px solid var(--primary)" : "1px solid #e2e8f0",
+                        background: c === chapter ? "#eef2ff" : "white",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {c}
+                    </button>
                   ))}
-                </select>
-              </label>
-              <label>
-                Chapitre
-                <input
-                  type="number"
-                  min={1}
-                  max={currentBook?.chapters || 150}
-                  value={chapter}
-                  onChange={(e) => setChapter(Math.max(1, Number(e.target.value)))}
-                  style={{ width: "100%" }}
-                />
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => bookId && loadChapter(bookId, Math.max(1, chapter))} disabled={!bookId || loadingChapter}>
-                  {loadingChapter ? "Chargement..." : "Charger chapitre"}
-                </button>
-                <button onClick={() => selectAllVerses(true)} disabled={!verses.length}>
+                </div>
+              </div>
+            ) : null}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => bookId && loadChapter(bookId, Math.max(1, chapter))} disabled={!bookId || loadingChapter}>
+                {loadingChapter ? "Chargement..." : "Charger chapitre"}
+              </button>
+              <button onClick={() => selectAllVerses(true)} disabled={!verses.length}>
                   Tout selectionner
                 </button>
                 <button onClick={() => selectAllVerses(false)} disabled={!verses.length}>
                   Vider
                 </button>
               </div>
-              <label>
-                Ref manuelle (ex: Jean 3:16-18)
-                <input onBlur={(e) => handleManualRef(e.target.value)} placeholder="Tape puis quitte le champ pour charger" />
-              </label>
             </div>
           </div>
 
