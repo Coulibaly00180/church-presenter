@@ -197,6 +197,7 @@ function createScreenWindow(key: ScreenKey) {
   const wa = getTargetWorkAreaForKey(key);
 
   const isMain = key === "A";
+  const allowInsecureMediaInDev = !app.isPackaged;
 
   const win = new BrowserWindow({
     x: wa.x,
@@ -214,8 +215,9 @@ function createScreenWindow(key: ScreenKey) {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false, // allow file:// media (PDF/images) from renderer served on http(s)
-      allowRunningInsecureContent: true,
+      // Restrict permissive behavior to development only.
+      webSecurity: !allowInsecureMediaInDev,
+      allowRunningInsecureContent: allowInsecureMediaInDev,
     },
   });
 
