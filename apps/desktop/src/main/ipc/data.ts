@@ -47,21 +47,90 @@ export function registerDataIpc() {
     if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
     const path = res.filePaths[0];
     const raw = fs.readFileSync(path, "utf-8");
-    const data = JSON.parse(raw);
+    let data: any;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return { ok: false, error: "Invalid JSON file" };
+    }
 
     const mode = payload?.mode || "MERGE";
+    const songs = Array.isArray(data?.songs) ? data.songs : [];
+    const plans = Array.isArray(data?.plans) ? data.plans : [];
+
+    if (mode === "REPLACE") {
+      try {
+        const counts = await prisma.$transaction(async (tx: any) => {
+          await tx.songBlock.deleteMany({});
+          await tx.song.deleteMany({});
+          await tx.serviceItem.deleteMany({});
+          await tx.servicePlan.deleteMany({});
+
+          let songsImported = 0;
+          let plansImported = 0;
+
+          for (const s of songs) {
+            const song = await tx.song.create({
+              data: {
+                title: s.title,
+                artist: s.artist,
+                album: s.album,
+                language: s.language,
+                tags: s.tags,
+              },
+            });
+            for (const b of s.blocks || []) {
+              await tx.songBlock.create({
+                data: {
+                  songId: song.id,
+                  order: b.order,
+                  type: b.type,
+                  title: b.title,
+                  content: b.content,
+                },
+              });
+            }
+            songsImported += 1;
+          }
+
+          for (const p of plans) {
+            const plan = await tx.servicePlan.create({
+              data: {
+                date: normalizeDateToMidnight(p.date),
+                title: p.title,
+              },
+            });
+            for (const it of p.items || []) {
+              await tx.serviceItem.create({
+                data: {
+                  planId: plan.id,
+                  order: it.order,
+                  kind: it.kind,
+                  refId: it.refId,
+                  refSubId: it.refSubId,
+                  title: it.title,
+                  content: it.content,
+                  mediaPath: it.mediaPath,
+                },
+              });
+            }
+            plansImported += 1;
+          }
+
+          return { songs: songsImported, plans: plansImported };
+        });
+
+        return { ok: true, imported: true, counts, errors: [] };
+      } catch (e: any) {
+        return { ok: false, rolledBack: true, error: e?.message || String(e) };
+      }
+    }
+
     const errors: Array<{ kind: string; title?: string; message: string }> = [];
     let songsImported = 0;
     let plansImported = 0;
 
-    if (mode === "REPLACE") {
-      await prisma.songBlock.deleteMany({});
-      await prisma.song.deleteMany({});
-      await prisma.serviceItem.deleteMany({});
-      await prisma.servicePlan.deleteMany({});
-    }
-
-    for (const s of data.songs || []) {
+    for (const s of songs) {
       try {
         const song = await prisma.song.create({
           data: {
@@ -89,7 +158,7 @@ export function registerDataIpc() {
       }
     }
 
-    for (const p of data.plans || []) {
+    for (const p of plans) {
       try {
         const plan = await prisma.servicePlan.create({
           data: {
@@ -117,6 +186,6 @@ export function registerDataIpc() {
       }
     }
 
-    return { ok: true, imported: true, counts: { songs: songsImported, plans: plansImported }, errors };
+    return { ok: true, imported: true, partial: errors.length > 0, counts: { songs: songsImported, plans: plansImported }, errors };
   });
 }

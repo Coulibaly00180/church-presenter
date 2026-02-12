@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 
 type PlanListItem = { id: string; date: string; title?: string | null; updatedAt: string };
+type ImportDetail = { counts: { songs: number; plans: number }; errors: any[] };
 
 function isoToYmd(iso: string) {
   const fromIso = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -21,12 +22,17 @@ function localNowYmd() {
   return `${y}-${m}-${day}`;
 }
 
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 export function HistoryPage() {
   const canUse = !!window.cp?.plans;
 
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
-  const [importDetail, setImportDetail] = useState<{ counts: { songs: number; plans: number }; errors: any[] } | null>(null);
+  const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
 
   useEffect(() => {
     if (!canUse) return;
@@ -45,14 +51,10 @@ export function HistoryPage() {
   return (
     <div style={{ fontFamily: "system-ui", padding: 16 }}>
       <h1 style={{ margin: 0 }}>Historique</h1>
-      <p style={{ opacity: 0.75, marginTop: 8 }}>
-        Plans passes (duplication et export JSON).
-      </p>
+      <p style={{ opacity: 0.75, marginTop: 8 }}>Plans passes (duplication et export JSON).</p>
 
       {msg ? (
-        <div style={{ marginTop: 8, padding: 10, border: "1px solid #cbd5ff", background: "#eef2ff", borderRadius: 10 }}>
-          {msg}
-        </div>
+        <div style={{ marginTop: 8, padding: 10, border: "1px solid #cbd5ff", background: "#eef2ff", borderRadius: 10 }}>{msg}</div>
       ) : null}
 
       {importDetail ? (
@@ -66,7 +68,7 @@ export function HistoryPage() {
           }}
         >
           <div style={{ fontWeight: 800, marginBottom: 6 }}>
-            Récap import : {importDetail.counts.songs} chants, {importDetail.counts.plans} plans
+            Recap import: {importDetail.counts.songs} chants, {importDetail.counts.plans} plans
           </div>
           {importDetail.errors.length === 0 ? (
             <div style={{ color: "#166534" }}>Aucune erreur.</div>
@@ -74,7 +76,7 @@ export function HistoryPage() {
             <div style={{ maxHeight: 200, overflow: "auto", borderTop: "1px solid #e4e4e7", paddingTop: 6 }}>
               {importDetail.errors.map((e, idx) => (
                 <div key={idx} style={{ fontSize: 13, marginBottom: 4, color: "#b91c1c" }}>
-                  [{e.kind}] {e.title || "??"} — {e.message}
+                  [{e.kind}] {e.title || "??"} - {e.message}
                 </div>
               ))}
             </div>
@@ -88,33 +90,63 @@ export function HistoryPage() {
       <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
         <button
           onClick={async () => {
-            const r = await window.cp.data?.exportAll();
-            if (r?.ok) setMsg(`Export global -> ${r.path}`);
+            try {
+              if (!window.cp.data) {
+                setMsg("API data indisponible.");
+                return;
+              }
+              const r = await window.cp.data.exportAll();
+              if (r?.ok) setMsg(`Export global -> ${r.path}`);
+              else if (r?.canceled) setMsg("Export annule.");
+              else setMsg(`Export echoue${r?.error ? `: ${r.error}` : "."}`);
+            } catch (e) {
+              setMsg(`Export echoue: ${getErrorMessage(e)}`);
+            }
           }}
         >
           Export JSON global
         </button>
+
         <button
           onClick={async () => {
-            const replace = window.confirm("Remplacer les donnees existantes ? OK = REPLACE, Annuler = MERGE");
-            let backupPath: string | undefined;
-            if (replace) {
-              const bk = await window.cp.data?.exportAll();
-              if (bk?.ok) backupPath = bk.path;
-            }
-            const r = await window.cp.data?.importAll({ mode: replace ? "REPLACE" : "MERGE" });
-            if (r?.ok) {
-              setPlans(await window.cp.plans.list());
-              setMsg(
-                `Import global OK (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
-                  backupPath ? ` • Backup: ${backupPath}` : ""
-                }`
-              );
-              setImportDetail({ counts: r.counts || { songs: 0, plans: 0 }, errors: r.errors || [] });
-            } else if (r?.canceled) {
-              setMsg("Import annule.");
-            } else {
-              setMsg("Import echoue.");
+            try {
+              if (!window.cp.data) {
+                setMsg("API data indisponible.");
+                return;
+              }
+
+              const replace = window.confirm("Remplacer les donnees existantes ? OK = REPLACE, Annuler = MERGE");
+              let backupPath: string | undefined;
+
+              if (replace) {
+                const bk = await window.cp.data.exportAll();
+                if (!bk?.ok || !bk?.path) {
+                  if (bk?.canceled) {
+                    setMsg("Import annule: backup obligatoire en mode REPLACE.");
+                    return;
+                  }
+                  setMsg(`Backup echoue${bk?.error ? `: ${bk.error}` : "."} Import REPLACE annule.`);
+                  return;
+                }
+                backupPath = bk.path;
+              }
+
+              const r = await window.cp.data.importAll({ mode: replace ? "REPLACE" : "MERGE" });
+              if (r?.ok) {
+                setPlans(await window.cp.plans.list());
+                setMsg(
+                  `Import global OK (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
+                    backupPath ? ` | Backup: ${backupPath}` : ""
+                  }`
+                );
+                setImportDetail({ counts: r.counts || { songs: 0, plans: 0 }, errors: r.errors || [] });
+              } else if (r?.canceled) {
+                setMsg("Import annule.");
+              } else {
+                setMsg(`Import echoue${r?.error ? `: ${r.error}` : "."}`);
+              }
+            } catch (e) {
+              setMsg(`Import echoue: ${getErrorMessage(e)}`);
             }
           }}
         >
@@ -124,27 +156,34 @@ export function HistoryPage() {
 
       <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
         {plans.map((p) => (
-          <div
-            key={p.id}
-            style={{ border: "1px solid #e6e6e6", borderRadius: 12, padding: 12, background: "white" }}
-          >
+          <div key={p.id} style={{ border: "1px solid #e6e6e6", borderRadius: 12, padding: 12, background: "white" }}>
             <div style={{ fontWeight: 900 }}>{p.title || "Culte"}</div>
             <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <button
                 onClick={async () => {
-                  await window.cp.plans.duplicate({ planId: p.id, dateIso: localNowYmd() });
-                  setPlans(await window.cp.plans.list());
-                  setMsg("Plan duplique.");
+                  try {
+                    await window.cp.plans.duplicate({ planId: p.id, dateIso: localNowYmd() });
+                    setPlans(await window.cp.plans.list());
+                    setMsg("Plan duplique.");
+                  } catch (e) {
+                    setMsg(`Duplication echouee: ${getErrorMessage(e)}`);
+                  }
                 }}
               >
                 Dupliquer
               </button>
+
               <button
                 onClick={async () => {
-                  const res = await window.cp.plans.export({ planId: p.id });
-                  if (res?.ok) setMsg(`Plan exporte -> ${res.path}`);
-                  else if (!res?.canceled) setMsg("Export echoue.");
+                  try {
+                    const res = await window.cp.plans.export({ planId: p.id });
+                    if (res?.ok) setMsg(`Plan exporte -> ${res.path}`);
+                    else if (res?.canceled) setMsg("Export annule.");
+                    else setMsg(`Export echoue${res?.error ? `: ${res.error}` : "."}`);
+                  } catch (e) {
+                    setMsg(`Export echoue: ${getErrorMessage(e)}`);
+                  }
                 }}
               >
                 Exporter JSON

@@ -24,6 +24,7 @@ export function ProjectionPage() {
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [pdfPageCount, setPdfPageCount] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pdfDocRef = useRef<{ path: string; doc: any } | null>(null);
   const [blockCursor, setBlockCursor] = useState<number>(0);
 
   function toFileUrl(p?: string) {
@@ -107,6 +108,7 @@ export function ProjectionPage() {
 
   const mode = state?.mode ?? "NORMAL";
   const current = state?.current ?? { kind: "EMPTY" };
+  const isPdf = current.kind === "MEDIA" && current.mediaType === "PDF";
   const lowerThird = !!state?.lowerThirdEnabled;
   const textBlocks = useMemo(
     () =>
@@ -142,7 +144,7 @@ export function ProjectionPage() {
     async function renderPdf() {
       setPdfImage(null);
       setPdfError(null);
-      if (current.kind !== "MEDIA" || current.mediaType !== "PDF" || !current.mediaPath) {
+      if (!isPdf || !current.mediaPath) {
         return;
       }
       setPdfLoading(true);
@@ -151,8 +153,13 @@ export function ProjectionPage() {
         const pageParam = frag?.match(/page=(\d+)/i);
         const initialPage = pageParam ? parseInt(pageParam[1], 10) || 1 : 1;
         const targetPage = pdfPage || initialPage;
-        const url = toFileUrl(pathOnly);
-        const pdf = await pdfjsLib.getDocument(url).promise;
+        const cachedPdf = pdfDocRef.current;
+        let pdf = cachedPdf && cachedPdf.path === pathOnly ? cachedPdf.doc : null;
+        if (!pdf) {
+          const url = toFileUrl(pathOnly);
+          pdf = await pdfjsLib.getDocument(url).promise;
+          pdfDocRef.current = { path: pathOnly, doc: pdf };
+        }
         setPdfPageCount(pdf.numPages);
         const page = await pdf.getPage(Math.min(targetPage, pdf.numPages));
         const baseViewport = page.getViewport({ scale: 1 });
@@ -176,24 +183,24 @@ export function ProjectionPage() {
     return () => {
       cancelled = true;
     };
-  }, [current.kind, current.mediaType, current.mediaPath, pdfPage]);
+  }, [isPdf, current.mediaPath, pdfPage]);
 
-  // Global key navigation in case container loses focus (haut/bas seulement, gauche/droite gÃ©rÃ©s sur le container)
+  // Global key navigation for PDF (single handler to avoid duplicate page jumps)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (current.mediaType !== "PDF") return;
-      if (e.key === "ArrowDown" || e.key === "PageDown") {
+      if (!isPdf) return;
+      if (e.key === "ArrowDown" || e.key === "PageDown" || e.key === "ArrowRight") {
         e.preventDefault();
         setPdfPage((p) => Math.min(p + 1, pdfPageCount || 1));
       }
-      if (e.key === "ArrowUp" || e.key === "PageUp") {
+      if (e.key === "ArrowUp" || e.key === "PageUp" || e.key === "ArrowLeft") {
         e.preventDefault();
         setPdfPage((p) => Math.max(p - 1, 1));
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [current.mediaType, pdfPageCount]);
+  }, [isPdf, pdfPageCount]);
 
   // Clamp when page count changes
   useEffect(() => {
@@ -241,7 +248,7 @@ export function ProjectionPage() {
       ref={containerRef}
       style={{ ...containerStyle, position: "relative" }}
       onWheel={(e) => {
-        if (current.mediaType === "PDF") {
+        if (isPdf) {
           e.preventDefault();
           const delta = e.deltaY > 0 ? 1 : -1;
           setPdfPage((p) => {
@@ -251,52 +258,36 @@ export function ProjectionPage() {
           });
         }
       }}
-      onKeyDown={(e) => {
-        if (current.mediaType === "PDF") {
-          if (e.key === "ArrowDown" || e.key === "PageDown") {
-            e.preventDefault();
-            setPdfPage((p) => {
-              const next = Math.min(p + 1, pdfPageCount || 1);
-              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
-              return next;
-            });
-          }
-          if (e.key === "ArrowUp" || e.key === "PageUp") {
-            e.preventDefault();
-            setPdfPage((p) => {
-              const next = Math.max(p - 1, 1);
-              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
-              return next;
-            });
-          }
-          if (e.key === "ArrowRight") {
-            e.preventDefault();
-            setPdfPage((p) => {
-              const next = Math.min(p + 1, pdfPageCount || 1);
-              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
-              return next;
-            });
-          }
-          if (e.key === "ArrowLeft") {
-            e.preventDefault();
-            setPdfPage((p) => {
-              const next = Math.max(p - 1, 1);
-              if (next !== p) console.log("[projection] key:", e.key, "-> PDF page", next);
-              return next;
-            });
-          }
-        }
-      }}
       tabIndex={0}
     >
       {/* click areas */}
       <div
-        onClick={() => window.cp.live?.prev?.()}
-        style={{ position: "absolute", left: 0, top: 0, width: "50%", height: "100%", cursor: "pointer" }}
+        onClick={() => {
+          if (!isPdf) window.cp.live?.prev?.();
+        }}
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: "50%",
+          height: "100%",
+          cursor: isPdf ? "default" : "pointer",
+          pointerEvents: isPdf ? "none" : "auto",
+        }}
       />
       <div
-        onClick={() => window.cp.live?.next?.()}
-        style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", cursor: "pointer" }}
+        onClick={() => {
+          if (!isPdf) window.cp.live?.next?.();
+        }}
+        style={{
+          position: "absolute",
+          right: 0,
+          top: 0,
+          width: "50%",
+          height: "100%",
+          cursor: isPdf ? "default" : "pointer",
+          pointerEvents: isPdf ? "none" : "auto",
+        }}
       />
       <div style={cardStyle} key={animKey}>
         {/* watermark screen id */}
