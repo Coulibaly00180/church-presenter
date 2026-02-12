@@ -28,8 +28,8 @@ async function projectTextToTarget(target: ScreenKey, title: string | undefined,
     return;
   }
 
-  const res: any = await screensApi.setContentText(dest, { title, body });
-  if (res?.ok === false && res?.reason === "MIRROR") {
+  const res = await screensApi.setContentText(dest, { title, body });
+  if (!res.ok && res.reason === "MIRROR") {
     await window.cp.projection.setContentText({ title, body });
   }
 }
@@ -61,8 +61,8 @@ async function projectMediaToTarget(
     return;
   }
 
-  const res: any = await screensApi.setContentMedia(dest, { title, mediaPath, mediaType });
-  if (res?.ok === false && res?.reason === "MIRROR") {
+  const res = await screensApi.setContentMedia(dest, { title, mediaPath, mediaType });
+  if (!res.ok && res.reason === "MIRROR") {
     await window.cp.projection.setContentMedia({ title, mediaPath, mediaType });
   }
 }

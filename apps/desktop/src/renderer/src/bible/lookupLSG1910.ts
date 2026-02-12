@@ -1,19 +1,28 @@
 import data from "./ls1910-mini.json";
-import { parseReference, VerseRange } from "./parseRef";
+import { parseReference } from "./parseRef";
 
-type MiniData = typeof data;
+type MiniBook = {
+  name: string;
+  chapters: Record<string, Record<string, string>>;
+};
+
+type MiniData = {
+  books: Record<string, MiniBook>;
+};
+
+const lsgData = data as unknown as MiniData;
 
 export type OfflineVerse = { bookId: string; bookName: string; chapter: number; verse: number; text: string };
 
 function getBook(d: MiniData, bookId: string) {
-  return (d.books as any)[bookId] as any;
+  return d.books[bookId];
 }
 
 export function lookupLSG1910(reference: string): { reference: string; verses: OfflineVerse[] } | null {
   const r = parseReference(reference);
   if (!r) return null;
 
-  const book = getBook(data as any, r.bookId);
+  const book = getBook(lsgData, r.bookId);
   if (!book) return null;
 
   const chapterObj = (book.chapters || {})[String(r.chapter)];

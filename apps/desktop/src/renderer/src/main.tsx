@@ -38,11 +38,11 @@ function App() {
 // logs + fallback global (très utile en Electron)
 window.addEventListener("error", (e) => {
   // eslint-disable-next-line no-console
-  console.error("window error", (e as any).error || (e as any).message);
+  console.error("window error", e.error || e.message);
 });
 window.addEventListener("unhandledrejection", (e) => {
   // eslint-disable-next-line no-console
-  console.error("unhandledrejection", (e as any).reason);
+  console.error("unhandledrejection", e.reason);
 });
 
 const rootEl = document.getElementById("root");

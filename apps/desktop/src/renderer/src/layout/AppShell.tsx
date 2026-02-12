@@ -9,7 +9,7 @@ function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;
   if (!t) return false;
   const tag = t.tagName?.toLowerCase();
-  return tag === "input" || tag === "textarea" || (t as any).isContentEditable;
+  return tag === "input" || tag === "textarea" || t.isContentEditable;
 }
 
 export function AppShell() {
@@ -21,8 +21,8 @@ export function AppShell() {
   useEffect(() => {
     if (!canUse) return;
 
-    window.cp.projectionWindow.isOpen().then((r: any) => setProjOpen(!!r?.isOpen));
-    const off = window.cp.projectionWindow.onWindowState((p: any) => setProjOpen(!!p?.isOpen));
+    window.cp.projectionWindow.isOpen().then((r) => setProjOpen(!!r?.isOpen));
+    const off = window.cp.projectionWindow.onWindowState((p) => setProjOpen(!!p?.isOpen));
     return () => off?.();
   }, [canUse]);
 

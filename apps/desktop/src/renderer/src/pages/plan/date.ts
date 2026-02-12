@@ -1,4 +1,12 @@
-export function isoToYmd(iso: string) {
+export function isoToYmd(iso: string | Date) {
+  if (iso instanceof Date) {
+    if (Number.isNaN(iso.getTime())) return "";
+    const y = iso.getUTCFullYear();
+    const m = String(iso.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(iso.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   const fromIso = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (fromIso) return `${fromIso[1]}-${fromIso[2]}-${fromIso[3]}`;
   const d = new Date(iso);

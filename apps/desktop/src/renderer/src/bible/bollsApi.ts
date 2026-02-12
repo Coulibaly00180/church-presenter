@@ -4,6 +4,7 @@
 export type BollsBook = { bookid: number; chronorder: number; name: string; chapters: number };
 export type BollsVerse = { pk: number; translation: string; book: number; chapter: number; verse: number; text: string; comment?: string };
 export type BollsFindResult = { total: number; exact_matches: number; results: BollsVerse[] };
+type BollsLanguageResponse = Array<{ language: string; translations?: CpBibleTranslation[] }>;
 
 const booksCache: Record<string, BollsBook[] | undefined> = {};
 let translationsCache: Array<{ language: string; short_name: string; full_name: string; dir?: string }> | null = null;
@@ -22,6 +23,21 @@ function norm(x: string) {
     .replace(/[^a-z0-9 ]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function normalizeVerse(
+  raw: Partial<BollsVerse> & { text?: string },
+  fallback: { translation: string; book: number; chapter: number; verse: number }
+): BollsVerse {
+  return {
+    pk: typeof raw.pk === "number" ? raw.pk : 0,
+    translation: typeof raw.translation === "string" ? raw.translation : fallback.translation,
+    book: typeof raw.book === "number" ? raw.book : fallback.book,
+    chapter: typeof raw.chapter === "number" ? raw.chapter : fallback.chapter,
+    verse: typeof raw.verse === "number" ? raw.verse : fallback.verse,
+    text: stripHtml(String(raw.text ?? "")),
+    comment: typeof raw.comment === "string" ? raw.comment : undefined,
+  };
 }
 
 export async function getBooks(translation: string): Promise<BollsBook[]> {
@@ -72,26 +88,15 @@ async function fetchBooks(translation: string): Promise<BollsBook[]> {
 export async function getChapter(translation: string, bookId: number, chapter: number): Promise<BollsVerse[]> {
   const r = await fetch(`https://bolls.life/get-text/${translation}/${bookId}/${chapter}/`);
   if (!r.ok) throw new Error(`Chapitre introuvable (${translation} ${bookId}:${chapter})`);
-  const json = (await r.json()) as any[];
-  return json.map((v) => ({
-    ...v,
-    book: v.book ?? bookId,
-    chapter: v.chapter ?? chapter,
-    text: stripHtml(v.text),
-  }));
+  const json = (await r.json()) as Array<Partial<BollsVerse> & { text?: string }>;
+  return json.map((v, idx) => normalizeVerse(v, { translation, book: bookId, chapter, verse: idx + 1 }));
 }
 
 export async function getVerse(translation: string, bookId: number, chapter: number, verse: number): Promise<BollsVerse> {
   const r = await fetch(`https://bolls.life/get-verse/${translation}/${bookId}/${chapter}/${verse}/`);
   if (!r.ok) throw new Error(`Verset introuvable (${translation} ${bookId}:${chapter}:${verse})`);
-  const v = (await r.json()) as any;
-  return {
-    ...v,
-    book: v.book ?? bookId,
-    chapter: v.chapter ?? chapter,
-    verse: v.verse ?? verse,
-    text: stripHtml(v.text),
-  };
+  const v = (await r.json()) as Partial<BollsVerse> & { text?: string };
+  return normalizeVerse(v, { translation, book: bookId, chapter, verse });
 }
 
 export async function searchVerses(
@@ -123,14 +128,16 @@ export async function getVersesBatch(
     body: JSON.stringify(payload),
   });
   if (!r.ok) throw new Error(`Batch verses KO (${r.status})`);
-  const json = (await r.json()) as any[][];
+  const json = (await r.json()) as Array<Array<Partial<BollsVerse> & { text?: string }>>;
   return json.map((arr, idx) =>
-    arr.map((v) => ({
-      ...v,
-      book: v.book ?? payload[idx]?.book,
-      chapter: v.chapter ?? payload[idx]?.chapter,
-      text: stripHtml(v.text),
-    }))
+    arr.map((v, verseIdx) =>
+      normalizeVerse(v, {
+        translation: payload[idx]?.translation ?? "",
+        book: payload[idx]?.book ?? 0,
+        chapter: payload[idx]?.chapter ?? 0,
+        verse: payload[idx]?.verses?.[verseIdx] ?? verseIdx + 1,
+      })
+    )
   );
 }
 
@@ -158,21 +165,23 @@ export function versesToText(verses: BollsVerse[]): string {
 export async function listTranslations(): Promise<Array<{ language: string; short_name: string; full_name: string; dir?: string }>> {
   if (translationsCache) return translationsCache;
   // Try IPC (main process avoids CORS)
-  if (typeof window !== "undefined" && (window as any).cp?.bible?.listTranslations) {
-    const resp = await (window as any).cp.bible.listTranslations();
-    if (resp?.ok && Array.isArray(resp.data)) {
-      const flat = resp.data.flatMap((l: any) => (l.translations || []).map((t: any) => ({ language: l.language, ...t })));
+  if (typeof window !== "undefined") {
+    const resp = await window.cp.bible.listTranslations();
+    if (resp.ok && Array.isArray(resp.data)) {
+      const flat = resp.data.flatMap((l) =>
+        (l.translations || []).map((t) => ({ language: l.language, short_name: t.short_name, full_name: t.full_name, dir: t.dir }))
+      );
       translationsCache = flat;
       return flat;
     }
-    if (resp?.error) throw new Error(resp.error);
+    if (!resp.ok && resp.error) throw new Error(resp.error);
   }
 
   // Fallback direct fetch (may fail if CORS)
   const r = await fetch("https://bolls.life/static/bolls/app/views/languages.json");
   if (!r.ok) throw new Error("Impossible de charger les traductions");
-  const json = (await r.json()) as Array<{ language: string; translations: Array<{ short_name: string; full_name: string; dir?: string }> }>;
-  const flat = json.flatMap((l) => l.translations.map((t) => ({ language: l.language, ...t })));
+  const json = (await r.json()) as BollsLanguageResponse;
+  const flat = json.flatMap((l) => (l.translations || []).map((t) => ({ language: l.language, ...t })));
   translationsCache = flat;
   return flat;
 }

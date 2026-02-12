@@ -5,24 +5,24 @@ type ScreenKey = "A" | "B" | "C";
 type SongListItem = {
   id: string;
   title: string;
-  artist?: string;
-  album?: string;
-  updatedAt: string;
+  artist?: string | null;
+  album?: string | null;
+  updatedAt: string | Date;
 };
 
 type SongBlock = {
   id?: string;
   order: number;
   type: string;
-  title?: string;
+  title?: string | null;
   content: string;
 };
 
 type SongDetail = {
   id: string;
   title: string;
-  artist?: string;
-  album?: string;
+  artist?: string | null;
+  album?: string | null;
   tags?: string | null;
   blocks: SongBlock[];
 };
@@ -60,8 +60,8 @@ async function projectTextToTarget(target: ScreenKey, title: string | undefined,
     return;
   }
 
-  const res = (await window.cp.screens.setContentText(target, { title, body, metaSong })) as { ok?: boolean; reason?: string };
-  if (res?.ok === false && res?.reason === "MIRROR") {
+  const res = await window.cp.screens.setContentText(target, { title, body, metaSong });
+  if (!res.ok && res.reason === "MIRROR") {
     // safety fallback: update A
     await window.cp.projection.setContentText({ title, body, metaSong });
   }
@@ -99,7 +99,7 @@ export function SongsPage() {
   async function loadPlanItems(id: string): Promise<PlanWithItems | null> {
     try {
       const p = await window.cp.plans.get(id);
-      return p as PlanWithItems;
+      return p;
     } catch {
       return null;
     }
@@ -117,6 +117,12 @@ export function SongsPage() {
 
   async function loadSong(id: string) {
     const s = await window.cp.songs.get(id);
+    if (!s) {
+      setSong(null);
+      setSelectedId(null);
+      setErr("Chant introuvable.");
+      return;
+    }
     setSong(s);
     setSelectedId(id);
     setTitle(s.title ?? "");
@@ -201,14 +207,15 @@ export function SongsPage() {
     setSaving(true);
     setErr(null);
     try {
-      const cleanedBlocks: SongBlock[] = (song.blocks ?? []).map((b, idx) => ({
+      const cleanedBlocks: Array<{ order: number; type: string; title?: string; content: string }> = (song.blocks ?? []).map((b, idx) => ({
         order: idx + 1,
         type: b.type || "VERSE",
-        title: b.title,
+        title: b.title ?? undefined,
         content: b.content ?? "",
       }));
 
       const updated = await window.cp.songs.replaceBlocks({ songId: song.id, blocks: cleanedBlocks });
+      if (!updated) throw new Error("Chant introuvable apres sauvegarde des blocs.");
       setSong(updated);
       await refresh(q);
     } catch (e) {
@@ -239,33 +246,42 @@ export function SongsPage() {
     const b = song.blocks[i];
     const metaSong = {
       title: song.title,
-      artist: song.artist,
-      album: song.album,
-      year: song.tags || song.album, // tags often used for year import
+      artist: song.artist ?? undefined,
+      album: song.album ?? undefined,
+      year: song.tags ?? song.album ?? undefined, // tags often used for year import
     };
     await projectTextToTarget(target, song.title, b.content || "", metaSong);
   }
 
   async function addBlockToPlan(i: number) {
     if (!song || !planId) return;
+    let sourceSong: SongDetail = song;
+
     // ensure block ids exist by saving if needed
     if (!song.blocks[i]?.id) {
       await onSaveBlocks();
       const re = await window.cp.songs.get(song.id);
+      if (!re) {
+        setErr("Chant introuvable apres sauvegarde.");
+        return;
+      }
       setSong(re);
+      sourceSong = re;
     }
-    const b = (song.blocks[i] as SongBlock) || {};
+    const b = sourceSong.blocks[i];
+    if (!b) return;
+
     const plan = await loadPlanItems(planId);
-    if (isDuplicate(plan, song.id, b.id)) {
+    if (isDuplicate(plan, sourceSong.id, b.id)) {
       setInfo({ kind: "info", text: "Bloc deja present dans le plan." });
       return;
     }
     const payload = {
       planId,
       kind: "SONG_BLOCK",
-      title: `${song.title} - ${b.title || b.type}`,
+      title: `${sourceSong.title} - ${b.title || b.type}`,
       content: b.content || "",
-      refId: song.id,
+      refId: sourceSong.id,
       refSubId: b.id,
     };
     await window.cp.plans.addItem(payload);
@@ -276,6 +292,10 @@ export function SongsPage() {
     if (!song || !planId) return;
     await onSaveBlocks();
     const fresh = await window.cp.songs.get(song.id);
+    if (!fresh) {
+      setErr("Chant introuvable apres sauvegarde.");
+      return;
+    }
     setSong(fresh);
     const plan = await loadPlanItems(planId);
     let added = 0;
@@ -286,9 +306,9 @@ export function SongsPage() {
         kind: "SONG_BLOCK",
         title: `${fresh.title} - ${b.title || b.type}`,
         content: b.content || "",
-      refId: fresh.id,
-      refSubId: b.id,
-    });
+        refId: fresh.id,
+        refSubId: b.id,
+      });
       added += 1;
     }
     setInfo({
@@ -302,9 +322,9 @@ export function SongsPage() {
     const text = song.blocks.map((b) => (b.content ?? "").trim()).filter(Boolean).join("\n\n");
     const metaSong = {
       title: song.title,
-      artist: song.artist,
-      album: song.album,
-      year: song.tags || song.album,
+      artist: song.artist ?? undefined,
+      album: song.album ?? undefined,
+      year: song.tags ?? song.album ?? undefined,
     };
     await projectTextToTarget(target, song.title, text, metaSong);
   }
@@ -369,8 +389,8 @@ export function SongsPage() {
                 console.warn("Import errors:", r.errors);
                 setErr(`${r.errors.length} erreur(s) durant l'import (voir console)`);
               }
-            } else if (r?.error) {
-              setErr(r.error);
+            } else if (r?.canceled) {
+              setInfo({ kind: "info", text: "Import annule." });
             }
           }}
           disabled={importing}

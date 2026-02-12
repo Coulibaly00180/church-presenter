@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-type PlanListItem = { id: string; date: string; title?: string | null; updatedAt: string };
+type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
 
 function ymd(d: Date) {
   const y = d.getFullYear();
@@ -8,7 +8,12 @@ function ymd(d: Date) {
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-function isoToYmd(iso: string) {
+function isoToYmd(iso: string | Date) {
+  if (iso instanceof Date) {
+    if (Number.isNaN(iso.getTime())) return "";
+    return `${iso.getUTCFullYear()}-${String(iso.getUTCMonth() + 1).padStart(2, "0")}-${String(iso.getUTCDate()).padStart(2, "0")}`;
+  }
+
   const fromIso = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (fromIso) return `${fromIso[1]}-${fromIso[2]}-${fromIso[3]}`;
   const d = new Date(iso);

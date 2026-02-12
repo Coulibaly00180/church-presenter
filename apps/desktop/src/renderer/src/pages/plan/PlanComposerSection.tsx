@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { lookupLSG1910 } from "../../bible/lookupLSG1910";
-import { findBookIdByName, getBooks, getChapter, maxChapter, buildReferenceLabel, searchVerses } from "../../bible/bollsApi";
+import { BollsBook, buildReferenceLabel, findBookIdByName, getBooks, getChapter, maxChapter, searchVerses } from "../../bible/bollsApi";
 import { Plan } from "./types";
 
 type ToastKind = "info" | "success" | "error";
+type BibleTranslation = "LSG1910" | "LSG" | "WEB" | "FRLSG";
+type PlanLike = { items?: Array<{ kind?: string; refId?: string | null; refSubId?: string | null }> } | null;
 
 type PlanComposerSectionProps = {
   plan: Plan;
@@ -11,7 +13,16 @@ type PlanComposerSectionProps = {
   showToast: (kind: ToastKind, text: string) => void;
 };
 
-function isSongDuplicate(pl: Plan | null, refId?: string | null, refSubId?: string | null) {
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function isBibleTranslation(value: string): value is BibleTranslation {
+  return value === "LSG1910" || value === "LSG" || value === "WEB" || value === "FRLSG";
+}
+
+function isSongDuplicate(pl: PlanLike, refId?: string | null, refSubId?: string | null) {
   if (!pl?.items) return false;
   return !!pl.items.find((i) => i.kind === "SONG_BLOCK" && i.refId === refId && i.refSubId === refSubId);
 }
@@ -28,12 +39,12 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
   const [songResults, setSongResults] = useState<Array<{ id: string; title: string }>>([]);
 
   const [bibleRef, setBibleRef] = useState("Jean 3:16-18");
-  const [bibleTranslation, setBibleTranslation] = useState<"LSG1910" | "LSG" | "WEB" | "FRLSG">("FRLSG");
+  const [bibleTranslation, setBibleTranslation] = useState<BibleTranslation>("FRLSG");
   const [bibleLoading, setBibleLoading] = useState(false);
   const [bibleError, setBibleError] = useState<string | null>(null);
   const [bibleVerses, setBibleVerses] = useState<Array<{ chapter: number; verse: number; text: string }>>([]);
   const [bibleReference, setBibleReference] = useState<string>("");
-  const bibleBooks = useRef<Record<string, any[]>>({});
+  const bibleBooks = useRef<Record<string, BollsBook[]>>({});
   const [bibleSearchText, setBibleSearchText] = useState("");
   const [bibleSearchResults, setBibleSearchResults] = useState<Array<{ book: number; chapter: number; verse: number; text: string }>>([]);
   const [bibleSearchLoading, setBibleSearchLoading] = useState(false);
@@ -42,7 +53,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
 
   function getBookNameFromCache(bookId: number): string {
     const books = bibleBooks.current[bibleTranslation];
-    const found = books?.find((b: any) => b.bookid === bookId);
+    const found = books?.find((b) => b.bookid === bookId);
     return found?.name || `Livre ${bookId}`;
   }
 
@@ -53,10 +64,14 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
 
   async function addSongAllBlocksToPlan(songId: string) {
     const song = await window.cp.songs.get(songId);
+    if (!song) {
+      showToast("error", "Chant introuvable");
+      return;
+    }
     const currentPlan = await window.cp.plans.get(plan.id);
     let added = 0;
     for (const b of song.blocks || []) {
-      if (isSongDuplicate(currentPlan as Plan, song.id, b.id)) continue;
+      if (isSongDuplicate(currentPlan, song.id, b.id)) continue;
       await window.cp.plans.addItem({
         planId: plan.id,
         kind: "SONG_BLOCK",
@@ -100,8 +115,8 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
         }
         const res = await searchVerses(trans, bibleSearchText.trim(), { limit: 20 });
         setBibleSearchResults(res.results.map((r) => ({ book: r.book, chapter: r.chapter, verse: r.verse, text: r.text })));
-      } catch (e: any) {
-        setBibleError(e?.message || String(e));
+      } catch (e: unknown) {
+        setBibleError(getErrorMessage(e));
         setBibleSearchResults([]);
       } finally {
         setBibleSearchLoading(false);
@@ -145,8 +160,8 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
         setBibleReference(label);
         setBibleVerses(filtered.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
       }
-    } catch (e: any) {
-      setBibleError(e?.message || String(e));
+    } catch (e: unknown) {
+      setBibleError(getErrorMessage(e));
     } finally {
       setBibleLoading(false);
     }
@@ -316,8 +331,16 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
             placeholder="Ex: Jean 3:16-18"
             style={{ flex: 1, padding: 10 }}
           />
-          <select value={bibleTranslation} onChange={(e) => setBibleTranslation(e.target.value as any)} style={{ padding: 10, minWidth: 180 }}>
+          <select
+            value={bibleTranslation}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (isBibleTranslation(value)) setBibleTranslation(value);
+            }}
+            style={{ padding: 10, minWidth: 180 }}
+          >
             <option value="LSG">Traduction preferee : LSG (bolls)</option>
+            <option value="FRLSG">FRLSG (bolls)</option>
             <option value="WEB">WEB (bolls)</option>
             <option value="LSG1910">LSG1910 offline</option>
           </select>

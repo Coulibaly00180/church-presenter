@@ -1,9 +1,17 @@
 import React, { useEffect, useState } from "react";
 
-type PlanListItem = { id: string; date: string; title?: string | null; updatedAt: string };
-type ImportDetail = { counts: { songs: number; plans: number }; errors: any[] };
+type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
+type ImportDetail = { counts: CpDataImportCounts; errors: CpDataImportError[] };
 
-function isoToYmd(iso: string) {
+function isoToYmd(iso: string | Date) {
+  if (iso instanceof Date) {
+    if (Number.isNaN(iso.getTime())) return "";
+    const y = iso.getUTCFullYear();
+    const m = String(iso.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(iso.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   const fromIso = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (fromIso) return `${fromIso[1]}-${fromIso[2]}-${fromIso[3]}`;
   const d = new Date(iso);
@@ -96,9 +104,8 @@ export function HistoryPage() {
                 return;
               }
               const r = await window.cp.data.exportAll();
-              if (r?.ok) setMsg(`Export global -> ${r.path}`);
-              else if (r?.canceled) setMsg("Export annule.");
-              else setMsg(`Export echoue${r?.error ? `: ${r.error}` : "."}`);
+              if (r.ok) setMsg(`Export global -> ${r.path}`);
+              else if (r.canceled) setMsg("Export annule.");
             } catch (e) {
               setMsg(`Export echoue: ${getErrorMessage(e)}`);
             }
@@ -120,19 +127,19 @@ export function HistoryPage() {
 
               if (replace) {
                 const bk = await window.cp.data.exportAll();
-                if (!bk?.ok || !bk?.path) {
-                  if (bk?.canceled) {
+                if (!bk.ok) {
+                  if (bk.canceled) {
                     setMsg("Import annule: backup obligatoire en mode REPLACE.");
                     return;
                   }
-                  setMsg(`Backup echoue${bk?.error ? `: ${bk.error}` : "."} Import REPLACE annule.`);
+                  setMsg("Backup echoue. Import REPLACE annule.");
                   return;
                 }
                 backupPath = bk.path;
               }
 
               const r = await window.cp.data.importAll({ mode: replace ? "REPLACE" : "MERGE" });
-              if (r?.ok) {
+              if (r.ok) {
                 setPlans(await window.cp.plans.list());
                 setMsg(
                   `Import global OK (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
@@ -140,10 +147,10 @@ export function HistoryPage() {
                   }`
                 );
                 setImportDetail({ counts: r.counts || { songs: 0, plans: 0 }, errors: r.errors || [] });
-              } else if (r?.canceled) {
+              } else if ("canceled" in r && r.canceled) {
                 setMsg("Import annule.");
               } else {
-                setMsg(`Import echoue${r?.error ? `: ${r.error}` : "."}`);
+                setMsg(`Import echoue${"error" in r && r.error ? `: ${r.error}` : "."}`);
               }
             } catch (e) {
               setMsg(`Import echoue: ${getErrorMessage(e)}`);
@@ -164,8 +171,12 @@ export function HistoryPage() {
                 onClick={async () => {
                   try {
                     const duplicated = await window.cp.plans.duplicate({ planId: p.id, dateIso: localNowYmd() });
+                    if (!duplicated) {
+                      setMsg("Duplication echouee: plan introuvable.");
+                      return;
+                    }
                     setPlans(await window.cp.plans.list());
-                    const duplicatedDate = duplicated?.date ? isoToYmd(duplicated.date) : null;
+                    const duplicatedDate = duplicated.date ? isoToYmd(duplicated.date) : null;
                     setMsg(duplicatedDate ? `Plan duplique au ${duplicatedDate}.` : "Plan duplique.");
                   } catch (e) {
                     setMsg(`Duplication echouee: ${getErrorMessage(e)}`);
@@ -179,9 +190,8 @@ export function HistoryPage() {
                 onClick={async () => {
                   try {
                     const res = await window.cp.plans.export({ planId: p.id });
-                    if (res?.ok) setMsg(`Plan exporte -> ${res.path}`);
-                    else if (res?.canceled) setMsg("Export annule.");
-                    else setMsg(`Export echoue${res?.error ? `: ${res.error}` : "."}`);
+                    if (res.ok) setMsg(`Plan exporte -> ${res.path}`);
+                    else if (res.canceled) setMsg("Export annule.");
                   } catch (e) {
                     setMsg(`Export echoue: ${getErrorMessage(e)}`);
                   }

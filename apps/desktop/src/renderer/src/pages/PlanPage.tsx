@@ -56,8 +56,8 @@ export function PlanPage() {
   useEffect(() => {
     if (!canUse) return;
 
-    window.cp.projectionWindow.isOpen().then((r: any) => setProjOpen(!!r?.isOpen));
-    const offWin = window.cp.projectionWindow.onWindowState((p: any) => setProjOpen(!!p.isOpen));
+    window.cp.projectionWindow.isOpen().then((r) => setProjOpen(!!r?.isOpen));
+    const offWin = window.cp.projectionWindow.onWindowState((p) => setProjOpen(!!p.isOpen));
 
     refreshPlans();
 

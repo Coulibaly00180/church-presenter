@@ -1,8 +1,8 @@
 export type PlanListItem = {
   id: string;
-  date: string;
+  date: string | Date;
   title?: string | null;
-  updatedAt: string;
+  updatedAt: string | Date;
 };
 
 export type PlanItem = {
@@ -18,7 +18,7 @@ export type PlanItem = {
 
 export type Plan = {
   id: string;
-  date: string;
+  date: string | Date;
   title?: string | null;
   items: PlanItem[];
 };
