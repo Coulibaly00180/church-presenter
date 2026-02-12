@@ -9,6 +9,7 @@ import { registerBibleIpc } from "./ipc/bible";
 type ProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 type ScreenKey = "A" | "B" | "C";
 type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
+type SongMeta = { title?: string; artist?: string; album?: string; year?: string };
 
 type ProjectionState = {
   mode: ProjectionMode;
@@ -23,7 +24,7 @@ type ProjectionState = {
     body?: string;
     mediaPath?: string;
     mediaType?: "IMAGE" | "PDF";
-    metaSong?: { title?: string; artist?: string; album?: string; year?: string };
+    metaSong?: SongMeta;
   };
   updatedAt: number;
 };
@@ -88,6 +89,11 @@ function inferMediaType(filePath: string): "IMAGE" | "PDF" | null {
   if (PDF_EXTENSIONS.has(ext)) return "PDF";
   if (IMAGE_EXTENSIONS.has(ext)) return "IMAGE";
   return null;
+}
+
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 function getMediaDir() {
@@ -362,9 +368,9 @@ ipcMain.handle("files:listMedia", async () => {
       })
       .filter((x): x is { name: string; path: string; mediaType: "PDF" | "IMAGE" } => !!x);
     return { ok: true, files };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("listMedia failed", e);
-    return { ok: false, error: e?.message || String(e) };
+    return { ok: false, error: getErrorMessage(e) };
   }
 });
 
@@ -379,9 +385,9 @@ ipcMain.handle("files:deleteMedia", async (_evt, payload: { path: string }) => {
       fs.unlinkSync(payload.path);
     }
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("deleteMedia failed", e);
-    return { ok: false, error: e?.message || String(e) };
+    return { ok: false, error: getErrorMessage(e) };
   }
 });
 
@@ -410,7 +416,7 @@ ipcMain.handle("projection:setAppearance", (_evt, patch: { textScale?: number; b
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; body: string; metaSong?: any }) => {
+ipcMain.handle("projection:setContentText", (_evt, payload: { title?: string; body: string; metaSong?: SongMeta }) => {
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
@@ -478,7 +484,7 @@ ipcMain.handle("screens:setMirror", (_evt, key: ScreenKey, mirror: ScreenMirrorM
 
 ipcMain.handle("screens:getState", (_evt, key: ScreenKey) => screenStates[key]);
 
-ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title?: string; body: string; metaSong?: any }) => {
+ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: { title?: string; body: string; metaSong?: SongMeta }) => {
   // If screen is mirroring, ignore direct set (safety)
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
   if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };

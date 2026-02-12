@@ -1,4 +1,5 @@
 import { dialog, ipcMain } from "electron";
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import mammoth from "mammoth";
@@ -7,6 +8,42 @@ import path from "path";
 import AdmZip from "adm-zip";
 
 const SUPPORTED_DOC_EXTENSIONS = [".docx", ".odt"];
+type PrismaClientType = ReturnType<typeof getPrisma>;
+type ImportSongBlock = { order?: number; type?: string; title?: string; content?: string };
+type ImportSongMeta = {
+  paroles?: string;
+  titre?: string;
+  auteur_interprete?: string;
+  auteur?: string;
+  interprete?: string;
+  album_inclus_dans?: string;
+  langue?: string;
+  annee_de_sortie_single?: string | number;
+};
+type ImportSongEntry = {
+  title?: string;
+  titre?: string;
+  artist?: string;
+  auteur?: string;
+  album?: string;
+  year?: string | number;
+  annee?: string | number;
+  published?: string | number;
+  release_year?: string | number;
+  language?: string;
+  lang?: string;
+  tags?: string;
+  lyrics?: string;
+  paroles?: string;
+  blocks?: ImportSongBlock[];
+  meta?: ImportSongMeta;
+  songs?: ImportSongEntry[];
+};
+
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
 
 function splitBlocks(text: string) {
   return text
@@ -85,7 +122,7 @@ async function extractTextFromDoc(buffer: Buffer, ext: string) {
   throw new Error("Extension non supportee");
 }
 
-async function importDocSong(prisma: any, filePath: string) {
+async function importDocSong(prisma: PrismaClientType, filePath: string) {
   const buffer = fs.readFileSync(filePath);
   const ext = path.extname(filePath).toLowerCase();
   if (!SUPPORTED_DOC_EXTENSIONS.includes(ext)) throw new Error("Extension non supportee (docx / odt)");
@@ -107,26 +144,26 @@ async function importDocSong(prisma: any, filePath: string) {
   return song;
 }
 
-async function importJsonFile(prisma: any, filePath: string) {
+async function importJsonFile(prisma: PrismaClientType, filePath: string) {
   const raw = fs.readFileSync(filePath, "utf-8");
-  let payload: any = JSON.parse(raw);
+  let payload = JSON.parse(raw) as unknown;
   if (Array.isArray(payload)) {
     // ok
-  } else if (payload?.songs && Array.isArray(payload.songs)) {
-    payload = payload.songs;
-  } else if (typeof payload === "object") {
-    payload = [payload]; // accepte un seul chant
+  } else if (typeof payload === "object" && payload !== null && "songs" in payload && Array.isArray((payload as ImportSongEntry).songs)) {
+    payload = (payload as ImportSongEntry).songs ?? [];
+  } else if (typeof payload === "object" && payload !== null) {
+    payload = [payload as ImportSongEntry]; // accepte un seul chant
   } else {
     throw new Error("Le fichier doit contenir un tableau de chants ou un objet unique.");
   }
 
   let imported = 0;
   const errors: Array<{ path: string; title?: string; message: string }> = [];
-  for (const s of payload) {
+  for (const s of payload as ImportSongEntry[]) {
     try {
       const meta = s.meta || {};
       // blocs : accepte soit blocks[], soit lyrics (string) qu'on decoupe en paragraphes
-      let blocks: any[] = Array.isArray(s.blocks) ? s.blocks : [];
+      let blocks: ImportSongBlock[] = Array.isArray(s.blocks) ? s.blocks : [];
       const lyrics = s.lyrics || s.paroles || meta.paroles;
       if ((!blocks || blocks.length === 0) && typeof lyrics === "string") {
         blocks = splitBlocks(lyrics).map((content, idx) => ({
@@ -165,8 +202,8 @@ async function importJsonFile(prisma: any, filePath: string) {
         });
       }
       imported += 1;
-    } catch (e: any) {
-      errors.push({ path: filePath, title: s?.title, message: e?.message || String(e) });
+    } catch (e: unknown) {
+      errors.push({ path: filePath, title: s?.title, message: getErrorMessage(e) });
     }
   }
   return { imported, errors };
@@ -245,7 +282,7 @@ export function registerSongsIpc() {
 
   ipcMain.handle("songs:replaceBlocks", async (_evt, payload: { songId: string; blocks: BlockInput[] }) => {
     const prisma = getPrisma();
-    return prisma.$transaction(async (tx: any) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.songBlock.deleteMany({ where: { songId: payload.songId } });
       await tx.songBlock.createMany({
         data: payload.blocks.map((b) => ({
@@ -275,7 +312,7 @@ export function registerSongsIpc() {
     const song = await prisma.song.findUnique({ where: { id: songId }, include: { blocks: { orderBy: { order: "asc" } } } });
     if (!song) throw new Error("Song not found");
 
-    const lyrics = (song.blocks || []).map((b: any) => (b.content || "").trim()).filter(Boolean).join("\n\n");
+    const lyrics = (song.blocks || []).map((b) => (b.content || "").trim()).filter(Boolean).join("\n\n");
     const doc = new Document({
       sections: [
         {
@@ -346,8 +383,8 @@ export function registerSongsIpc() {
     try {
       const r = await importJsonFile(prisma, res.filePaths[0]);
       return { ok: true, imported: r.imported, errors: r.errors, path: res.filePaths[0] };
-    } catch (e: any) {
-      return { ok: false, error: e?.message || String(e) };
+    } catch (e: unknown) {
+      return { ok: false, error: getErrorMessage(e) };
     }
   });
 
@@ -366,8 +403,8 @@ export function registerSongsIpc() {
       try {
         await importDocSong(prisma, p);
         imported += 1;
-      } catch (e: any) {
-        errors.push({ path: p, message: e?.message || String(e) });
+      } catch (e: unknown) {
+        errors.push({ path: p, message: getErrorMessage(e) });
       }
     }
     return { ok: true, imported, errors, files: res.filePaths };
@@ -402,11 +439,11 @@ export function registerSongsIpc() {
           await importDocSong(prisma, p);
           imported += 1;
           docFiles += 1;
-        } else {
-          errors.push({ path: p, message: "Extension non supportee" });
-        }
-      } catch (e: any) {
-        errors.push({ path: p, message: e?.message || String(e) });
+      } else {
+        errors.push({ path: p, message: "Extension non supportee" });
+      }
+      } catch (e: unknown) {
+        errors.push({ path: p, message: getErrorMessage(e) });
       }
     }
 

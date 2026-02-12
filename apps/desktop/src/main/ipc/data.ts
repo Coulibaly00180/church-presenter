@@ -1,8 +1,51 @@
 import { ipcMain, dialog } from "electron";
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
 import fs from "fs";
 
-function normalizeDateToMidnight(dateIso?: string) {
+type ImportedSongBlock = {
+  order?: number;
+  type?: string;
+  title?: string;
+  content?: string;
+};
+
+type ImportedSong = {
+  title?: string;
+  artist?: string;
+  album?: string;
+  language?: string;
+  tags?: string;
+  blocks?: ImportedSongBlock[];
+};
+
+type ImportedPlanItem = {
+  order?: number;
+  kind?: string;
+  refId?: string;
+  refSubId?: string;
+  title?: string;
+  content?: string;
+  mediaPath?: string;
+};
+
+type ImportedPlan = {
+  date?: string | Date;
+  title?: string;
+  items?: ImportedPlanItem[];
+};
+
+type ImportedDataPayload = {
+  songs?: ImportedSong[];
+  plans?: ImportedPlan[];
+};
+
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function normalizeDateToMidnight(dateIso?: string | Date) {
   if (!dateIso) {
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
@@ -47,20 +90,21 @@ export function registerDataIpc() {
     if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
     const path = res.filePaths[0];
     const raw = fs.readFileSync(path, "utf-8");
-    let data: any;
+    let data: ImportedDataPayload;
     try {
-      data = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as unknown;
+      data = typeof parsed === "object" && parsed !== null ? (parsed as ImportedDataPayload) : {};
     } catch {
       return { ok: false, error: "Invalid JSON file" };
     }
 
     const mode = payload?.mode || "MERGE";
-    const songs = Array.isArray(data?.songs) ? data.songs : [];
-    const plans = Array.isArray(data?.plans) ? data.plans : [];
+    const songs = Array.isArray(data.songs) ? data.songs : [];
+    const plans = Array.isArray(data.plans) ? data.plans : [];
 
     if (mode === "REPLACE") {
       try {
-        const counts = await prisma.$transaction(async (tx: any) => {
+        const counts = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           await tx.songBlock.deleteMany({});
           await tx.song.deleteMany({});
           await tx.serviceItem.deleteMany({});
@@ -72,7 +116,7 @@ export function registerDataIpc() {
           for (const s of songs) {
             const song = await tx.song.create({
               data: {
-                title: s.title,
+                title: s.title || "Sans titre",
                 artist: s.artist,
                 album: s.album,
                 language: s.language,
@@ -83,10 +127,10 @@ export function registerDataIpc() {
               await tx.songBlock.create({
                 data: {
                   songId: song.id,
-                  order: b.order,
-                  type: b.type,
+                  order: b.order ?? 1,
+                  type: b.type ?? "VERSE",
                   title: b.title,
-                  content: b.content,
+                  content: b.content ?? "",
                 },
               });
             }
@@ -104,8 +148,8 @@ export function registerDataIpc() {
               await tx.serviceItem.create({
                 data: {
                   planId: plan.id,
-                  order: it.order,
-                  kind: it.kind,
+                  order: it.order ?? 1,
+                  kind: it.kind ?? "ANNOUNCEMENT_TEXT",
                   refId: it.refId,
                   refSubId: it.refSubId,
                   title: it.title,
@@ -121,8 +165,8 @@ export function registerDataIpc() {
         });
 
         return { ok: true, imported: true, counts, errors: [] };
-      } catch (e: any) {
-        return { ok: false, rolledBack: true, error: e?.message || String(e) };
+      } catch (e: unknown) {
+        return { ok: false, rolledBack: true, error: getErrorMessage(e) };
       }
     }
 
@@ -134,7 +178,7 @@ export function registerDataIpc() {
       try {
         const song = await prisma.song.create({
           data: {
-            title: s.title,
+            title: s.title || "Sans titre",
             artist: s.artist,
             album: s.album,
             language: s.language,
@@ -145,16 +189,16 @@ export function registerDataIpc() {
           await prisma.songBlock.create({
             data: {
               songId: song.id,
-              order: b.order,
-              type: b.type,
+              order: b.order ?? 1,
+              type: b.type ?? "VERSE",
               title: b.title,
-              content: b.content,
+              content: b.content ?? "",
             },
           });
         }
         songsImported += 1;
-      } catch (e: any) {
-        errors.push({ kind: "song", title: s.title, message: e?.message || String(e) });
+      } catch (e: unknown) {
+        errors.push({ kind: "song", title: s.title, message: getErrorMessage(e) });
       }
     }
 
@@ -170,8 +214,8 @@ export function registerDataIpc() {
           await prisma.serviceItem.create({
             data: {
               planId: plan.id,
-              order: it.order,
-              kind: it.kind,
+              order: it.order ?? 1,
+              kind: it.kind ?? "ANNOUNCEMENT_TEXT",
               refId: it.refId,
               refSubId: it.refSubId,
               title: it.title,
@@ -181,8 +225,8 @@ export function registerDataIpc() {
           });
         }
         plansImported += 1;
-      } catch (e: any) {
-        errors.push({ kind: "plan", title: p.title, message: e?.message || String(e) });
+      } catch (e: unknown) {
+        errors.push({ kind: "plan", title: p.title, message: getErrorMessage(e) });
       }
     }
 

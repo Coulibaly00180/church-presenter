@@ -1,4 +1,5 @@
 import { dialog, ipcMain } from "electron";
+import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
 
 function normalizeDateToMidnight(dateIso: string) {
@@ -56,7 +57,7 @@ export function registerPlansIpc() {
 
     for (let attempt = 0; attempt < 3660; attempt += 1) {
       try {
-        return await prisma.$transaction(async (tx: any) => {
+        return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           const created = await tx.servicePlan.create({
             data: { date: candidateDate, title },
           });
@@ -159,7 +160,7 @@ export function registerPlansIpc() {
     });
 
     await prisma.$transaction(
-      items.map((it: any, idx: number) => prisma.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } }))
+      items.map((it, idx: number) => prisma.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } }))
     );
 
     return { ok: true };

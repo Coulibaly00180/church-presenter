@@ -1,5 +1,10 @@
 import { ipcMain } from "electron";
 
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 export function registerBibleIpc() {
   ipcMain.handle("bible:listTranslations", async () => {
     try {
@@ -7,8 +12,8 @@ export function registerBibleIpc() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const json = await r.json();
       return { ok: true, data: json };
-    } catch (e: any) {
-      return { ok: false, error: e?.message || String(e) };
+    } catch (e: unknown) {
+      return { ok: false, error: getErrorMessage(e) };
     }
   });
 }

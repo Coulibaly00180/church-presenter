@@ -2,22 +2,53 @@ import { contextBridge, ipcRenderer } from "electron";
 
 type ScreenKey = "A" | "B" | "C";
 type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
+type ProjectionMode = "NORMAL" | "BLACK" | "WHITE";
+type MediaType = "IMAGE" | "PDF";
+type SongMeta = { title?: string; artist?: string; album?: string; year?: string };
+type ProjectionCurrent = {
+  kind: "EMPTY" | "TEXT" | "MEDIA";
+  title?: string;
+  body?: string;
+  mediaPath?: string;
+  mediaType?: MediaType;
+  metaSong?: SongMeta;
+};
+type ProjectionState = {
+  mode: ProjectionMode;
+  lowerThirdEnabled: boolean;
+  transitionEnabled: boolean;
+  textScale: number;
+  background: string;
+  foreground: string;
+  current: ProjectionCurrent;
+  updatedAt: number;
+};
+type LiveState = {
+  enabled: boolean;
+  planId: string | null;
+  cursor: number;
+  target: ScreenKey;
+  black: boolean;
+  white: boolean;
+  lockedScreens: Record<ScreenKey, boolean>;
+  updatedAt: number;
+};
 
 contextBridge.exposeInMainWorld("cp", {
   // Backward compatible API (A only)
   projection: {
     getState: () => ipcRenderer.invoke("projection:getState"),
-    setState: (patch: any) => ipcRenderer.invoke("projection:setState", patch),
+    setState: (patch: Partial<ProjectionState>) => ipcRenderer.invoke("projection:setState", patch),
     setAppearance: (payload: { textScale?: number; background?: string; foreground?: string }) =>
       ipcRenderer.invoke("projection:setAppearance", payload),
-    setContentText: (payload: { title?: string; body: string; metaSong?: any }) =>
+    setContentText: (payload: { title?: string; body: string; metaSong?: SongMeta }) =>
       ipcRenderer.invoke("projection:setContentText", payload),
-    setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) =>
+    setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: MediaType }) =>
       ipcRenderer.invoke("projection:setContentMedia", payload),
-    setMode: (mode: "NORMAL" | "BLACK" | "WHITE") =>
+    setMode: (mode: ProjectionMode) =>
       ipcRenderer.invoke("projection:setMode", mode),
-    onState: (cb: (state: any) => void) => {
-      const handler = (_: any, payload: { key: ScreenKey; state: any }) => {
+    onState: (cb: (state: ProjectionState) => void) => {
+      const handler = (_: unknown, payload: { key: ScreenKey; state: ProjectionState }) => {
         if (payload?.key === "A") cb(payload.state);
       };
       ipcRenderer.on("screens:state", handler);
@@ -31,7 +62,7 @@ contextBridge.exposeInMainWorld("cp", {
     close: () => ipcRenderer.invoke("projectionWindow:close"),
     isOpen: () => ipcRenderer.invoke("projectionWindow:isOpen"),
     onWindowState: (cb: (payload: { isOpen: boolean }) => void) => {
-      const handler = (_: any, payload: { key: ScreenKey; isOpen: boolean }) => {
+      const handler = (_: unknown, payload: { key: ScreenKey; isOpen: boolean }) => {
         if (payload?.key === "A") cb({ isOpen: payload.isOpen });
       };
       ipcRenderer.on("screens:window", handler);
@@ -48,21 +79,21 @@ contextBridge.exposeInMainWorld("cp", {
     setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) =>
       ipcRenderer.invoke("screens:setMirror", key, mirror),
     getState: (key: ScreenKey) => ipcRenderer.invoke("screens:getState", key),
-    setContentText: (key: ScreenKey, payload: { title?: string; body: string; metaSong?: any }) =>
+    setContentText: (key: ScreenKey, payload: { title?: string; body: string; metaSong?: SongMeta }) =>
       ipcRenderer.invoke("screens:setContentText", key, payload),
-    setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) =>
+    setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: MediaType }) =>
       ipcRenderer.invoke("screens:setContentMedia", key, payload),
-    setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") =>
+    setMode: (key: ScreenKey, mode: ProjectionMode) =>
       ipcRenderer.invoke("screens:setMode", key, mode),
-    onState: (key: ScreenKey, cb: (state: any) => void) => {
-      const handler = (_: any, payload: { key: ScreenKey; state: any }) => {
+    onState: (key: ScreenKey, cb: (state: ProjectionState) => void) => {
+      const handler = (_: unknown, payload: { key: ScreenKey; state: ProjectionState }) => {
         if (payload?.key === key) cb(payload.state);
       };
       ipcRenderer.on("screens:state", handler);
       return () => ipcRenderer.removeListener("screens:state", handler);
     },
     onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => {
-      const handler = (_: any, payload: { key: ScreenKey; isOpen: boolean }) => {
+      const handler = (_: unknown, payload: { key: ScreenKey; isOpen: boolean }) => {
         if (payload?.key === key) cb({ isOpen: payload.isOpen });
       };
       ipcRenderer.on("screens:window", handler);
@@ -134,8 +165,8 @@ contextBridge.exposeInMainWorld("cp", {
     toggleWhite: () => ipcRenderer.invoke("live:toggleWhite"),
     resume: () => ipcRenderer.invoke("live:resume"),
     setLocked: (key: ScreenKey, locked: boolean) => ipcRenderer.invoke("live:setLocked", { key, locked }),
-    onUpdate: (cb: (state: any) => void) => {
-      const handler = (_: any, payload: any) => cb(payload);
+    onUpdate: (cb: (state: LiveState) => void) => {
+      const handler = (_: unknown, payload: LiveState) => cb(payload);
       ipcRenderer.on("live:update", handler);
       return () => ipcRenderer.removeListener("live:update", handler);
     },
