@@ -16,7 +16,7 @@ function getScreenKey(): "A" | "B" | "C" {
 
 export function ProjectionPage() {
   const screenKey = useMemo(() => getScreenKey(), []);
-  const [state, setState] = useState<any>(null);
+  const [state, setState] = useState<CpProjectionState | null>(null);
   const [animKey, setAnimKey] = useState(0);
   const [pdfImage, setPdfImage] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -24,8 +24,13 @@ export function ProjectionPage() {
   const [pdfPage, setPdfPage] = useState<number>(1);
   const [pdfPageCount, setPdfPageCount] = useState<number>(1);
   const containerRef = useRef<HTMLDivElement>(null);
-  const pdfDocRef = useRef<{ path: string; doc: any } | null>(null);
+  const pdfDocRef = useRef<{ path: string; doc: pdfjsLib.PDFDocumentProxy } | null>(null);
   const [blockCursor, setBlockCursor] = useState<number>(0);
+
+  function getErrorMessage(err: unknown) {
+    if (err instanceof Error) return err.message;
+    return String(err);
+  }
 
   function toFileUrl(p?: string) {
     if (!p) return "";
@@ -107,7 +112,7 @@ export function ProjectionPage() {
   }, [state?.current?.kind, state?.current?.title, state?.current?.body]);
 
   const mode = state?.mode ?? "NORMAL";
-  const current = state?.current ?? { kind: "EMPTY" };
+  const current: CpProjectionCurrent = state?.current ?? { kind: "EMPTY" };
   const isPdf = current.kind === "MEDIA" && current.mediaType === "PDF";
   const lowerThird = !!state?.lowerThirdEnabled;
   const textBlocks = useMemo(
@@ -154,7 +159,7 @@ export function ProjectionPage() {
         const initialPage = pageParam ? parseInt(pageParam[1], 10) || 1 : 1;
         const targetPage = pdfPage || initialPage;
         const cachedPdf = pdfDocRef.current;
-        let pdf = cachedPdf && cachedPdf.path === pathOnly ? cachedPdf.doc : null;
+        let pdf: pdfjsLib.PDFDocumentProxy | null = cachedPdf && cachedPdf.path === pathOnly ? cachedPdf.doc : null;
         if (!pdf) {
           const url = toFileUrl(pathOnly);
           pdf = await pdfjsLib.getDocument(url).promise;
@@ -173,8 +178,8 @@ export function ProjectionPage() {
         canvas.height = viewport.height;
         await page.render({ canvasContext: ctx, viewport }).promise;
         if (!cancelled) setPdfImage(canvas.toDataURL("image/png"));
-      } catch (e: any) {
-        if (!cancelled) setPdfError(e?.message || String(e));
+      } catch (e: unknown) {
+        if (!cancelled) setPdfError(getErrorMessage(e));
       } finally {
         if (!cancelled) setPdfLoading(false);
       }

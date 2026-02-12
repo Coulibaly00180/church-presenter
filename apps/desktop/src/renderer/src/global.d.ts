@@ -3,16 +3,37 @@ export {};
 declare global {
   type ScreenKey = "A" | "B" | "C";
   type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
+  type CpProjectionMode = "NORMAL" | "BLACK" | "WHITE";
+  type CpMediaType = "IMAGE" | "PDF";
+  type CpSongMeta = { title?: string; artist?: string; album?: string; year?: string };
+  type CpProjectionCurrent = {
+    kind: "EMPTY" | "TEXT" | "MEDIA";
+    title?: string;
+    body?: string;
+    mediaPath?: string;
+    mediaType?: CpMediaType;
+    metaSong?: CpSongMeta;
+  };
+  type CpProjectionState = {
+    mode: CpProjectionMode;
+    lowerThirdEnabled: boolean;
+    transitionEnabled: boolean;
+    textScale: number;
+    background: string;
+    foreground: string;
+    current: CpProjectionCurrent;
+    updatedAt: number;
+  };
 
   interface Window {
     cp: {
       projection: {
-        getState: () => Promise<any>;
-        setState: (patch: any) => Promise<any>;
-        setContentText: (payload: { title?: string; body: string; metaSong?: any }) => Promise<any>;
-        setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => Promise<any>;
-        setMode: (mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
-        onState: (cb: (state: any) => void) => () => void;
+        getState: () => Promise<CpProjectionState>;
+        setState: (patch: Partial<CpProjectionState>) => Promise<any>;
+        setContentText: (payload: { title?: string; body: string; metaSong?: CpSongMeta }) => Promise<any>;
+        setContentMedia: (payload: { title?: string; mediaPath: string; mediaType: CpMediaType }) => Promise<any>;
+        setMode: (mode: CpProjectionMode) => Promise<any>;
+        onState: (cb: (state: CpProjectionState) => void) => () => void;
         setAppearance: (payload: { textScale?: number; background?: string; foreground?: string }) => Promise<any>;
       };
 
@@ -29,11 +50,11 @@ declare global {
         open: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
         close: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
         setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) => Promise<any>;
-        getState: (key: ScreenKey) => Promise<any>;
-        setContentText: (key: ScreenKey, payload: { title?: string; body: string; metaSong?: any }) => Promise<any>;
-        setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: "IMAGE" | "PDF" }) => Promise<any>;
-        setMode: (key: ScreenKey, mode: "NORMAL" | "BLACK" | "WHITE") => Promise<any>;
-        onState: (key: ScreenKey, cb: (state: any) => void) => () => void;
+        getState: (key: ScreenKey) => Promise<CpProjectionState>;
+        setContentText: (key: ScreenKey, payload: { title?: string; body: string; metaSong?: CpSongMeta }) => Promise<any>;
+        setContentMedia: (key: ScreenKey, payload: { title?: string; mediaPath: string; mediaType: CpMediaType }) => Promise<any>;
+        setMode: (key: ScreenKey, mode: CpProjectionMode) => Promise<any>;
+        onState: (key: ScreenKey, cb: (state: CpProjectionState) => void) => () => void;
         onWindowState: (key: ScreenKey, cb: (payload: { isOpen: boolean }) => void) => () => void;
       };
 
