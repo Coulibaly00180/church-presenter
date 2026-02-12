@@ -1,25 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-type ScreenKey = "A" | "B" | "C";
-type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
-type ProjectionState = { mode: string; lowerThirdEnabled: boolean; current: any; textScale?: number; background?: string; foreground?: string };
-type ScreenMeta = { key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode };
-type LiveState = {
-  enabled: boolean;
-  planId: string | null;
-  cursor: number;
-  target: ScreenKey;
-  black: boolean;
-  white: boolean;
-  lockedScreens: Record<ScreenKey, boolean>;
-  updatedAt: number;
+type LivePatch = {
+  planId?: string | null;
+  cursor?: number | null;
+  enabled?: boolean;
+  target?: ScreenKey;
+  black?: boolean;
+  white?: boolean;
 };
 
 function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;
   if (!t) return false;
   const tag = t.tagName?.toLowerCase();
-  return tag === "input" || tag === "textarea" || (t as any).isContentEditable;
+  return tag === "input" || tag === "textarea" || t.isContentEditable;
 }
 
 function splitBlocks(text: string) {
@@ -31,7 +25,7 @@ function splitBlocks(text: string) {
 
 async function projectText(target: ScreenKey, title: string | undefined, body: string) {
   const screensApi = window.cp.screens;
-  const list: ScreenMeta[] = screensApi ? await screensApi.list() : [];
+  const list: CpScreenMeta[] = screensApi ? await screensApi.list() : [];
   const meta = list.find((s) => s.key === target);
 
   if (target === "A") {
@@ -48,7 +42,7 @@ async function projectText(target: ScreenKey, title: string | undefined, body: s
     return;
   }
 
-  const res: any = await screensApi.setContentText(dest, { title, body });
+  const res = (await screensApi.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
   if (res?.ok === false && res?.reason === "MIRROR") {
     await window.cp.projection.setContentText({ title, body });
   }
@@ -57,11 +51,11 @@ async function projectText(target: ScreenKey, title: string | undefined, body: s
 export function RegiePage() {
   const [title, setTitle] = useState("Bienvenue");
   const [body, setBody] = useState("Tape ton texte ici, puis clique Afficher.");
-  const [stateA, setStateA] = useState<ProjectionState | null>(null);
-  const [screens, setScreens] = useState<ScreenMeta[]>([]);
+  const [stateA, setStateA] = useState<CpProjectionState | null>(null);
+  const [screens, setScreens] = useState<CpScreenMeta[]>([]);
   const [projOpenA, setProjOpenA] = useState(false);
   const [blockCursor, setBlockCursor] = useState<number>(-1);
-  const [live, setLive] = useState<LiveState | null>(null);
+  const [live, setLive] = useState<CpLiveState | null>(null);
 
   const target = live?.target ?? "A";
   const locked = live?.lockedScreens ?? { A: false, B: false, C: false };
@@ -99,11 +93,11 @@ export function RegiePage() {
   useEffect(() => {
     if (!window.cp.live) return;
     window.cp.live.get().then(setLive).catch(() => null);
-    const off = window.cp.live.onUpdate((s: LiveState) => setLive(s));
+    const off = window.cp.live.onUpdate(setLive);
     return () => off?.();
   }, []);
 
-  async function updateLive(patch: Partial<LiveState>) {
+  async function updateLive(patch: LivePatch) {
     if (!window.cp.live) return;
     const next = await window.cp.live.set(patch);
     setLive(next);

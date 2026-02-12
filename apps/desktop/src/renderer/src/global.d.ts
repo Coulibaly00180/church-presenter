@@ -24,6 +24,17 @@ declare global {
     current: CpProjectionCurrent;
     updatedAt: number;
   };
+  type CpScreenMeta = { key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode };
+  type CpLiveState = {
+    enabled: boolean;
+    planId: string | null;
+    cursor: number;
+    target: ScreenKey;
+    black: boolean;
+    white: boolean;
+    lockedScreens: Record<ScreenKey, boolean>;
+    updatedAt: number;
+  };
 
   interface Window {
     cp: {
@@ -45,7 +56,7 @@ declare global {
       };
 
       screens: {
-        list: () => Promise<Array<{ key: ScreenKey; isOpen: boolean; mirror: ScreenMirrorMode }>>;
+        list: () => Promise<CpScreenMeta[]>;
         isOpen: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
         open: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
         close: (key: ScreenKey) => Promise<{ isOpen: boolean }>;
@@ -101,27 +112,18 @@ declare global {
       };
 
       live: {
-        get: () => Promise<{
-          enabled: boolean;
-          planId: string | null;
-          cursor: number;
-          target: ScreenKey;
-          black: boolean;
-          white: boolean;
-          lockedScreens: Record<ScreenKey, boolean>;
-          updatedAt: number;
-        }>;
-        set: (payload: { planId?: string | null; cursor?: number | null; enabled?: boolean; target?: ScreenKey; black?: boolean; white?: boolean }) => Promise<any>;
-        next: () => Promise<any>;
-        prev: () => Promise<any>;
-        setCursor: (cursor: number) => Promise<any>;
-        setTarget: (target: ScreenKey) => Promise<any>;
-        toggle: () => Promise<any>;
-        toggleBlack: () => Promise<any>;
-        toggleWhite: () => Promise<any>;
-        resume: () => Promise<any>;
-        setLocked: (key: ScreenKey, locked: boolean) => Promise<any>;
-        onUpdate: (cb: (state: any) => void) => () => void;
+        get: () => Promise<CpLiveState>;
+        set: (payload: { planId?: string | null; cursor?: number | null; enabled?: boolean; target?: ScreenKey; black?: boolean; white?: boolean }) => Promise<CpLiveState>;
+        next: () => Promise<CpLiveState>;
+        prev: () => Promise<CpLiveState>;
+        setCursor: (cursor: number) => Promise<CpLiveState>;
+        setTarget: (target: ScreenKey) => Promise<CpLiveState>;
+        toggle: () => Promise<CpLiveState>;
+        toggleBlack: () => Promise<CpLiveState>;
+        toggleWhite: () => Promise<CpLiveState>;
+        resume: () => Promise<CpLiveState>;
+        setLocked: (key: ScreenKey, locked: boolean) => Promise<CpLiveState>;
+        onUpdate: (cb: (state: CpLiveState) => void) => () => void;
       };
 
 

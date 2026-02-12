@@ -7,8 +7,8 @@ type PlanLiveToolbarProps = {
   target: ScreenKey;
   live: LiveState | null;
   filterSongsOnly: boolean;
-  onUpdateLive: (patch: Partial<LiveState>) => void | Promise<void>;
-  onSetLocked: (screen: ScreenKey, locked: boolean) => void | Promise<void>;
+  onUpdateLive: (patch: Partial<LiveState>) => void | Promise<unknown>;
+  onSetLocked: (screen: ScreenKey, locked: boolean) => void | Promise<unknown>;
   onPrev: () => void;
   onNext: () => void;
   onSetFilterSongsOnly: (value: boolean) => void;
