@@ -1,5 +1,6 @@
 import React from "react";
 import { LiveState, ScreenKey } from "./types";
+import { ActionRow, Panel } from "../../ui/primitives";
 
 type PlanLiveToolbarProps = {
   liveEnabled: boolean;
@@ -17,8 +18,8 @@ export function PlanLiveToolbar(props: PlanLiveToolbarProps) {
   const { liveEnabled, target, live, filterSongsOnly, onUpdateLive, onSetLocked, onPrev, onNext, onSetFilterSongsOnly } = props;
 
   return (
-    <div className="panel cp-panel cp-panel-soft" style={{ marginTop: 12 }}>
-      <div className="cp-actions">
+    <Panel soft style={{ marginTop: 12 }}>
+      <ActionRow>
         <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input type="checkbox" checked={liveEnabled} onChange={(e) => onUpdateLive({ enabled: e.target.checked })} />
           Live
@@ -61,7 +62,7 @@ export function PlanLiveToolbar(props: PlanLiveToolbarProps) {
           <input type="checkbox" checked={filterSongsOnly} onChange={(e) => onSetFilterSongsOnly(e.target.checked)} />
           Chants uniquement
         </label>
-      </div>
-    </div>
+      </ActionRow>
+    </Panel>
   );
 }

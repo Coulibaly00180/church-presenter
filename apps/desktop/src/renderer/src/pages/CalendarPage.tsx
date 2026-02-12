@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { PageHeader, Panel } from "../ui/primitives";
 
 type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
 
@@ -72,21 +73,19 @@ export function CalendarPage() {
 
   return (
     <div className="cp-page">
-      <div className="cp-page-header">
-        <div>
-          <h1 className="cp-page-title">Calendrier</h1>
-          <div className="cp-page-subtitle">
-            Preparer en avance: chaque date peut avoir un ou plusieurs plans (culte, veillee, evenement).
-          </div>
-        </div>
-        <div className="cp-actions">
+      <PageHeader
+        title="Calendrier"
+        subtitle="Preparer en avance: chaque date peut avoir un ou plusieurs plans (culte, veillee, evenement)."
+        actions={
+          <>
           <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>{"<"}</button>
           <div style={{ fontWeight: 900, minWidth: 220, textAlign: "center" }}>{title}</div>
           <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>{">"}</button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <div className="panel cp-panel">
+      <Panel>
         <div
           style={{
             display: "grid",
@@ -143,7 +142,7 @@ export function CalendarPage() {
             );
           })}
         </div>
-      </div>
+      </Panel>
 
       <div className="cp-page-subtitle" style={{ fontSize: 12 }}>
         (Prochaine etape) ouvrir directement un plan depuis le calendrier + filtrer passe/avenir.

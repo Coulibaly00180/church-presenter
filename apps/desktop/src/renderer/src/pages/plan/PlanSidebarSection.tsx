@@ -1,6 +1,7 @@
 import React from "react";
 import { isoToYmd } from "./date";
 import { PlanListItem } from "./types";
+import { Panel } from "../../ui/primitives";
 
 type PlanSidebarSectionProps = {
   newDate: string;
@@ -19,7 +20,7 @@ export function PlanSidebarSection(props: PlanSidebarSectionProps) {
 
   return (
     <div className="cp-stack">
-      <div className="panel cp-panel">
+      <Panel>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
         <div style={{ display: "grid", gap: 8 }}>
           <label>
@@ -34,9 +35,9 @@ export function PlanSidebarSection(props: PlanSidebarSectionProps) {
             + Creer
           </button>
         </div>
-      </div>
+      </Panel>
 
-      <div className="panel cp-panel">
+      <Panel>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
           <div style={{ fontWeight: 800 }}>Plans</div>
           <span style={{ fontSize: 12, opacity: 0.6 }}>{plans.length} plan(s)</span>
@@ -62,7 +63,7 @@ export function PlanSidebarSection(props: PlanSidebarSectionProps) {
             </button>
           ))}
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

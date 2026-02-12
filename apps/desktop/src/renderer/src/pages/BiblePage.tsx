@@ -12,6 +12,7 @@ import {
   versesToText,
   listTranslations,
 } from "../bible/bollsApi";
+import { Alert, PageHeader, Panel } from "../ui/primitives";
 
 type ScreenKey = "A" | "B" | "C";
 type PlanListItem = { id: string; title?: string | null; date?: string | Date };
@@ -334,13 +335,11 @@ export function BiblePage() {
 
   return (
     <div className="cp-page">
-      <div className="cp-page-header">
-        <div>
-          <h1 className="cp-page-title">Bible</h1>
-          <div className="cp-page-subtitle">Rechercher, projeter et envoyer vers le plan (bolls.life).</div>
-        </div>
-
-        <div className="cp-actions">
+      <PageHeader
+        title="Bible"
+        subtitle="Rechercher, projeter et envoyer vers le plan (bolls.life)."
+        actions={
+          <>
           <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
             Langue
             <select
@@ -392,15 +391,16 @@ export function BiblePage() {
               <option value="C">Ecran C</option>
             </select>
           </label>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {err ? <div className="cp-alert cp-alert--error">Erreur : {err}</div> : null}
-      {info ? <div className="cp-alert cp-alert--success">{info}</div> : null}
+      {err ? <Alert tone="error">Erreur : {err}</Alert> : null}
+      {info ? <Alert tone="success">{info}</Alert> : null}
 
       <div className="cp-grid-main">
         <div className="cp-stack">
-          <div className="panel cp-panel">
+          <Panel>
             <div style={{ fontWeight: 800, marginBottom: 8 }}>Naviguer</div>
             <div style={{ display: "grid", gap: 8 }}>
             <label>
@@ -475,9 +475,9 @@ export function BiblePage() {
                 </button>
               </div>
             </div>
-          </div>
+          </Panel>
 
-          <div className="panel cp-panel">
+          <Panel>
             <div style={{ fontWeight: 800, marginBottom: 6 }}>Recherche texte (API bolls)</div>
             <input
               value={searchText}
@@ -503,10 +503,10 @@ export function BiblePage() {
                 <div style={{ opacity: 0.6, fontSize: 12 }}>Aucun resultat.</div>
               ) : null}
             </div>
-          </div>
+          </Panel>
         </div>
 
-        <div className="panel cp-panel">
+        <Panel>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div>
               <div style={{ fontWeight: 900 }}>{currentBook?.name ?? "—"}</div>
@@ -559,7 +559,7 @@ export function BiblePage() {
           <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
             Passage = un seul item avec tout le texte. Verset par verset = un item par verset pour faciliter la navigation live.
           </div>
-        </div>
+        </Panel>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
 
 type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
 type ImportDetail = { counts: CpDataImportCounts; errors: CpDataImportError[] };
@@ -58,15 +59,12 @@ export function HistoryPage() {
 
   return (
     <div className="cp-page">
-      <div>
-        <h1 className="cp-page-title">Historique</h1>
-        <p className="cp-page-subtitle">Plans passes (duplication et export JSON).</p>
-      </div>
+      <PageHeader title="Historique" subtitle="Plans passes (duplication et export JSON)." />
 
-      {msg ? <div className="cp-alert">{msg}</div> : null}
+      {msg ? <Alert>{msg}</Alert> : null}
 
       {importDetail ? (
-        <div className="panel cp-panel cp-panel-soft">
+        <Panel soft>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>
             Recap import: {importDetail.counts.songs} chants, {importDetail.counts.plans} plans
           </div>
@@ -84,10 +82,10 @@ export function HistoryPage() {
           <button onClick={() => setImportDetail(null)} style={{ marginTop: 6 }}>
             Fermer
           </button>
-        </div>
+        </Panel>
       ) : null}
 
-      <div className="cp-actions">
+      <ActionRow>
         <button
           onClick={async () => {
             try {
@@ -151,14 +149,14 @@ export function HistoryPage() {
         >
           Import JSON global
         </button>
-      </div>
+      </ActionRow>
 
       <div className="cp-stack">
         {plans.map((p) => (
-          <div key={p.id} className="panel cp-panel">
+          <Panel key={p.id}>
             <div style={{ fontWeight: 900 }}>{p.title || "Culte"}</div>
             <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
-            <div className="cp-actions" style={{ marginTop: 10 }}>
+            <ActionRow style={{ marginTop: 10 }}>
               <button
                 onClick={async () => {
                   try {
@@ -191,8 +189,8 @@ export function HistoryPage() {
               >
                 Exporter JSON
               </button>
-            </div>
-          </div>
+            </ActionRow>
+          </Panel>
         ))}
         {plans.length === 0 && <div style={{ opacity: 0.7 }}>Aucun plan.</div>}
       </div>

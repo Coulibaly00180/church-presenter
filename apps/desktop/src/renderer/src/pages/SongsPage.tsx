@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Alert, PageHeader, Panel } from "../ui/primitives";
 
 type ScreenKey = "A" | "B" | "C";
 
@@ -323,11 +324,12 @@ export function SongsPage() {
 
   return (
     <div className="cp-page">
-      <div className="cp-page-header" style={{ justifyContent: "flex-start" }}>
-        <div style={{ flex: 1 }}>
-          <h1 className="cp-page-title">Chants</h1>
-          <div className="cp-page-subtitle">Bibliotheque, projection, ajout au plan</div>
-        </div>
+      <PageHeader
+        title="Chants"
+        subtitle="Bibliotheque, projection, ajout au plan"
+        style={{ justifyContent: "flex-start" }}
+        actions={
+          <>
 
         <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
           Projeter vers
@@ -391,18 +393,20 @@ export function SongsPage() {
         >
           Importer des chants (docx / odt / json)
         </button>
-      </div>
+          </>
+        }
+      />
 
       {err ? (
-        <div className="cp-alert cp-alert--error">
+        <Alert tone="error">
           <b>Erreur :</b> {err}
-        </div>
+        </Alert>
       ) : null}
-      {info ? <div className={`cp-alert ${info.kind === "success" ? "cp-alert--success" : ""}`}>{info.text}</div> : null}
+      {info ? <Alert tone={info.kind}>{info.text}</Alert> : null}
 
       <div className="cp-grid-main cp-grid-main--songs">
         {/* LEFT list */}
-        <div className="panel cp-panel" style={{ padding: 0 }}>
+        <Panel style={{ padding: 0 }}>
           <div style={{ padding: 14, borderBottom: "1px solid var(--border)" }}>
             <input
               value={q}
@@ -461,10 +465,10 @@ export function SongsPage() {
               <div style={{ padding: 10, opacity: 0.7 }}>Aucun chant.</div>
             ) : null}
           </div>
-        </div>
+        </Panel>
 
         {/* RIGHT editor */}
-        <div className="panel cp-panel">
+        <Panel>
           {!song ? (
             <div style={{ opacity: 0.7 }}>Sélectionne un chant à gauche ou crée-en un.</div>
           ) : (
@@ -573,7 +577,7 @@ export function SongsPage() {
               </div>
             </>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );

@@ -8,12 +8,7 @@ import { PlanLiveToolbar } from "./plan/PlanLiveToolbar";
 import { PlanSidebarSection } from "./plan/PlanSidebarSection";
 import { projectPlanItemToTarget } from "./plan/projection";
 import { LiveState, Plan, PlanListItem } from "./plan/types";
-
-function toastClass(kind: "info" | "success" | "error") {
-  if (kind === "error") return "cp-alert cp-alert--error";
-  if (kind === "success") return "cp-alert cp-alert--success";
-  return "cp-alert";
-}
+import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
 
 export function PlanPage() {
   const canUse = !!window.cp?.plans && !!window.cp?.projection && !!window.cp?.projectionWindow;
@@ -125,13 +120,11 @@ export function PlanPage() {
 
   return (
     <div className="cp-page">
-      <div className="cp-page-header">
-        <div>
-          <h1 className="cp-page-title">Plan</h1>
-          <div className="cp-page-subtitle">Projection: {projOpen ? "ouverte" : "fermee"}</div>
-        </div>
-
-        <div className="cp-actions">
+      <PageHeader
+        title="Plan"
+        subtitle={`Projection: ${projOpen ? "ouverte" : "fermee"}`}
+        actions={
+          <>
           <span className={`badge ${projOpen ? "cp-badge-open" : "cp-badge-closed"}`}>{projOpen ? "Projection ON" : "Projection OFF"}</span>
           <button
             className="btn-primary"
@@ -148,10 +141,11 @@ export function PlanPage() {
             {projOpen ? "Fermer" : "Ouvrir"}
           </button>
           <button onClick={() => window.cp.live?.resume()}>Reprendre live</button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      {toast ? <div className={toastClass(toast.kind)}>{toast.text}</div> : null}
+      {toast ? <Alert tone={toast.kind}>{toast.text}</Alert> : null}
 
       <div className="cp-grid-main">
         <PlanSidebarSection
@@ -170,7 +164,7 @@ export function PlanPage() {
           onSelectPlan={loadPlan}
         />
 
-        <div className="panel cp-panel">
+        <Panel>
           {!plan ? (
             <div style={{ opacity: 0.75 }}>Selectionne un plan a gauche.</div>
           ) : (
@@ -184,7 +178,7 @@ export function PlanPage() {
                   ) : null}
                 </div>
 
-                <div className="cp-actions">
+                <ActionRow>
                   <button
                     className="btn-primary"
                     onClick={async () => {
@@ -204,7 +198,7 @@ export function PlanPage() {
                   >
                     Supprimer
                   </button>
-                </div>
+                </ActionRow>
               </div>
 
               <PlanLiveToolbar
@@ -239,7 +233,7 @@ export function PlanPage() {
               />
             </>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );

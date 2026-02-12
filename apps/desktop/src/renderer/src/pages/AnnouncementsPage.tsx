@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -114,11 +115,11 @@ export function AnnouncementsPage() {
 
   return (
     <div className="cp-page">
-      <div className="cp-page-header">
-        <div>
-          <h1 className="cp-page-title">Annonces</h1>
-          <div className="cp-page-subtitle">Importer des PDF ou saisir une annonce texte puis ajouter au plan.</div>
-        </div>
+      <PageHeader
+        title="Annonces"
+        subtitle="Importer des PDF ou saisir une annonce texte puis ajouter au plan."
+        actions={
+          <>
         <button
           className="btn-primary"
           onClick={async () => {
@@ -143,13 +144,15 @@ export function AnnouncementsPage() {
             <option value="C">Ecran C</option>
           </select>
         </label>
-      </div>
+          </>
+        }
+      />
 
-      {err ? <div className="cp-alert cp-alert--error">{err}</div> : null}
-      {info ? <div className="cp-alert cp-alert--success">{info}</div> : null}
+      {err ? <Alert tone="error">{err}</Alert> : null}
+      {info ? <Alert tone="success">{info}</Alert> : null}
 
       <div className="cp-grid-main">
-        <div className="panel cp-panel">
+        <Panel>
           <div style={{ fontWeight: 800, marginBottom: 8 }}>Annonce texte</div>
           <label>
             Titre
@@ -189,9 +192,9 @@ export function AnnouncementsPage() {
           <button onClick={() => projectText(manualTitle, manualContent)} style={{ marginTop: 6 }} disabled={!manualContent && !manualTitle}>
             Projeter maintenant
           </button>
-        </div>
+        </Panel>
 
-        <div className="panel cp-panel">
+        <Panel>
           <div style={{ fontWeight: 800, marginBottom: 8 }}>PDF importes ({pdfs.length})</div>
           <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
@@ -234,7 +237,7 @@ export function AnnouncementsPage() {
                       Page choisie: {parseInt(pdfPage || "1", 10) || 1} / {pageCounts[f.path]}
                     </div>
                   ) : null}
-                  <div className="cp-actions">
+                  <ActionRow>
                     <button
                       className="btn-primary"
                       onClick={async () => {
@@ -260,7 +263,7 @@ export function AnnouncementsPage() {
                     >
                       Projeter
                     </button>
-                  </div>
+                  </ActionRow>
                 </div>
                 <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                   <button
@@ -279,7 +282,7 @@ export function AnnouncementsPage() {
             ))}
             {pdfs.length === 0 ? <div style={{ opacity: 0.6 }}>Aucun PDF importe pour le moment.</div> : null}
           </div>
-        </div>
+        </Panel>
       </div>
     </div>
   );

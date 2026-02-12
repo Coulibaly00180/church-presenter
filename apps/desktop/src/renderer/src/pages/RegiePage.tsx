@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
 
 type LivePatch = {
   planId?: string | null;
@@ -177,15 +178,13 @@ export function RegiePage() {
 
   return (
     <div className="cp-page">
-      <div className="panel cp-panel">
-        <div className="cp-page-header">
-          <div>
-            <h1 className="cp-page-title" style={{ fontSize: 24, marginBottom: 4 }}>
-              Live / Projection
-            </h1>
-            <div className="cp-page-subtitle">{status}</div>
-          </div>
-          <div className="cp-actions">
+      <Panel>
+        <PageHeader
+          title="Live / Projection"
+          subtitle={status}
+          titleStyle={{ fontSize: 24, marginBottom: 4 }}
+          actions={
+            <>
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
               <input type="checkbox" checked={!!live?.enabled} onChange={(e) => updateLive({ enabled: e.target.checked })} />
               Live
@@ -209,10 +208,11 @@ export function RegiePage() {
                 </button>
               ))}
             </div>
-          </div>
-        </div>
+            </>
+          }
+        />
 
-        <div className="cp-actions" style={{ marginTop: 10 }}>
+        <ActionRow style={{ marginTop: 10 }}>
           <button onClick={() => window.cp.live?.toggleBlack()}>Noir (B)</button>
           <button onClick={() => window.cp.live?.toggleWhite()}>Blanc (W)</button>
           <button onClick={() => window.cp.live?.resume()}>Reprendre (R)</button>
@@ -267,12 +267,12 @@ export function RegiePage() {
               </label>
             ))}
           </div>
-        </div>
-      </div>
+        </ActionRow>
+      </Panel>
 
-      <div className="panel cp-panel">
+      <Panel>
         <div style={{ fontWeight: 900, marginBottom: 4 }}>Ecrans (ouvrir / miroir)</div>
-        <div className="cp-actions">
+        <ActionRow>
           <button
             onClick={async () => {
               const r = await window.cp.projectionWindow.open();
@@ -318,13 +318,13 @@ export function RegiePage() {
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_A")}>DevTools A</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_B")}>DevTools B</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_C")}>DevTools C</button>
-        </div>
+        </ActionRow>
         <div className="cp-page-subtitle" style={{ fontSize: 12, marginTop: 6 }}>
           Astuce: B/C en miroir suivent A. Decoche pour utiliser en ecran libre (versets, annonces...).
         </div>
-      </div>
+      </Panel>
 
-      <div className="panel cp-panel" style={{ maxWidth: 980 }}>
+      <Panel style={{ maxWidth: 980 }}>
         <h2 style={{ margin: 0, fontSize: 20 }}>Texte rapide</h2>
 
         <label>
@@ -337,7 +337,7 @@ export function RegiePage() {
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="cp-input-full" style={{ fontSize: 16 }} />
         </label>
 
-        <div className="cp-actions">
+        <ActionRow>
           <button
             className="btn-primary"
             onClick={async () => {
@@ -356,9 +356,9 @@ export function RegiePage() {
           </button>
           <button onClick={() => window.cp.devtools?.open?.("REGIE")}>DevTools Regie</button>
           <button onClick={() => window.cp.devtools?.open?.("PROJECTION")}>DevTools Projection</button>
-        </div>
+        </ActionRow>
 
-        <div className="panel cp-panel cp-panel-soft" style={{ marginTop: 4 }}>
+        <Panel soft style={{ marginTop: 4 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Blocs (clic ou ^/v)</div>
           {splitBlocks(body).length === 0 ? (
             <div style={{ opacity: 0.7 }}>Aucun bloc (separe avec des lignes vides).</div>
@@ -389,13 +389,13 @@ export function RegiePage() {
               })}
             </div>
           )}
-        </div>
+        </Panel>
 
-        <div className="cp-alert" style={{ marginTop: 8, fontSize: 13 }}>
+        <Alert style={{ marginTop: 8, fontSize: 13 }}>
           <div style={{ fontWeight: 700 }}>Raccourcis</div>
           <div>{"1/2/3 = cible A/B/C * <-/-> = plan live prev/next * B/W/R = noir/blanc/reprendre * ^/v = bloc * Entree/Espace = projeter bloc"}</div>
-        </div>
-      </div>
+        </Alert>
+      </Panel>
     </div>
   );
 }
