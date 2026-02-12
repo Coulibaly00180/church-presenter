@@ -49,39 +49,31 @@ export function HistoryPage() {
 
   if (!canUse) {
     return (
-      <div style={{ fontFamily: "system-ui", padding: 16 }}>
-        <h1 style={{ margin: 0 }}>Historique</h1>
-        <p style={{ color: "crimson" }}>Preload non charge (window.cp.plans indisponible).</p>
+      <div className="cp-page">
+        <h1 className="cp-page-title">Historique</h1>
+        <p style={{ color: "crimson", margin: 0 }}>Preload non charge (window.cp.plans indisponible).</p>
       </div>
     );
   }
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16 }}>
-      <h1 style={{ margin: 0 }}>Historique</h1>
-      <p style={{ opacity: 0.75, marginTop: 8 }}>Plans passes (duplication et export JSON).</p>
+    <div className="cp-page">
+      <div>
+        <h1 className="cp-page-title">Historique</h1>
+        <p className="cp-page-subtitle">Plans passes (duplication et export JSON).</p>
+      </div>
 
-      {msg ? (
-        <div style={{ marginTop: 8, padding: 10, border: "1px solid #cbd5ff", background: "#eef2ff", borderRadius: 10 }}>{msg}</div>
-      ) : null}
+      {msg ? <div className="cp-alert">{msg}</div> : null}
 
       {importDetail ? (
-        <div
-          style={{
-            marginTop: 10,
-            padding: 12,
-            border: "1px solid #e4e4e7",
-            background: "#fafafa",
-            borderRadius: 12,
-          }}
-        >
+        <div className="panel cp-panel cp-panel-soft">
           <div style={{ fontWeight: 800, marginBottom: 6 }}>
             Recap import: {importDetail.counts.songs} chants, {importDetail.counts.plans} plans
           </div>
           {importDetail.errors.length === 0 ? (
             <div style={{ color: "#166534" }}>Aucune erreur.</div>
           ) : (
-            <div style={{ maxHeight: 200, overflow: "auto", borderTop: "1px solid #e4e4e7", paddingTop: 6 }}>
+            <div style={{ maxHeight: 200, overflow: "auto", borderTop: "1px solid var(--border)", paddingTop: 6 }}>
               {importDetail.errors.map((e, idx) => (
                 <div key={idx} style={{ fontSize: 13, marginBottom: 4, color: "#b91c1c" }}>
                   [{e.kind}] {e.title || "??"} - {e.message}
@@ -95,7 +87,7 @@ export function HistoryPage() {
         </div>
       ) : null}
 
-      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+      <div className="cp-actions">
         <button
           onClick={async () => {
             try {
@@ -161,12 +153,12 @@ export function HistoryPage() {
         </button>
       </div>
 
-      <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+      <div className="cp-stack">
         {plans.map((p) => (
-          <div key={p.id} style={{ border: "1px solid #e6e6e6", borderRadius: 12, padding: 12, background: "white" }}>
+          <div key={p.id} className="panel cp-panel">
             <div style={{ fontWeight: 900 }}>{p.title || "Culte"}</div>
             <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            <div className="cp-actions" style={{ marginTop: 10 }}>
               <button
                 onClick={async () => {
                   try {

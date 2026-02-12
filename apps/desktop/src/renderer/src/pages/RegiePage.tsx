@@ -176,20 +176,18 @@ export function RegiePage() {
   }, [body, blockCursor, target, title]);
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16, display: "grid", gap: 16 }}>
-      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12, display: "grid", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <div className="cp-page">
+      <div className="panel cp-panel">
+        <div className="cp-page-header">
           <div>
-            <div style={{ fontWeight: 900, fontSize: 20 }}>Live / Projection</div>
-            <div style={{ opacity: 0.75 }}>{status}</div>
+            <h1 className="cp-page-title" style={{ fontSize: 24, marginBottom: 4 }}>
+              Live / Projection
+            </h1>
+            <div className="cp-page-subtitle">{status}</div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div className="cp-actions">
             <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <input
-                type="checkbox"
-                checked={!!live?.enabled}
-                onChange={(e) => updateLive({ enabled: e.target.checked })}
-              />
+              <input type="checkbox" checked={!!live?.enabled} onChange={(e) => updateLive({ enabled: e.target.checked })} />
               Live
             </label>
             <div style={{ display: "flex", gap: 6 }}>
@@ -199,8 +197,8 @@ export function RegiePage() {
                   onClick={() => updateLive({ target: k })}
                   style={{
                     padding: "6px 10px",
-                    borderRadius: 8,
-                    border: target === k ? "2px solid #111" : "1px solid #ddd",
+                    borderRadius: 10,
+                    border: target === k ? "2px solid #111" : "1px solid var(--border)",
                     background: target === k ? "#111" : "white",
                     color: target === k ? "white" : "#111",
                     fontWeight: 800,
@@ -214,22 +212,12 @@ export function RegiePage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button onClick={() => window.cp.live?.toggleBlack()} style={{ padding: "10px 14px" }}>
-            Noir (B)
-          </button>
-          <button onClick={() => window.cp.live?.toggleWhite()} style={{ padding: "10px 14px" }}>
-            Blanc (W)
-          </button>
-          <button onClick={() => window.cp.live?.resume()} style={{ padding: "10px 14px" }}>
-            Reprendre (R)
-          </button>
-          <button
-            onClick={() => window.cp.projection.setState({ lowerThirdEnabled: !(stateA?.lowerThirdEnabled ?? false) })}
-            style={{ padding: "10px 14px" }}
-          >
-            Lower Third (L)
-          </button>
+        <div className="cp-actions" style={{ marginTop: 10 }}>
+          <button onClick={() => window.cp.live?.toggleBlack()}>Noir (B)</button>
+          <button onClick={() => window.cp.live?.toggleWhite()}>Blanc (W)</button>
+          <button onClick={() => window.cp.live?.resume()}>Reprendre (R)</button>
+          <button onClick={() => window.cp.projection.setState({ lowerThirdEnabled: !(stateA?.lowerThirdEnabled ?? false) })}>Lower Third (L)</button>
+
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontWeight: 700 }}>Taille</span>
             <button
@@ -252,6 +240,7 @@ export function RegiePage() {
               +
             </button>
           </div>
+
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontWeight: 700 }}>Fond</span>
             <input
@@ -260,6 +249,7 @@ export function RegiePage() {
               onChange={(e) => window.cp.projection.setAppearance({ background: e.target.value })}
             />
           </div>
+
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <span style={{ fontWeight: 700 }}>Texte</span>
             <input
@@ -268,14 +258,11 @@ export function RegiePage() {
               onChange={(e) => window.cp.projection.setAppearance({ foreground: e.target.value })}
             />
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 10 }}>
+
+          <div className="cp-chip-row" style={{ marginLeft: 10 }}>
             {(["A", "B", "C"] as ScreenKey[]).map((k) => (
               <label key={k} style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <input
-                  type="checkbox"
-                  checked={!!locked[k]}
-                  onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)}
-                />
+                <input type="checkbox" checked={!!locked[k]} onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)} />
                 Lock {k}
               </label>
             ))}
@@ -283,9 +270,9 @@ export function RegiePage() {
         </div>
       </div>
 
-      <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12, display: "grid", gap: 8 }}>
+      <div className="panel cp-panel">
         <div style={{ fontWeight: 900, marginBottom: 4 }}>Ecrans (ouvrir / miroir)</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="cp-actions">
           <button
             onClick={async () => {
               const r = await window.cp.projectionWindow.open();
@@ -294,6 +281,7 @@ export function RegiePage() {
           >
             {projOpenA ? "A ouvert" : "Ouvrir A"}
           </button>
+
           {(["B", "C"] as ScreenKey[]).map((k) => {
             const meta = screens.find((s) => s.key === k);
             const isOpen = !!meta?.isOpen;
@@ -326,35 +314,32 @@ export function RegiePage() {
               </div>
             );
           })}
+
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_A")}>DevTools A</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_B")}>DevTools B</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_C")}>DevTools C</button>
         </div>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>
+        <div className="cp-page-subtitle" style={{ fontSize: 12, marginTop: 6 }}>
           Astuce: B/C en miroir suivent A. Decoche pour utiliser en ecran libre (versets, annonces...).
         </div>
       </div>
 
-      <div style={{ display: "grid", gap: 10, maxWidth: 900 }}>
-        <h2 style={{ margin: 0 }}>Texte rapide</h2>
+      <div className="panel cp-panel" style={{ maxWidth: 980 }}>
+        <h2 style={{ margin: 0, fontSize: 20 }}>Texte rapide</h2>
 
         <label>
           <div style={{ fontWeight: 700 }}>Titre</div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%", padding: 10, fontSize: 16 }} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className="cp-input-full" style={{ fontSize: 16 }} />
         </label>
 
         <label>
           <div style={{ fontWeight: 700 }}>Texte</div>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={8}
-            style={{ width: "100%", padding: 10, fontSize: 16 }}
-          />
+          <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="cp-input-full" style={{ fontSize: 16 }} />
         </label>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="cp-actions">
           <button
+            className="btn-primary"
             onClick={async () => {
               const blocks = splitBlocks(body);
               if (blocks.length === 0) {
@@ -365,19 +350,15 @@ export function RegiePage() {
               setBlockCursor(0);
               await projectText(target, title, blocks[0]);
             }}
-            style={{ padding: "10px 14px", fontSize: 16 }}
+            style={{ fontSize: 16 }}
           >
             Afficher
           </button>
-          <button onClick={() => window.cp.devtools?.open?.("REGIE")} style={{ padding: "10px 14px" }}>
-            DevTools Regie
-          </button>
-          <button onClick={() => window.cp.devtools?.open?.("PROJECTION")} style={{ padding: "10px 14px" }}>
-            DevTools Projection
-          </button>
+          <button onClick={() => window.cp.devtools?.open?.("REGIE")}>DevTools Regie</button>
+          <button onClick={() => window.cp.devtools?.open?.("PROJECTION")}>DevTools Projection</button>
         </div>
 
-        <div style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8 }}>
+        <div className="panel cp-panel cp-panel-soft" style={{ marginTop: 4 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>Blocs (clic ou ^/v)</div>
           {splitBlocks(body).length === 0 ? (
             <div style={{ opacity: 0.7 }}>Aucun bloc (separe avec des lignes vides).</div>
@@ -396,7 +377,7 @@ export function RegiePage() {
                       textAlign: "left",
                       padding: 10,
                       borderRadius: 10,
-                      border: active ? "2px solid #111" : "1px solid #ddd",
+                      border: active ? "2px solid #111" : "1px solid var(--border)",
                       background: "white",
                       cursor: "pointer",
                     }}
@@ -410,11 +391,9 @@ export function RegiePage() {
           )}
         </div>
 
-        <div style={{ marginTop: 8, padding: 12, background: "#f5f5f5", borderRadius: 8, fontSize: 13 }}>
+        <div className="cp-alert" style={{ marginTop: 8, fontSize: 13 }}>
           <div style={{ fontWeight: 700 }}>Raccourcis</div>
-          <div>
-            {"1/2/3 = cible A/B/C * <-/-> = plan live prev/next * B/W/R = noir/blanc/reprendre * ^/v = bloc * Entree/Espace = projeter bloc"}
-          </div>
+          <div>{"1/2/3 = cible A/B/C * <-/-> = plan live prev/next * B/W/R = noir/blanc/reprendre * ^/v = bloc * Entree/Espace = projeter bloc"}</div>
         </div>
       </div>
     </div>

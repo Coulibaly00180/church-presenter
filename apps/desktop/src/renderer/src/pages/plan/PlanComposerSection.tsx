@@ -200,13 +200,13 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="cp-stack">
       <div style={{ fontWeight: 800 }}>Ajouter un element</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
         <label>
           <div style={{ fontWeight: 600 }}>Type</div>
-          <select value={addKind} onChange={(e) => setAddKind(e.target.value)} style={{ width: "100%", padding: 10 }}>
+          <select value={addKind} onChange={(e) => setAddKind(e.target.value)} className="cp-input-full">
             <option value="ANNOUNCEMENT_TEXT">ANNOUNCEMENT_TEXT</option>
             <option value="VERSE_MANUAL">VERSE_MANUAL</option>
             <option value="BIBLE_VERSE">BIBLE_VERSE</option>
@@ -217,13 +217,13 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
         </label>
         <label>
           <div style={{ fontWeight: 600 }}>Titre</div>
-          <input value={addTitle} onChange={(e) => setAddTitle(e.target.value)} style={{ width: "100%", padding: 10 }} />
+          <input value={addTitle} onChange={(e) => setAddTitle(e.target.value)} className="cp-input-full" />
         </label>
       </div>
 
       <label>
         <div style={{ fontWeight: 600 }}>Contenu</div>
-        <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} style={{ width: "100%", padding: 10 }} />
+        <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} className="cp-input-full" />
       </label>
 
       {(addKind === "ANNOUNCEMENT_IMAGE" || addKind === "ANNOUNCEMENT_PDF") && (
@@ -234,7 +234,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
               setAddContent(res.path);
             }
           }}
-          style={{ padding: "8px 10px", width: 220 }}
+          style={{ width: 220 }}
         >
           Choisir fichier
         </button>
@@ -247,12 +247,13 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
             min={1}
             value={addPdfPage}
             onChange={(e) => setAddPdfPage(e.target.value)}
-            style={{ width: "100%", padding: 10 }}
+            className="cp-input-full"
           />
         </label>
       ) : null}
 
       <button
+        className="btn-primary"
         onClick={async () => {
           const mediaPath =
             addKind === "ANNOUNCEMENT_PDF" && addContent
@@ -271,19 +272,19 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
           await reloadPlan(plan.id);
           showToast("success", "Element ajoute au plan");
         }}
-        style={{ padding: "10px 14px", width: 220 }}
+        style={{ width: 220 }}
       >
         + Ajouter
       </button>
 
-      <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
+      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
         <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un chant (recherche)</div>
         <div style={{ position: "relative" }}>
           <input
             value={songSearch}
             onChange={(e) => setSongSearch(e.target.value)}
             placeholder="Titre, artiste..."
-            style={{ width: "100%", padding: 10 }}
+            className="cp-input-full"
           />
           {songResults.length > 0 ? (
             <div
@@ -295,7 +296,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                 background: "white",
                 border: "1px solid var(--border)",
                 borderRadius: 12,
-                boxShadow: "var(--shadow)",
+                boxShadow: "var(--shadow-sm)",
                 zIndex: 5,
                 maxHeight: 200,
                 overflow: "auto",
@@ -308,7 +309,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                   style={{
                     padding: 10,
                     cursor: "pointer",
-                    borderBottom: "1px solid #f1f5f9",
+                    borderBottom: "1px solid var(--border)",
                   }}
                 >
                   <div style={{ fontWeight: 700 }}>{s.title}</div>
@@ -322,14 +323,14 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
         </div>
       </div>
 
-      <div style={{ borderTop: "1px solid #eee", paddingTop: 8 }}>
+      <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
         <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un verset/passage</div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+        <div className="cp-actions" style={{ marginBottom: 6 }}>
           <input
             value={bibleRef}
             onChange={(e) => setBibleRef(e.target.value)}
             placeholder="Ex: Jean 3:16-18"
-            style={{ flex: 1, padding: 10 }}
+            style={{ flex: 1 }}
           />
           <select
             value={bibleTranslation}
@@ -337,14 +338,14 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
               const value = e.target.value;
               if (isBibleTranslation(value)) setBibleTranslation(value);
             }}
-            style={{ padding: 10, minWidth: 180 }}
+            style={{ minWidth: 180 }}
           >
             <option value="LSG">Traduction preferee : LSG (bolls)</option>
             <option value="FRLSG">FRLSG (bolls)</option>
             <option value="WEB">WEB (bolls)</option>
             <option value="LSG1910">LSG1910 offline</option>
           </select>
-          <button onClick={fetchBible} disabled={bibleLoading} style={{ padding: "10px 12px" }}>
+          <button onClick={fetchBible} disabled={bibleLoading}>
             {bibleLoading ? "..." : "Chercher"}
           </button>
         </div>
@@ -354,7 +355,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
             value={bibleSearchText}
             onChange={(e) => setBibleSearchText(e.target.value)}
             placeholder="Mot ou expression"
-            style={{ width: "100%" }}
+            className="cp-input-full"
           />
           {bibleSearchLoading ? <div style={{ opacity: 0.7, fontSize: 12 }}>Recherche...</div> : null}
           <div style={{ maxHeight: 160, overflow: "auto", display: "grid", gap: 6, marginTop: 6 }}>
@@ -421,8 +422,8 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
             {bibleReference || bibleRef}: {bibleVerses.length} versets
           </div>
         ) : null}
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => addBibleToPlan("PASSAGE")} disabled={bibleVerses.length === 0}>
+        <div className="cp-actions">
+          <button className="btn-primary" onClick={() => addBibleToPlan("PASSAGE")} disabled={bibleVerses.length === 0}>
             Ajouter passage
           </button>
           <button onClick={() => addBibleToPlan("VERSES")} disabled={bibleVerses.length === 0}>
