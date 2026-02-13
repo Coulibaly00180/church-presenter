@@ -165,7 +165,7 @@ export function RegiePage() {
           subtitle={status}
           titleClassName="cp-page-title-lg"
           actions={
-            <ActionRow>
+            <ActionRow className="cp-toolbar-row">
               <LiveEnabledToggle value={!!live?.enabled} onChange={(enabled) => updateLive({ enabled })} />
               <LiveTargetButtons
                 target={target}
@@ -184,7 +184,7 @@ export function RegiePage() {
           }
         />
 
-        <ActionRow className="cp-mt-10">
+        <ActionRow className="cp-mt-10 cp-toolbar-row">
           <LiveModeButtons
             onBlack={() => window.cp.live?.toggleBlack()}
             onWhite={() => window.cp.live?.toggleWhite()}
@@ -244,7 +244,7 @@ export function RegiePage() {
 
       <Panel>
         <div className="cp-section-label">Ecrans (ouvrir / miroir)</div>
-        <ActionRow>
+        <ActionRow className="cp-toolbar-row">
           <button
             onClick={async () => {
               const r = await window.cp.projectionWindow.open();
@@ -307,7 +307,7 @@ export function RegiePage() {
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="cp-input-full cp-input-lg" />
         </Field>
 
-        <ActionRow>
+        <ActionRow className="cp-toolbar-row">
           <button
             className="btn-primary cp-btn-lg"
             onClick={async () => {

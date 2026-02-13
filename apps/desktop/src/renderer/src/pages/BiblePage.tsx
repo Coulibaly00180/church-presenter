@@ -316,11 +316,13 @@ export function BiblePage() {
 
   return (
     <div className="cp-page">
-      <PageHeader
-        title="Bible"
-        subtitle="Rechercher, projeter et envoyer vers le plan (bolls.life)."
-        actions={
-          <>
+      <PageHeader title="Bible" subtitle="Rechercher, projeter et envoyer vers le plan (bolls.life)." />
+
+      {err ? <Alert tone="error">Erreur : {err}</Alert> : null}
+      {info ? <Alert tone="success">{info}</Alert> : null}
+
+      <Panel soft className="cp-toolbar-panel">
+        <ActionRow className="cp-toolbar-row">
           <InlineField label="Langue">
             <select
               value={translationLanguage}
@@ -360,12 +362,8 @@ export function BiblePage() {
             onChange={setPlanId}
           />
           <ProjectionTargetField value={target} onChange={setTarget} />
-          </>
-        }
-      />
-
-      {err ? <Alert tone="error">Erreur : {err}</Alert> : null}
-      {info ? <Alert tone="success">{info}</Alert> : null}
+        </ActionRow>
+      </Panel>
 
       <div className="cp-grid-main">
         <div className="cp-stack">
