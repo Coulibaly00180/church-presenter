@@ -44,7 +44,12 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 8px;
+  row-gap: 8px;
   flex-wrap: wrap;
+}
+
+.cp-actions > * {
+  min-width: 0;
 }
 
 .cp-field {
@@ -1130,12 +1135,51 @@ textarea:focus-visible {
     gap: 12px;
   }
 
+  .cp-page-header {
+    align-items: flex-start;
+  }
+
+  .cp-page-header > :first-child,
+  .cp-page-header > .cp-actions {
+    width: 100%;
+  }
+
+  .cp-page-header .cp-actions > button,
+  .cp-page-header .cp-actions > input,
+  .cp-page-header .cp-actions > select,
+  .cp-page-header .cp-actions > .badge {
+    width: 100%;
+  }
+
+  .cp-page-header .cp-actions > .cp-inline-field {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .cp-inline-row-tight {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .cp-target-picker > button {
+    flex: 1 1 72px;
+  }
+
+  .cp-shell-brand {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
   .cp-calendar-grid {
     grid-template-columns: 1fr;
   }
 
   .cp-calendar-month-title {
     min-width: 0;
+  }
+
+  .cp-calendar-day {
+    min-height: 0;
   }
 
   .cp-input-min-180,

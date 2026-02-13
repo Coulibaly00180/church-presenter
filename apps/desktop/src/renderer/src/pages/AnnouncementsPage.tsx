@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
+import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -136,13 +137,7 @@ export function AnnouncementsPage() {
             >
               Importer un PDF
             </button>
-            <InlineField label="Projeter vers">
-              <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
-                <option value="A">Ecran A</option>
-                <option value="B">Ecran B</option>
-                <option value="C">Ecran C</option>
-              </select>
-            </InlineField>
+            <ProjectionTargetField value={target} onChange={setTarget} />
           </>
         }
       />
@@ -203,15 +198,17 @@ export function AnnouncementsPage() {
                 className="cp-input-narrow"
               />
             </InlineField>
-            <InlineField label="Plan">
-              <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title || "Culte"} {formatDate(p)}
-                  </option>
-                ))}
-              </select>
-            </InlineField>
+            <PlanSelectField
+              value={planId}
+              plans={plans}
+              getPlanId={(p) => p.id}
+              getPlanLabel={(p) => (
+                <>
+                  {p.title || "Culte"} {formatDate(p)}
+                </>
+              )}
+              onChange={setPlanId}
+            />
           </ActionRow>
 
           <div className="cp-grid-card-list">

@@ -13,6 +13,7 @@ import {
   listTranslations,
 } from "../bible/bollsApi";
 import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
+import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 
 type ScreenKey = "A" | "B" | "C";
 type PlanListItem = { id: string; title?: string | null; date?: string | Date };
@@ -375,22 +376,14 @@ export function BiblePage() {
               ))}
             </select>
           </InlineField>
-          <InlineField label="Plan">
-            <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {formatPlanLabel(p)}
-                </option>
-              ))}
-            </select>
-          </InlineField>
-          <InlineField label="Projeter vers">
-            <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
-              <option value="A">Ecran A</option>
-              <option value="B">Ecran B</option>
-              <option value="C">Ecran C</option>
-            </select>
-          </InlineField>
+          <PlanSelectField
+            value={planId}
+            plans={plans}
+            getPlanId={(p) => p.id}
+            getPlanLabel={formatPlanLabel}
+            onChange={setPlanId}
+          />
+          <ProjectionTargetField value={target} onChange={setTarget} />
           </>
         }
       />

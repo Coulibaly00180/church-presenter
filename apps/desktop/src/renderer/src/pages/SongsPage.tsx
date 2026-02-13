@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
+import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
+import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 
 type ScreenKey = "A" | "B" | "C";
 
@@ -334,23 +335,20 @@ export function SongsPage() {
         className="cp-page-header-start"
         actions={
           <>
-            <InlineField label="Projeter vers" wide>
-              <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
-                <option value="A">Ecran A</option>
-                <option value="B">Ecran B</option>
-                <option value="C">Ecran C</option>
-              </select>
-            </InlineField>
+            <ProjectionTargetField value={target} onChange={setTarget} wide />
 
-            <InlineField label="Plan" wide>
-              <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title || "Culte"} {formatPlanDate(p) ? `(${formatPlanDate(p)})` : ""}
-                  </option>
-                ))}
-              </select>
-            </InlineField>
+            <PlanSelectField
+              value={planId}
+              plans={plans}
+              getPlanId={(p) => p.id}
+              getPlanLabel={(p) => (
+                <>
+                  {p.title || "Culte"} {formatPlanDate(p) ? `(${formatPlanDate(p)})` : ""}
+                </>
+              )}
+              onChange={setPlanId}
+              wide
+            />
 
         <input
           value={newSongTitle}
