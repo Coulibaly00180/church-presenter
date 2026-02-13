@@ -407,7 +407,10 @@ export function registerSongsIpc() {
     const song = await prisma.song.findUnique({ where: { id: songId }, include: { blocks: { orderBy: { order: "asc" } } } });
     if (!song) throw new Error("Song not found");
 
-    const lyrics = (song.blocks || []).map((b) => (b.content || "").trim()).filter(Boolean).join("\n\n");
+    const lyrics = (song.blocks || [])
+      .map((b: { content?: string | null }) => (b.content || "").trim())
+      .filter(Boolean)
+      .join("\n\n");
     const doc = new Document({
       sections: [
         {

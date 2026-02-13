@@ -185,7 +185,7 @@ export function registerPlansIpc() {
       select: { id: true },
     });
 
-    const currentIds = currentItems.map((it) => it.id);
+    const currentIds = currentItems.map((it: { id: string }) => it.id);
     const requestedIds = payload.orderedItemIds ?? [];
     validatePlanReorderPayload(currentIds, requestedIds);
 
