@@ -68,18 +68,18 @@ export function AppShell() {
             <div className="cp-shell-title">Church Presenter</div>
             <div className="cp-shell-subtitle">Regie / Projection</div>
           </div>
-          <span className={cls("badge", projOpen ? "cp-badge-open" : "cp-badge-closed")} style={{ fontSize: 11 }}>
+          <span className={cls("badge", "cp-shell-badge", projOpen ? "cp-badge-open" : "cp-badge-closed")}>
             {projOpen ? "Projection ouverte" : "Projection fermee"}
           </span>
         </div>
 
         <div className="panel cp-panel cp-panel-soft cp-shell-projection-card">
-          <div className="cp-page-header" style={{ alignItems: "center", gap: 8 }}>
-            <div style={{ fontWeight: 700 }}>Projection</div>
-            <div style={{ fontSize: 12, color: "#475569" }}>Ctrl+P pour basculer</div>
+          <div className="cp-shell-projection-head">
+            <div className="cp-shell-projection-title">Projection</div>
+            <div className="cp-shell-projection-subtitle">Ctrl+P pour basculer</div>
           </div>
           <button
-            className="btn-primary"
+            className="btn-primary cp-shell-toggle"
             disabled={!canUse}
             onClick={async () => {
               if (!canUse) return;
@@ -91,11 +91,10 @@ export function AppShell() {
                 setProjOpen(!!r?.isOpen);
               }
             }}
-            style={{ width: "100%", marginTop: 10 }}
           >
             {projOpen ? "Fermer la projection" : "Ouvrir la projection"}
           </button>
-          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 8, lineHeight: 1.4 }}>
+          <div className="cp-shell-hint">
             B / W / R pour noir / blanc / normal. Fleches pour naviguer en live.
           </div>
         </div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
+import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -120,30 +120,29 @@ export function AnnouncementsPage() {
         subtitle="Importer des PDF ou saisir une annonce texte puis ajouter au plan."
         actions={
           <>
-        <button
-          className="btn-primary"
-          onClick={async () => {
-            setLoading(true);
-            setErr(null);
-            const r = await window.cp.files?.pickMedia?.();
-            setLoading(false);
-            if (r?.ok) {
-              setInfo("Fichier importe.");
-              refreshFiles();
-            }
-          }}
-          disabled={loading}
-        >
-          Importer un PDF
-        </button>
-        <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          Projeter vers
-          <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
-            <option value="A">Ecran A</option>
-            <option value="B">Ecran B</option>
-            <option value="C">Ecran C</option>
-          </select>
-        </label>
+            <button
+              className="btn-primary"
+              onClick={async () => {
+                setLoading(true);
+                setErr(null);
+                const r = await window.cp.files?.pickMedia?.();
+                setLoading(false);
+                if (r?.ok) {
+                  setInfo("Fichier importe.");
+                  refreshFiles();
+                }
+              }}
+              disabled={loading}
+            >
+              Importer un PDF
+            </button>
+            <InlineField label="Projeter vers">
+              <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
+                <option value="A">Ecran A</option>
+                <option value="B">Ecran B</option>
+                <option value="C">Ecran C</option>
+              </select>
+            </InlineField>
           </>
         }
       />
@@ -153,17 +152,14 @@ export function AnnouncementsPage() {
 
       <div className="cp-grid-main">
         <Panel>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Annonce texte</div>
-          <label>
-            Titre
+          <div className="cp-section-label">Annonce texte</div>
+          <Field label="Titre">
             <input value={manualTitle} onChange={(e) => setManualTitle(e.target.value)} className="cp-input-full" />
-          </label>
-          <label>
-            Contenu
+          </Field>
+          <Field label="Contenu">
             <textarea value={manualContent} onChange={(e) => setManualContent(e.target.value)} rows={6} className="cp-input-full" />
-          </label>
-          <label>
-            Plan
+          </Field>
+          <Field label="Plan">
             <select value={planId} onChange={(e) => setPlanId(e.target.value)} className="cp-input-full">
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -171,38 +167,43 @@ export function AnnouncementsPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <button
-            className="btn-primary"
-            onClick={async () => {
-              if (!planId) return;
-              await window.cp.plans.addItem({
-                planId,
-                kind: "ANNOUNCEMENT_TEXT",
-                title: manualTitle.trim() || "Annonce",
-                content: manualContent,
-              });
-              setInfo("Annonce texte ajoutee au plan.");
-              setManualContent("");
-            }}
-            style={{ marginTop: 8 }}
-          >
-            Ajouter au plan
-          </button>
-          <button onClick={() => projectText(manualTitle, manualContent)} style={{ marginTop: 6 }} disabled={!manualContent && !manualTitle}>
-            Projeter maintenant
-          </button>
+          </Field>
+          <ActionRow className="cp-mt-8">
+            <button
+              className="btn-primary"
+              onClick={async () => {
+                if (!planId) return;
+                await window.cp.plans.addItem({
+                  planId,
+                  kind: "ANNOUNCEMENT_TEXT",
+                  title: manualTitle.trim() || "Annonce",
+                  content: manualContent,
+                });
+                setInfo("Annonce texte ajoutee au plan.");
+                setManualContent("");
+              }}
+            >
+              Ajouter au plan
+            </button>
+            <button onClick={() => projectText(manualTitle, manualContent)} disabled={!manualContent && !manualTitle}>
+              Projeter maintenant
+            </button>
+          </ActionRow>
         </Panel>
 
         <Panel>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>PDF importes ({pdfs.length})</div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 8 }}>
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Page
-              <input type="number" min={1} value={pdfPage} onChange={(e) => setPdfPage(e.target.value)} style={{ width: 80 }} />
-            </label>
-            <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              Plan
+          <div className="cp-section-label">PDF importes ({pdfs.length})</div>
+          <ActionRow className="cp-mb-8">
+            <InlineField label="Page">
+              <input
+                type="number"
+                min={1}
+                value={pdfPage}
+                onChange={(e) => setPdfPage(e.target.value)}
+                className="cp-input-narrow"
+              />
+            </InlineField>
+            <InlineField label="Plan">
               <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -210,30 +211,19 @@ export function AnnouncementsPage() {
                   </option>
                 ))}
               </select>
-            </label>
-          </div>
+            </InlineField>
+          </ActionRow>
 
-          <div style={{ maxHeight: "65vh", overflow: "auto", display: "grid", gap: 8 }}>
+          <div className="cp-grid-card-list">
             {pdfs.map((f) => (
-              <div
-                key={f.path}
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  padding: 10,
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  alignItems: "center",
-                  gap: 10,
-                }}
-              >
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontWeight: 700 }}>{f.name}</div>
-                  <div style={{ fontSize: 12, opacity: 0.7 }}>
+              <div key={f.path} className="cp-media-card">
+                <div className="cp-media-meta">
+                  <div className="cp-field-label">{f.name}</div>
+                  <div className="cp-help-text-flat">
                     {f.mediaType} {pageCounts[f.path] ? `- ${pageCounts[f.path]} page(s)` : ""}
                   </div>
                   {pageCounts[f.path] ? (
-                    <div style={{ fontSize: 12, opacity: 0.65 }}>
+                    <div className="cp-help-text-muted">
                       Page choisie: {parseInt(pdfPage || "1", 10) || 1} / {pageCounts[f.path]}
                     </div>
                   ) : null}
@@ -265,9 +255,9 @@ export function AnnouncementsPage() {
                     </button>
                   </ActionRow>
                 </div>
-                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                <div className="cp-media-actions">
                   <button
-                    style={{ color: "#b91c1c" }}
+                    className="cp-danger"
                     onClick={async () => {
                       const ok = window.confirm("Supprimer ce fichier importe ?");
                       if (!ok) return;
@@ -280,7 +270,7 @@ export function AnnouncementsPage() {
                 </div>
               </div>
             ))}
-            {pdfs.length === 0 ? <div style={{ opacity: 0.6 }}>Aucun PDF importe pour le moment.</div> : null}
+            {pdfs.length === 0 ? <div className="cp-muted">Aucun PDF importe pour le moment.</div> : null}
           </div>
         </Panel>
       </div>
