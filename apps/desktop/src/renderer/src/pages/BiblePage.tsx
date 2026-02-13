@@ -6,7 +6,6 @@ import {
   findBookIdByName,
   getBooks,
   getChapter,
-  getVerse,
   maxChapter,
   searchVerses,
   versesToText,
@@ -62,7 +61,6 @@ export function BiblePage() {
   const [translation, setTranslation] = useState<string>("FRLSG"); // default translation code
   const activeTranslation = translation;
   const [groups, setGroups] = useState<TranslationGroup[]>([]);
-  const [translationFilter, setTranslationFilter] = useState("");
 
   const [books, setBooks] = useState<BollsBook[]>([]);
   const [bookId, setBookId] = useState<number | null>(null);
@@ -84,6 +82,7 @@ export function BiblePage() {
   const [searchResults, setSearchResults] = useState<BollsVerse[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchTimer = useRef<NodeJS.Timeout | null>(null);
+  const skipNextBookAutoLoad = useRef(false);
 
   const currentBook = useMemo(() => books.find((b) => b.bookid === bookId), [books, bookId]);
 
@@ -157,6 +156,11 @@ export function BiblePage() {
   // Auto-load chapter when book changes
   useEffect(() => {
     if (!bookId) return;
+    // Searching a verse can set book + chapter explicitly; avoid overwriting with chapter 1.
+    if (skipNextBookAutoLoad.current) {
+      skipNextBookAutoLoad.current = false;
+      return;
+    }
     void loadChapter(bookId, 1);
   }, [bookId]);
 
@@ -276,6 +280,7 @@ export function BiblePage() {
       if (!books.length) {
         await getBooks(activeTranslation); // ensure cache
       }
+      skipNextBookAutoLoad.current = true;
       setBookId(v.book);
       await loadChapter(v.book, v.chapter);
       setSelectedVerses(new Set([v.verse]));

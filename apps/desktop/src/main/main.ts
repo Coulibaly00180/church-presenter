@@ -488,6 +488,7 @@ ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: CpProje
     updatedAt: Date.now(),
   };
   sendScreenState(key);
+  applyMirrorsFrom(key);
   return { ok: true, state: screenStates[key] };
 });
 
@@ -503,6 +504,7 @@ ipcMain.handle(
       updatedAt: Date.now(),
     };
     sendScreenState(key);
+    applyMirrorsFrom(key);
     return { ok: true, state: screenStates[key] };
   }
 );
@@ -514,6 +516,7 @@ ipcMain.handle("screens:setMode", (_evt, key: ScreenKey, mode: ProjectionMode) =
 
   screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
   sendScreenState(key);
+  applyMirrorsFrom(key);
   return { ok: true, state: screenStates[key] };
 });
 

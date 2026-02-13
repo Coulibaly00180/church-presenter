@@ -76,7 +76,7 @@ export function CalendarPage() {
     <div className="cp-page">
       <PageHeader
         title="Calendrier"
-        subtitle="Preparer en avance: chaque date peut avoir un ou plusieurs plans (culte, veillee, evenement)."
+        subtitle="Preparer en avance: une date correspond a un plan (si la date est prise, la prochaine date libre est utilisee)."
         actions={
           <>
           <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>{"<"}</button>
@@ -105,10 +105,15 @@ export function CalendarPage() {
                   <div className="cp-title-strong">{d.getDate()}</div>
                   <button
                     onClick={async () => {
-                      await window.cp.plans.create({ dateIso: key, title: "Culte" });
+                      const created = await window.cp.plans.create({ dateIso: key, title: "Culte" });
+                      const createdDate = isoToYmd(created.date);
                       const next = await window.cp.plans.list();
                       setPlans(next);
-                      setMsg("Plan cree. Va dans Plan pour l'editer.");
+                      setMsg(
+                        createdDate === key
+                          ? "Plan cree. Va dans Plan pour l'editer."
+                          : `Date deja prise, plan cree le ${createdDate}.`
+                      );
                       setTimeout(() => setMsg(null), 2400);
                     }}
                     className="cp-btn-compact"

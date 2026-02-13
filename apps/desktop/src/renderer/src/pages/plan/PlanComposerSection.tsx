@@ -356,6 +356,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                           refId: refLbl,
                           refSubId: `${r.chapter}:${r.verse}`,
                         });
+                        await reloadPlan(plan.id);
                         showToast("success", "Verset ajoute au plan.");
                       }}
                     >
@@ -371,6 +372,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                           refId: refLbl,
                           refSubId: `${r.chapter}:${r.verse}`,
                         });
+                        await reloadPlan(plan.id);
                         showToast("success", "Passage ajoute au plan.");
                       }}
                     >
