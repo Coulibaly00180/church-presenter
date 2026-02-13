@@ -66,7 +66,7 @@ export function HistoryPage() {
       {importDetail ? (
         <Panel soft>
           <div className="cp-section-label cp-mb-6">
-            Recap import: {importDetail.counts.songs} chants, {importDetail.counts.plans} plans
+            Recapitulatif import: {importDetail.counts.songs} chants, {importDetail.counts.plans} plans.
           </div>
           {importDetail.errors.length === 0 ? (
             <div className="cp-success-text">Aucune erreur.</div>
@@ -94,7 +94,7 @@ export function HistoryPage() {
                 return;
               }
               const r = await window.cp.data.exportAll();
-              if (r.ok) setMsg(`Export global -> ${r.path}`);
+              if (r.ok) setMsg(`Export global termine: ${r.path}.`);
               else if (r.canceled) setMsg("Export annule.");
             } catch (e) {
               setMsg(`Export echoue: ${getErrorMessage(e)}`);
@@ -119,10 +119,10 @@ export function HistoryPage() {
                 const bk = await window.cp.data.exportAll();
                 if (!bk.ok) {
                   if (bk.canceled) {
-                    setMsg("Import annule: backup obligatoire en mode REPLACE.");
+                    setMsg("Import annule: sauvegarde obligatoire en mode REPLACE.");
                     return;
                   }
-                  setMsg("Backup echoue. Import REPLACE annule.");
+                  setMsg("Sauvegarde echouee. Import REPLACE annule.");
                   return;
                 }
                 backupPath = bk.path;
@@ -132,9 +132,9 @@ export function HistoryPage() {
               if (r.ok) {
                 setPlans(await window.cp.plans.list());
                 setMsg(
-                  `Import global OK (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
-                    backupPath ? ` | Backup: ${backupPath}` : ""
-                  }`
+                  `Import global termine (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
+                    backupPath ? ` | Sauvegarde: ${backupPath}` : ""
+                  }.`
                 );
                 setImportDetail({ counts: r.counts || { songs: 0, plans: 0 }, errors: r.errors || [] });
               } else if ("canceled" in r && r.canceled) {
@@ -180,7 +180,7 @@ export function HistoryPage() {
                 onClick={async () => {
                   try {
                     const res = await window.cp.plans.export({ planId: p.id });
-                    if (res.ok) setMsg(`Plan exporte -> ${res.path}`);
+                    if (res.ok) setMsg(`Plan exporte: ${res.path}.`);
                     else if (res.canceled) setMsg("Export annule.");
                   } catch (e) {
                     setMsg(`Export echoue: ${getErrorMessage(e)}`);

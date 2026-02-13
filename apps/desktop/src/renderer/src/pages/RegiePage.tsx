@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
+import { Alert, Field, PageHeader, Panel, ToolbarRow } from "../ui/primitives";
 import { LiveEnabledToggle, LiveLockChips, LiveModeButtons, LiveTargetButtons } from "../ui/liveControls";
 import { projectTextToScreen } from "../projection/target";
 
@@ -165,7 +165,7 @@ export function RegiePage() {
           subtitle={status}
           titleClassName="cp-page-title-lg"
           actions={
-            <ActionRow className="cp-toolbar-row">
+            <ToolbarRow>
               <LiveEnabledToggle value={!!live?.enabled} onChange={(enabled) => updateLive({ enabled })} />
               <LiveTargetButtons
                 target={target}
@@ -180,11 +180,11 @@ export function RegiePage() {
                   </>
                 )}
               />
-            </ActionRow>
+            </ToolbarRow>
           }
         />
 
-        <ActionRow className="cp-mt-10 cp-toolbar-row">
+        <ToolbarRow className="cp-mt-10">
           <LiveModeButtons
             onBlack={() => window.cp.live?.toggleBlack()}
             onWhite={() => window.cp.live?.toggleWhite()}
@@ -239,12 +239,12 @@ export function RegiePage() {
             className="cp-chip-row cp-chip-row--offset"
             itemClassName="cp-inline-check"
           />
-        </ActionRow>
+        </ToolbarRow>
       </Panel>
 
       <Panel>
         <div className="cp-section-label">Ecrans (ouverture / miroir)</div>
-        <ActionRow className="cp-toolbar-row">
+        <ToolbarRow>
           <button
             onClick={async () => {
               const r = await window.cp.projectionWindow.open();
@@ -290,7 +290,7 @@ export function RegiePage() {
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_A")}>Outils dev A</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_B")}>Outils dev B</button>
           <button onClick={() => window.cp.devtools?.open?.("SCREEN_C")}>Outils dev C</button>
-        </ActionRow>
+        </ToolbarRow>
         <div className="cp-help-text">
           Astuce: B/C en miroir suivent A. Decoche pour utiliser en ecran libre (versets, annonces...).
         </div>
@@ -307,7 +307,7 @@ export function RegiePage() {
           <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="cp-input-full cp-input-lg" />
         </Field>
 
-        <ActionRow className="cp-toolbar-row">
+        <ToolbarRow>
           <button
             className="btn-primary cp-btn-lg"
             onClick={async () => {
@@ -324,7 +324,7 @@ export function RegiePage() {
           </button>
           <button onClick={() => window.cp.devtools?.open?.("REGIE")}>Outils dev Regie</button>
           <button onClick={() => window.cp.devtools?.open?.("PROJECTION")}>Outils dev Projection</button>
-        </ActionRow>
+        </ToolbarRow>
 
         <Panel soft className="cp-mt-4">
           <div className="cp-soft-heading">Blocs (clic ou ^/v)</div>

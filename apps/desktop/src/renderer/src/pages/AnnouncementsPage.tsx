@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
+import { Alert, Field, InlineField, PageHeader, Panel, ToolbarPanel, ToolbarRow } from "../ui/primitives";
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 import { projectMediaToScreen, projectTextToScreen } from "../projection/target";
 
@@ -81,8 +81,7 @@ export function AnnouncementsPage() {
       {err ? <Alert tone="error">{err}</Alert> : null}
       {info ? <Alert tone="success">{info}</Alert> : null}
 
-      <Panel soft className="cp-toolbar-panel">
-        <ActionRow className="cp-toolbar-row">
+      <ToolbarPanel>
           <button
             className="btn-primary"
             onClick={async () => {
@@ -100,8 +99,7 @@ export function AnnouncementsPage() {
             Importer un PDF
           </button>
           <ProjectionTargetField value={target} onChange={setTarget} />
-        </ActionRow>
-      </Panel>
+      </ToolbarPanel>
 
       <div className="cp-grid-main">
         <Panel>
@@ -121,7 +119,7 @@ export function AnnouncementsPage() {
               ))}
             </select>
           </Field>
-          <ActionRow className="cp-mt-8 cp-toolbar-row">
+          <ToolbarRow className="cp-mt-8">
             <button
               className="btn-primary"
               onClick={async () => {
@@ -144,12 +142,12 @@ export function AnnouncementsPage() {
             >
               Projeter maintenant
             </button>
-          </ActionRow>
+          </ToolbarRow>
         </Panel>
 
         <Panel>
           <div className="cp-section-label">PDF importes ({pdfs.length})</div>
-          <ActionRow className="cp-mb-8 cp-toolbar-row">
+          <ToolbarRow className="cp-mb-8">
             <InlineField label="Page">
               <input
                 type="number"
@@ -170,7 +168,7 @@ export function AnnouncementsPage() {
               )}
               onChange={setPlanId}
             />
-          </ActionRow>
+          </ToolbarRow>
 
           <div className="cp-grid-card-list">
             {pdfs.map((f) => (
@@ -185,7 +183,7 @@ export function AnnouncementsPage() {
                       Page choisie: {parseInt(pdfPage || "1", 10) || 1} / {pageCounts[f.path]}
                     </div>
                   ) : null}
-                  <ActionRow className="cp-toolbar-row">
+                  <ToolbarRow>
                     <button
                       className="btn-primary"
                       onClick={async () => {
@@ -216,7 +214,7 @@ export function AnnouncementsPage() {
                     >
                       Projeter
                     </button>
-                  </ActionRow>
+                  </ToolbarRow>
                 </div>
                 <div className="cp-media-actions">
                   <button

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
+import { ActionRow, Alert, Field, PageHeader, Panel, ToolbarPanel } from "../ui/primitives";
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 import { projectTextToScreen } from "../projection/target";
 
@@ -329,8 +329,7 @@ export function SongsPage() {
         </Alert>
       ) : null}
       {info ? <Alert tone={info.kind}>{info.text}</Alert> : null}
-      <Panel soft className="cp-toolbar-panel">
-        <ActionRow className="cp-toolbar-row">
+      <ToolbarPanel>
           <input
             value={newSongTitle}
             onChange={(e) => setNewSongTitle(e.target.value)}
@@ -344,7 +343,7 @@ export function SongsPage() {
             onClick={async () => {
               if (!selectedId) return;
               const r = await window.cp.songs.exportWord(selectedId);
-              if (r?.ok) setInfo({ kind: "success", text: "Export Word OK" });
+              if (r?.ok) setInfo({ kind: "success", text: "Export Word termine." });
             }}
             disabled={!selectedId}
           >
@@ -358,8 +357,8 @@ export function SongsPage() {
               if (r?.ok) {
                 await refresh(q);
                 const count = r.imported || 0;
-                const detail = `${count} chant${count > 1 ? "s" : ""} importé${count > 1 ? "s" : ""}`;
-                setInfo({ kind: "success", text: `Import OK • ${detail}` });
+                const detail = `${count} chant${count > 1 ? "s" : ""} importe${count > 1 ? "s" : ""}`;
+                setInfo({ kind: "success", text: `Import termine: ${detail}.` });
                 if (r?.errors?.length) {
                   console.warn("Import errors:", r.errors);
                   setErr(`${r.errors.length} erreur(s) durant l'import (voir console)`);
@@ -372,8 +371,7 @@ export function SongsPage() {
           >
             Importer des chants (docx / odt / json)
           </button>
-        </ActionRow>
-      </Panel>
+      </ToolbarPanel>
 
       <div className="cp-grid-main cp-grid-main--songs">
         {/* LEFT list */}
@@ -535,4 +533,3 @@ export function SongsPage() {
     </div>
   );
 }
-

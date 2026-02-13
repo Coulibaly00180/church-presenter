@@ -66,7 +66,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
   async function addSongAllBlocksToPlan(songId: string) {
     const song = await window.cp.songs.get(songId);
     if (!song) {
-      showToast("error", "Chant introuvable");
+      showToast("error", "Chant introuvable.");
       return;
     }
     const currentPlan = await window.cp.plans.get(plan.id);
@@ -84,7 +84,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
       added += 1;
     }
     await reloadPlan(plan.id);
-    showToast(added > 0 ? "success" : "info", added > 0 ? "Chant ajoute au plan" : "Tous les blocs etaient deja presents");
+    showToast(added > 0 ? "success" : "info", added > 0 ? "Chant ajoute au plan." : "Tous les blocs etaient deja presents.");
   }
 
   useEffect(() => {
@@ -266,7 +266,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
           });
           setAddContent("");
           await reloadPlan(plan.id);
-          showToast("success", "Element ajoute au plan");
+          showToast("success", "Element ajoute au plan.");
         }}
         className="btn-primary cp-w-220"
       >
@@ -356,7 +356,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                           refId: refLbl,
                           refSubId: `${r.chapter}:${r.verse}`,
                         });
-                        showToast("success", "Verset ajoute au plan");
+                        showToast("success", "Verset ajoute au plan.");
                       }}
                     >
                       + Verset
@@ -371,7 +371,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                           refId: refLbl,
                           refSubId: `${r.chapter}:${r.verse}`,
                         });
-                        showToast("success", "Passage ajoute au plan");
+                        showToast("success", "Passage ajoute au plan.");
                       }}
                     >
                       Passage

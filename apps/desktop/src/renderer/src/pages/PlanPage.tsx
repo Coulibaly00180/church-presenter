@@ -8,7 +8,7 @@ import { PlanLiveToolbar } from "./plan/PlanLiveToolbar";
 import { PlanSidebarSection } from "./plan/PlanSidebarSection";
 import { projectPlanItemToTarget } from "./plan/projection";
 import { LiveState, Plan, PlanListItem } from "./plan/types";
-import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
+import { Alert, PageHeader, Panel, ToolbarRow } from "../ui/primitives";
 import { LiveModeButtons } from "../ui/liveControls";
 
 export function PlanPage() {
@@ -125,7 +125,7 @@ export function PlanPage() {
         title="Plan"
         subtitle={`Projection: ${projOpen ? "ouverte" : "fermee"}`}
         actions={
-          <ActionRow className="cp-toolbar-row">
+          <ToolbarRow>
             <span className={`badge ${projOpen ? "cp-badge-open" : "cp-badge-closed"}`}>
               {projOpen ? "Projection ouverte" : "Projection fermee"}
             </span>
@@ -144,7 +144,7 @@ export function PlanPage() {
               {projOpen ? "Fermer projection" : "Ouvrir projection"}
             </button>
             <LiveModeButtons onResume={() => window.cp.live?.resume()} resumeLabel="Reprendre live" />
-          </ActionRow>
+          </ToolbarRow>
         }
       />
 
@@ -181,7 +181,7 @@ export function PlanPage() {
                   ) : null}
                 </div>
 
-                <ActionRow className="cp-toolbar-row">
+                <ToolbarRow>
                   <button
                     className="btn-primary"
                     onClick={async () => {
@@ -201,7 +201,7 @@ export function PlanPage() {
                   >
                     Supprimer
                   </button>
-                </ActionRow>
+                </ToolbarRow>
               </div>
 
               <PlanLiveToolbar

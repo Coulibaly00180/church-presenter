@@ -86,6 +86,37 @@ export function ActionRow(props: ActionRowProps) {
   );
 }
 
+type ToolbarRowProps = ActionRowProps;
+
+export function ToolbarRow(props: ToolbarRowProps) {
+  const { children, className, style } = props;
+  return (
+    <ActionRow className={cls("cp-toolbar-row", className)} style={style}>
+      {children}
+    </ActionRow>
+  );
+}
+
+type ToolbarPanelProps = {
+  children: React.ReactNode;
+  className?: string;
+  rowClassName?: string;
+  style?: React.CSSProperties;
+  rowStyle?: React.CSSProperties;
+  soft?: boolean;
+};
+
+export function ToolbarPanel(props: ToolbarPanelProps) {
+  const { children, className, rowClassName, style, rowStyle, soft = true } = props;
+  return (
+    <Panel soft={soft} className={cls("cp-toolbar-panel", className)} style={style}>
+      <ToolbarRow className={rowClassName} style={rowStyle}>
+        {children}
+      </ToolbarRow>
+    </Panel>
+  );
+}
+
 type FieldProps = {
   label: React.ReactNode;
   children: React.ReactNode;

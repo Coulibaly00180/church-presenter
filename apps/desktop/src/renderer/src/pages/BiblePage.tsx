@@ -12,7 +12,7 @@ import {
   versesToText,
   listTranslations,
 } from "../bible/bollsApi";
-import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
+import { ActionRow, Alert, Field, InlineField, PageHeader, Panel, ToolbarPanel } from "../ui/primitives";
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 import { projectTextToScreen } from "../projection/target";
 
@@ -143,7 +143,7 @@ export function BiblePage() {
         setChapter(1);
         setVerses([]);
         setSelectedVerses(new Set());
-        setInfo(`Traduction ${activeTranslation} chargee (${list.length} livres)`);
+        setInfo(`Traduction ${activeTranslation} chargee (${list.length} livres).`);
       } catch (e: unknown) {
         setErr(getErrorMessage(e));
         setBooks([]);
@@ -234,7 +234,7 @@ export function BiblePage() {
       // eslint-disable-next-line no-await-in-loop
       await window.cp.plans.addItem(it);
     }
-    setInfo(`${items.length} element(s) ajoute(s) au plan`);
+    setInfo(`${items.length} element(s) ajoute(s) au plan.`);
   }
 
   async function projectNow() {
@@ -321,8 +321,7 @@ export function BiblePage() {
       {err ? <Alert tone="error">Erreur : {err}</Alert> : null}
       {info ? <Alert tone="success">{info}</Alert> : null}
 
-      <Panel soft className="cp-toolbar-panel">
-        <ActionRow className="cp-toolbar-row">
+      <ToolbarPanel>
           <InlineField label="Langue">
             <select
               value={translationLanguage}
@@ -362,8 +361,7 @@ export function BiblePage() {
             onChange={setPlanId}
           />
           <ProjectionTargetField value={target} onChange={setTarget} />
-        </ActionRow>
-      </Panel>
+      </ToolbarPanel>
 
       <div className="cp-grid-main">
         <div className="cp-stack">
