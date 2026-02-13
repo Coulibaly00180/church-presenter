@@ -52,6 +52,18 @@ textarea:focus-visible {
   min-width: 0;
 }
 
+.cp-toolbar-panel {
+  padding: 12px;
+}
+
+.cp-toolbar-row {
+  gap: 10px;
+}
+
+.cp-toolbar-row > * {
+  min-width: 0;
+}
+
 .cp-field {
   display: flex;
   flex-direction: column;
@@ -1154,6 +1166,10 @@ textarea:focus-visible {
   .cp-page-header .cp-actions > .cp-inline-field {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .cp-toolbar-row > * {
+    width: 100%;
   }
 
   .cp-inline-row-tight {

@@ -319,48 +319,6 @@ export function SongsPage() {
               onChange={setPlanId}
               wide
             />
-
-        <input
-          value={newSongTitle}
-          onChange={(e) => setNewSongTitle(e.target.value)}
-          placeholder="Titre du nouveau chant"
-          className="cp-input-min-180"
-        />
-        <button className="btn-primary" onClick={onCreate}>
-          + Nouveau chant
-        </button>
-        <button
-          onClick={async () => {
-            if (!selectedId) return;
-            const r = await window.cp.songs.exportWord(selectedId);
-            if (r?.ok) setInfo({ kind: "success", text: "Export Word OK" });
-          }}
-          disabled={!selectedId}
-        >
-          Exporter Word
-        </button>
-        <button
-          onClick={async () => {
-            setImporting(true);
-            const r = await window.cp.songs.importAuto();
-            setImporting(false);
-            if (r?.ok) {
-              await refresh(q);
-              const count = r.imported || 0;
-              const detail = `${count} chant${count > 1 ? "s" : ""} importé${count > 1 ? "s" : ""}`;
-              setInfo({ kind: "success", text: `Import OK • ${detail}` });
-              if (r?.errors?.length) {
-                console.warn("Import errors:", r.errors);
-                setErr(`${r.errors.length} erreur(s) durant l'import (voir console)`);
-              }
-            } else if (r?.canceled) {
-              setInfo({ kind: "info", text: "Import annule." });
-            }
-          }}
-          disabled={importing}
-        >
-          Importer des chants (docx / odt / json)
-        </button>
           </>
         }
       />
@@ -371,6 +329,51 @@ export function SongsPage() {
         </Alert>
       ) : null}
       {info ? <Alert tone={info.kind}>{info.text}</Alert> : null}
+      <Panel soft className="cp-toolbar-panel">
+        <ActionRow className="cp-toolbar-row">
+          <input
+            value={newSongTitle}
+            onChange={(e) => setNewSongTitle(e.target.value)}
+            placeholder="Titre du nouveau chant"
+            className="cp-input-min-180 cp-flex-1"
+          />
+          <button className="btn-primary" onClick={onCreate}>
+            + Nouveau chant
+          </button>
+          <button
+            onClick={async () => {
+              if (!selectedId) return;
+              const r = await window.cp.songs.exportWord(selectedId);
+              if (r?.ok) setInfo({ kind: "success", text: "Export Word OK" });
+            }}
+            disabled={!selectedId}
+          >
+            Exporter Word
+          </button>
+          <button
+            onClick={async () => {
+              setImporting(true);
+              const r = await window.cp.songs.importAuto();
+              setImporting(false);
+              if (r?.ok) {
+                await refresh(q);
+                const count = r.imported || 0;
+                const detail = `${count} chant${count > 1 ? "s" : ""} importé${count > 1 ? "s" : ""}`;
+                setInfo({ kind: "success", text: `Import OK • ${detail}` });
+                if (r?.errors?.length) {
+                  console.warn("Import errors:", r.errors);
+                  setErr(`${r.errors.length} erreur(s) durant l'import (voir console)`);
+                }
+              } else if (r?.canceled) {
+                setInfo({ kind: "info", text: "Import annule." });
+              }
+            }}
+            disabled={importing}
+          >
+            Importer des chants (docx / odt / json)
+          </button>
+        </ActionRow>
+      </Panel>
 
       <div className="cp-grid-main cp-grid-main--songs">
         {/* LEFT list */}
@@ -532,3 +535,4 @@ export function SongsPage() {
     </div>
   );
 }
+
