@@ -387,7 +387,7 @@ export function SongsPage() {
             />
             <ActionRow className="cp-mt-8">
               <button onClick={() => refresh(q)}>Rechercher</button>
-              <button onClick={() => { setQ(""); refresh(""); }}>Reset</button>
+              <button onClick={() => { setQ(""); refresh(""); }}>Reinitialiser</button>
             </ActionRow>
             {filtered.length > 0 && q.trim().length > 0 ? (
               <div className="cp-song-suggest-list">

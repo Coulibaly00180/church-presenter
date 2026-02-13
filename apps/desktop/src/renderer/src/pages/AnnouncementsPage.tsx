@@ -91,7 +91,7 @@ export function AnnouncementsPage() {
               const r = await window.cp.files?.pickMedia?.();
               setLoading(false);
               if (r?.ok) {
-                setInfo("Fichier importe.");
+                setInfo("Fichier importe avec succes.");
                 refreshFiles();
               }
             }}
@@ -198,7 +198,7 @@ export function AnnouncementsPage() {
                           mediaPath,
                           content: mediaPath,
                         });
-                        setInfo("PDF ajoute au plan");
+                        setInfo("PDF ajoute au plan.");
                       }}
                     >
                       Ajouter au plan

@@ -49,8 +49,8 @@ export function AppShell() {
 
   const items = useMemo(
     () => [
-      { to: "/regie", label: "Regie (Live)", desc: "Controle, raccourcis, noir/blanc, projection" },
-      { to: "/plan", label: "Plan", desc: "Deroule du culte, ordre, drag & drop" },
+      { to: "/regie", label: "Regie (live)", desc: "Controle, raccourcis, noir/blanc, projection" },
+      { to: "/plan", label: "Plan", desc: "Deroule du culte, ordre, glisser-deposer" },
       { to: "/bible", label: "Bible", desc: "Recherche, ajout au plan, projection" },
       { to: "/songs", label: "Chants", desc: "Bibliotheque, recherche, blocs" },
       { to: "/announcements", label: "Annonces", desc: "PDF importes + annonces texte" },

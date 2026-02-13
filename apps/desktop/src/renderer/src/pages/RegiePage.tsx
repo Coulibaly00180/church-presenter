@@ -176,7 +176,7 @@ export function RegiePage() {
                 formatLabel={(screen, isLocked) => (
                   <>
                     {screen}
-                    {isLocked ? " [LOCK]" : ""}
+                    {isLocked ? " [Lock]" : ""}
                   </>
                 )}
               />
@@ -243,7 +243,7 @@ export function RegiePage() {
       </Panel>
 
       <Panel>
-        <div className="cp-section-label">Ecrans (ouvrir / miroir)</div>
+        <div className="cp-section-label">Ecrans (ouverture / miroir)</div>
         <ActionRow className="cp-toolbar-row">
           <button
             onClick={async () => {
@@ -287,9 +287,9 @@ export function RegiePage() {
             );
           })}
 
-          <button onClick={() => window.cp.devtools?.open?.("SCREEN_A")}>DevTools A</button>
-          <button onClick={() => window.cp.devtools?.open?.("SCREEN_B")}>DevTools B</button>
-          <button onClick={() => window.cp.devtools?.open?.("SCREEN_C")}>DevTools C</button>
+          <button onClick={() => window.cp.devtools?.open?.("SCREEN_A")}>Outils dev A</button>
+          <button onClick={() => window.cp.devtools?.open?.("SCREEN_B")}>Outils dev B</button>
+          <button onClick={() => window.cp.devtools?.open?.("SCREEN_C")}>Outils dev C</button>
         </ActionRow>
         <div className="cp-help-text">
           Astuce: B/C en miroir suivent A. Decoche pour utiliser en ecran libre (versets, annonces...).
@@ -322,8 +322,8 @@ export function RegiePage() {
           >
             Afficher
           </button>
-          <button onClick={() => window.cp.devtools?.open?.("REGIE")}>DevTools Regie</button>
-          <button onClick={() => window.cp.devtools?.open?.("PROJECTION")}>DevTools Projection</button>
+          <button onClick={() => window.cp.devtools?.open?.("REGIE")}>Outils dev Regie</button>
+          <button onClick={() => window.cp.devtools?.open?.("PROJECTION")}>Outils dev Projection</button>
         </ActionRow>
 
         <Panel soft className="cp-mt-4">

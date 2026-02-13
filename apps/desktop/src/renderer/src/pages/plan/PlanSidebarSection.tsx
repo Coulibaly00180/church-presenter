@@ -53,7 +53,7 @@ export function PlanSidebarSection(props: PlanSidebarSectionProps) {
             >
               <div className="cp-field-label">{p.title || "Culte"}</div>
               <div className="cp-date-muted">{isoToYmd(p.date)}</div>
-              {livePlanId === p.id ? <div className="cp-live-tag">LIVE</div> : null}
+              {livePlanId === p.id ? <div className="cp-live-tag">Live</div> : null}
             </button>
           ))}
         </div>

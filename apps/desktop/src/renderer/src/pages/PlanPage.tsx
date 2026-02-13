@@ -177,7 +177,7 @@ export function PlanPage() {
                   <div className="cp-plan-title-lg">{plan.title || "Culte"}</div>
                   <div className="cp-date-muted">{isoToYmd(plan.date)}</div>
                   {livePlanId === plan.id ? (
-                    <div className="cp-live-tag-md">LIVE (curseur {liveCursor + 1})</div>
+                    <div className="cp-live-tag-md">Live (curseur {liveCursor + 1})</div>
                   ) : null}
                 </div>
 

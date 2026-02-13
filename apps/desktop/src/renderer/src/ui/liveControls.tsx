@@ -98,7 +98,7 @@ type LiveTransportButtonsProps = {
 };
 
 export function LiveTransportButtons(props: LiveTransportButtonsProps) {
-  const { onPrev, onNext, className = "cp-inline-row-tight", prevLabel = "< Prev", nextLabel = "Next >" } = props;
+  const { onPrev, onNext, className = "cp-inline-row-tight", prevLabel = "< Precedent", nextLabel = "Suivant >" } = props;
   return (
     <div className={className}>
       <button type="button" onClick={onPrev}>

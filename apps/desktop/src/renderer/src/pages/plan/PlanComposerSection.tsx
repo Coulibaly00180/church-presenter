@@ -381,7 +381,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
               );
             })}
             {bibleSearchText && !bibleSearchResults.length && !bibleSearchLoading ? (
-              <div className="cp-help-text-muted">Aucun resultat</div>
+              <div className="cp-help-text-muted">Aucun resultat.</div>
             ) : null}
           </div>
         </div>

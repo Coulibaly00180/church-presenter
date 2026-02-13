@@ -132,7 +132,7 @@ export function CalendarPage() {
       </Panel>
 
       <div className="cp-page-subtitle cp-subtitle-xs">
-        (Prochaine etape) ouvrir directement un plan depuis le calendrier + filtrer passe/avenir.
+        Astuce: cree un plan depuis un jour, puis ouvre la page Plan pour l'editer.
       </div>
     </div>
   );
