@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
 import { LiveEnabledToggle, LiveLockChips, LiveTargetButtons } from "../ui/liveControls";
+import { projectTextToScreen } from "../projection/target";
 
 type LivePatch = {
   planId?: string | null;
@@ -27,31 +28,6 @@ function splitBlocks(text: string) {
     .split(/\n\s*\n/g)
     .map((s) => s.trim())
     .filter(Boolean);
-}
-
-async function projectText(target: ScreenKey, title: string | undefined, body: string) {
-  const screensApi = window.cp.screens;
-  const list: CpScreenMeta[] = screensApi ? await screensApi.list() : [];
-  const meta = list.find((s) => s.key === target);
-
-  if (target === "A") {
-    await window.cp.projectionWindow?.open?.();
-  } else if (!meta?.isOpen && screensApi) {
-    await screensApi.open(target);
-  }
-
-  const isMirrorOfA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
-  const dest: ScreenKey = isMirrorOfA ? "A" : target;
-
-  if (dest === "A" || !screensApi) {
-    await window.cp.projection.setContentText({ title, body });
-    return;
-  }
-
-  const res = (await screensApi.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
-  if (res?.ok === false && res?.reason === "MIRROR") {
-    await window.cp.projection.setContentText({ title, body });
-  }
 }
 
 export function RegiePage() {
@@ -160,7 +136,7 @@ export function RegiePage() {
       const projectByIndex = async (idx: number) => {
         const bounded = Math.max(0, Math.min(idx, blocks.length - 1));
         setBlockCursor(bounded);
-        await projectText(target, title, blocks[bounded]);
+        await projectTextToScreen({ target, title, body: blocks[bounded] });
       };
 
       if (e.key === "ArrowDown") {
@@ -334,12 +310,12 @@ export function RegiePage() {
             className="btn-primary cp-btn-lg"
             onClick={async () => {
               if (blocks.length === 0) {
-                await projectText(target, title, "");
+                await projectTextToScreen({ target, title, body: "" });
                 setBlockCursor(-1);
                 return;
               }
               setBlockCursor(0);
-              await projectText(target, title, blocks[0]);
+              await projectTextToScreen({ target, title, body: blocks[0] });
             }}
           >
             Afficher
@@ -361,7 +337,7 @@ export function RegiePage() {
                     key={idx}
                     onClick={async () => {
                       setBlockCursor(idx);
-                      await projectText(target, title, b);
+                      await projectTextToScreen({ target, title, body: b });
                     }}
                     className={cls("cp-block-button", active && "is-active")}
                   >

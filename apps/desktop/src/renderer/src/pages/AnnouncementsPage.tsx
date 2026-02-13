@@ -3,6 +3,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
+import { projectMediaToScreen, projectTextToScreen } from "../projection/target";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -41,47 +42,6 @@ export function AnnouncementsPage() {
       if (list?.length) setPlanId((prev) => prev || list[0].id);
     } catch {
       // ignore
-    }
-  }
-
-  async function ensureScreenOpen(key: ScreenKey) {
-    if (key === "A") {
-      await window.cp.projectionWindow.open();
-      return;
-    }
-    const list: CpScreenMeta[] = (await window.cp.screens?.list?.()) || [];
-    const meta = list.find((s) => s.key === key);
-    if (!meta?.isOpen) {
-      await window.cp.screens?.open?.(key);
-    }
-  }
-
-  async function projectText(title: string | undefined, body: string) {
-    const dest = target;
-    await ensureScreenOpen(dest);
-    if (dest === "A" || !window.cp.screens) {
-      await window.cp.projection.setContentText({ title, body });
-      return;
-    }
-    const res = (await window.cp.screens.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
-    if (res?.ok === false && res?.reason === "MIRROR") {
-      await window.cp.projection.setContentText({ title, body });
-    }
-  }
-
-  async function projectPdf(title: string | undefined, mediaPath: string) {
-    const dest = target;
-    await ensureScreenOpen(dest);
-    if (dest === "A" || !window.cp.screens) {
-      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
-      return;
-    }
-    const res = (await window.cp.screens.setContentMedia(dest, { title, mediaPath, mediaType: "PDF" })) as {
-      ok?: boolean;
-      reason?: string;
-    };
-    if (res?.ok === false && res?.reason === "MIRROR") {
-      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType: "PDF" });
     }
   }
 
@@ -180,7 +140,10 @@ export function AnnouncementsPage() {
             >
               Ajouter au plan
             </button>
-            <button onClick={() => projectText(manualTitle, manualContent)} disabled={!manualContent && !manualTitle}>
+            <button
+              onClick={() => projectTextToScreen({ target, title: manualTitle, body: manualContent })}
+              disabled={!manualContent && !manualTitle}
+            >
               Projeter maintenant
             </button>
           </ActionRow>
@@ -245,7 +208,12 @@ export function AnnouncementsPage() {
                     <button
                       onClick={() => {
                         const mediaPath = `${f.path}#page=${parseInt(pdfPage || "1", 10) || 1}`;
-                        projectPdf(`${f.name} (p.${pdfPage || "1"})`, mediaPath);
+                        projectMediaToScreen({
+                          target,
+                          title: `${f.name} (p.${pdfPage || "1"})`,
+                          mediaPath,
+                          mediaType: "PDF",
+                        });
                       }}
                     >
                       Projeter

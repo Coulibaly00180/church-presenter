@@ -14,6 +14,7 @@ import {
 } from "../bible/bollsApi";
 import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
+import { projectTextToScreen } from "../projection/target";
 
 type ScreenKey = "A" | "B" | "C";
 type PlanListItem = { id: string; title?: string | null; date?: string | Date };
@@ -49,31 +50,6 @@ function formatPlanLabel(plan: PlanListItem) {
 
 function cls(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
-}
-
-async function projectText(target: ScreenKey, title: string | undefined, body: string) {
-  const screens = window.cp.screens;
-  const list: CpScreenMeta[] = screens ? await screens.list() : [];
-  const meta = list.find((s) => s.key === target);
-
-  if (target === "A") {
-    await window.cp.projectionWindow.open();
-  } else if (!meta?.isOpen && screens) {
-    await screens.open(target);
-  }
-
-  const isMirrorA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
-  const dest = isMirrorA ? "A" : target;
-
-  if (dest === "A" || !screens) {
-    await window.cp.projection.setContentText({ title, body });
-    return;
-  }
-
-  const res = (await screens.setContentText(dest, { title, body })) as { ok?: boolean; reason?: string };
-  if (res?.ok === false && res?.reason === "MIRROR") {
-    await window.cp.projection.setContentText({ title, body });
-  }
 }
 
 type TranslationGroup = {
@@ -266,7 +242,7 @@ export function BiblePage() {
       setErr("Charge un chapitre d'abord.");
       return;
     }
-    await projectText(target, `${referenceLabel} (${activeTranslation})`, passageText);
+    await projectTextToScreen({ target, title: `${referenceLabel} (${activeTranslation})`, body: passageText });
   }
 
   // Text search (debounced)

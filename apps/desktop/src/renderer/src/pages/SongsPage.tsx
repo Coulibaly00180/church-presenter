@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
+import { projectTextToScreen } from "../projection/target";
 
 type ScreenKey = "A" | "B" | "C";
 
@@ -40,37 +41,6 @@ function splitBlocks(text: string) {
 
 function cls(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
-}
-
-async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string, metaSong?: CpSongMeta) {
-  // Always ensure A exists when needed
-  const screens: CpScreenMeta[] = await window.cp.screens.list();
-  const meta = screens.find((s) => s.key === target);
-
-  // If target is not open, open it (A via legacy, others via screens)
-  if (target === "A") {
-    await window.cp.projectionWindow.open();
-  } else if (!meta?.isOpen) {
-    await window.cp.screens.open(target);
-  }
-
-  // If B/C are mirroring A, projecting to B/C should actually update A (so mirror follows)
-  if (target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A") {
-    await window.cp.projection.setContentText({ title, body, metaSong });
-    return;
-  }
-
-  // Normal cases
-  if (target === "A") {
-    await window.cp.projection.setContentText({ title, body, metaSong });
-    return;
-  }
-
-  const res = await window.cp.screens.setContentText(target, { title, body, metaSong });
-  if (!res.ok && res.reason === "MIRROR") {
-    // safety fallback: update A
-    await window.cp.projection.setContentText({ title, body, metaSong });
-  }
 }
 
 
@@ -248,7 +218,7 @@ export function SongsPage() {
       album: song.album ?? undefined,
       year: song.tags ?? song.album ?? undefined, // tags often used for year import
     };
-    await projectTextToTarget(target, song.title, b.content || "", metaSong);
+    await projectTextToScreen({ target, title: song.title, body: b.content || "", metaSong });
   }
 
   async function addBlockToPlan(i: number) {
@@ -324,7 +294,7 @@ export function SongsPage() {
       album: song.album ?? undefined,
       year: song.tags ?? song.album ?? undefined,
     };
-    await projectTextToTarget(target, song.title, text, metaSong);
+    await projectTextToScreen({ target, title: song.title, body: text, metaSong });
   }
 
   return (
