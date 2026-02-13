@@ -76,34 +76,32 @@ export function AnnouncementsPage() {
 
   return (
     <div className="cp-page">
-      <PageHeader
-        title="Annonces"
-        subtitle="Importer des PDF ou saisir une annonce texte puis ajouter au plan."
-        actions={
-          <>
-            <button
-              className="btn-primary"
-              onClick={async () => {
-                setLoading(true);
-                setErr(null);
-                const r = await window.cp.files?.pickMedia?.();
-                setLoading(false);
-                if (r?.ok) {
-                  setInfo("Fichier importe.");
-                  refreshFiles();
-                }
-              }}
-              disabled={loading}
-            >
-              Importer un PDF
-            </button>
-            <ProjectionTargetField value={target} onChange={setTarget} />
-          </>
-        }
-      />
+      <PageHeader title="Annonces" subtitle="Importer des PDF ou saisir une annonce texte puis ajouter au plan." />
 
       {err ? <Alert tone="error">{err}</Alert> : null}
       {info ? <Alert tone="success">{info}</Alert> : null}
+
+      <Panel soft className="cp-toolbar-panel">
+        <ActionRow className="cp-toolbar-row">
+          <button
+            className="btn-primary"
+            onClick={async () => {
+              setLoading(true);
+              setErr(null);
+              const r = await window.cp.files?.pickMedia?.();
+              setLoading(false);
+              if (r?.ok) {
+                setInfo("Fichier importe.");
+                refreshFiles();
+              }
+            }}
+            disabled={loading}
+          >
+            Importer un PDF
+          </button>
+          <ProjectionTargetField value={target} onChange={setTarget} />
+        </ActionRow>
+      </Panel>
 
       <div className="cp-grid-main">
         <Panel>
@@ -123,7 +121,7 @@ export function AnnouncementsPage() {
               ))}
             </select>
           </Field>
-          <ActionRow className="cp-mt-8">
+          <ActionRow className="cp-mt-8 cp-toolbar-row">
             <button
               className="btn-primary"
               onClick={async () => {
@@ -151,7 +149,7 @@ export function AnnouncementsPage() {
 
         <Panel>
           <div className="cp-section-label">PDF importes ({pdfs.length})</div>
-          <ActionRow className="cp-mb-8">
+          <ActionRow className="cp-mb-8 cp-toolbar-row">
             <InlineField label="Page">
               <input
                 type="number"
@@ -187,7 +185,7 @@ export function AnnouncementsPage() {
                       Page choisie: {parseInt(pdfPage || "1", 10) || 1} / {pageCounts[f.path]}
                     </div>
                   ) : null}
-                  <ActionRow>
+                  <ActionRow className="cp-toolbar-row">
                     <button
                       className="btn-primary"
                       onClick={async () => {

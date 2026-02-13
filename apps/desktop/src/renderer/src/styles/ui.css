@@ -58,6 +58,7 @@ textarea:focus-visible {
 
 .cp-toolbar-row {
   gap: 10px;
+  width: 100%;
 }
 
 .cp-toolbar-row > * {

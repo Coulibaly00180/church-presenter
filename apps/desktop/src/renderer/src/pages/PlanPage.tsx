@@ -125,24 +125,26 @@ export function PlanPage() {
         title="Plan"
         subtitle={`Projection: ${projOpen ? "ouverte" : "fermee"}`}
         actions={
-          <>
-          <span className={`badge ${projOpen ? "cp-badge-open" : "cp-badge-closed"}`}>{projOpen ? "Projection ON" : "Projection OFF"}</span>
-          <button
-            className="btn-primary"
-            onClick={async () => {
-              if (projOpen) {
-                const r = await window.cp.projectionWindow.close();
-                setProjOpen(!!r?.isOpen);
-              } else {
-                const r = await window.cp.projectionWindow.open();
-                setProjOpen(!!r?.isOpen);
-              }
-            }}
-          >
-            {projOpen ? "Fermer" : "Ouvrir"}
-          </button>
-          <LiveModeButtons onResume={() => window.cp.live?.resume()} resumeLabel="Reprendre live" />
-          </>
+          <ActionRow className="cp-toolbar-row">
+            <span className={`badge ${projOpen ? "cp-badge-open" : "cp-badge-closed"}`}>
+              {projOpen ? "Projection ouverte" : "Projection fermee"}
+            </span>
+            <button
+              className="btn-primary"
+              onClick={async () => {
+                if (projOpen) {
+                  const r = await window.cp.projectionWindow.close();
+                  setProjOpen(!!r?.isOpen);
+                } else {
+                  const r = await window.cp.projectionWindow.open();
+                  setProjOpen(!!r?.isOpen);
+                }
+              }}
+            >
+              {projOpen ? "Fermer projection" : "Ouvrir projection"}
+            </button>
+            <LiveModeButtons onResume={() => window.cp.live?.resume()} resumeLabel="Reprendre live" />
+          </ActionRow>
         }
       />
 
@@ -179,7 +181,7 @@ export function PlanPage() {
                   ) : null}
                 </div>
 
-                <ActionRow>
+                <ActionRow className="cp-toolbar-row">
                   <button
                     className="btn-primary"
                     onClick={async () => {
