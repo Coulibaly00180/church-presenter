@@ -285,10 +285,15 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
           {songResults.length > 0 ? (
             <div className="cp-dropdown-surface">
               {songResults.map((s) => (
-                <div key={s.id} onClick={() => addSongAllBlocksToPlan(s.id)} className="cp-dropdown-option">
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => addSongAllBlocksToPlan(s.id)}
+                  className="cp-dropdown-option cp-dropdown-option-btn"
+                >
                   <div className="cp-field-label">{s.title}</div>
                   <div className="cp-help-text-muted">Ajouter tous les blocs</div>
-                </div>
+                </button>
               ))}
             </div>
           ) : (

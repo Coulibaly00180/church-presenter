@@ -5,6 +5,14 @@
   font-family: var(--font-body);
 }
 
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .cp-page-title {
   margin: 0;
   letter-spacing: -0.02em;
@@ -324,6 +332,24 @@
   border-bottom: 1px solid var(--border);
 }
 
+.cp-dropdown-option-btn {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.cp-dropdown-option-btn:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
 .cp-target-btn-live {
   padding: 6px 10px;
   border-radius: 10px;
@@ -517,6 +543,20 @@
   height: 100%;
   cursor: pointer;
   pointer-events: auto;
+}
+
+.cp-projection-click-btn {
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  appearance: none;
+}
+
+.cp-projection-click-btn:focus-visible {
+  outline: none;
 }
 
 .cp-projection-click--left {
@@ -755,6 +795,23 @@
   background: transparent;
 }
 
+.cp-song-suggest-item-btn {
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.cp-song-suggest-item-btn:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
 .cp-song-suggest-item.is-active {
   background: #eef6ff;
 }
@@ -776,6 +833,21 @@
   border: 1px solid var(--border);
   background: transparent;
   margin-bottom: 6px;
+}
+
+.cp-song-list-item-btn {
+  width: 100%;
+  text-align: left;
+  box-shadow: none;
+  transform: none;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+
+.cp-song-list-item-btn:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
 }
 
 .cp-song-list-item.is-active {

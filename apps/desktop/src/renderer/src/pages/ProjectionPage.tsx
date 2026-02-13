@@ -48,7 +48,6 @@ export function ProjectionPage() {
     return frag ? `${base}#${frag}` : base;
   }
 
-
   // Live controls from projection window: arrows/Q/D + click left/right (skip when PDF to avoid conflict with PDF paging)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -67,7 +66,6 @@ export function ProjectionPage() {
         const max = Math.max(parts.length - 1, 0);
         setBlockCursor((idx) => {
           const next = Math.min(Math.max(idx + (isNext ? 1 : -1), 0), max);
-          if (next !== idx) console.log("[projection] key:", e.key, "-> text block", next + 1, "/", max + 1);
           return next;
         });
         return;
@@ -75,12 +73,10 @@ export function ProjectionPage() {
 
       if (isNext) {
         e.preventDefault();
-        console.log("[projection] key:", e.key, "-> live: next");
         window.cp.live?.next?.();
       }
       if (isPrev) {
         e.preventDefault();
-        console.log("[projection] key:", e.key, "-> live: prev");
         window.cp.live?.prev?.();
       }
     };
@@ -261,27 +257,29 @@ export function ProjectionPage() {
         if (isPdf) {
           e.preventDefault();
           const delta = e.deltaY > 0 ? 1 : -1;
-          setPdfPage((p) => {
-            const next = Math.min(Math.max(p + delta, 1), pdfPageCount || 1);
-            if (next !== p) console.log("[projection] wheel -> PDF page", next);
-            return next;
-          });
+          setPdfPage((p) => Math.min(Math.max(p + delta, 1), pdfPageCount || 1));
         }
       }}
       tabIndex={0}
     >
       {/* click areas */}
-      <div
+      <button
+        type="button"
+        aria-label="Precedent"
         onClick={() => {
           if (!isPdf) window.cp.live?.prev?.();
         }}
-        className={cls("cp-projection-click", "cp-projection-click--left", isPdf && "is-disabled")}
+        className={cls("cp-projection-click", "cp-projection-click-btn", "cp-projection-click--left", isPdf && "is-disabled")}
+        disabled={isPdf}
       />
-      <div
+      <button
+        type="button"
+        aria-label="Suivant"
         onClick={() => {
           if (!isPdf) window.cp.live?.next?.();
         }}
-        className={cls("cp-projection-click", "cp-projection-click--right", isPdf && "is-disabled")}
+        className={cls("cp-projection-click", "cp-projection-click-btn", "cp-projection-click--right", isPdf && "is-disabled")}
+        disabled={isPdf}
       />
       <div style={cardStyle} key={animKey}>
         {/* watermark screen id */}

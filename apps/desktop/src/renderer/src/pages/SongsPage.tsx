@@ -376,7 +376,6 @@ export function SongsPage() {
             setImporting(true);
             const r = await window.cp.songs.importAuto();
             setImporting(false);
-            console.log("Import auto result", r);
             if (r?.ok) {
               await refresh(q);
               const count = r.imported || 0;
@@ -422,12 +421,17 @@ export function SongsPage() {
             {filtered.length > 0 && q.trim().length > 0 ? (
               <div className="cp-song-suggest-list">
                 {filtered.slice(0, 8).map((s) => (
-                  <div key={s.id} onClick={() => loadSong(s.id)} className={cls("cp-song-suggest-item", s.id === selectedId && "is-active")}>
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => loadSong(s.id)}
+                    className={cls("cp-song-suggest-item", "cp-song-suggest-item-btn", s.id === selectedId && "is-active")}
+                  >
                     <div className="cp-song-item-title">{s.title}</div>
                     <div className="cp-help-text-flat">
                       {(s.artist || "—")} {s.album ? `• ${s.album}` : ""}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : null}
@@ -435,12 +439,17 @@ export function SongsPage() {
 
           <div className="cp-song-list-scroll">
             {filtered.map((s) => (
-              <div key={s.id} onClick={() => loadSong(s.id)} className={cls("cp-song-list-item", s.id === selectedId && "is-active")}>
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => loadSong(s.id)}
+                className={cls("cp-song-list-item", "cp-song-list-item-btn", s.id === selectedId && "is-active")}
+              >
                 <div className="cp-song-list-title">{s.title}</div>
                 <div className="cp-song-list-meta">
                   {(s.artist || "—")} {s.album ? `• ${s.album}` : ""}
                 </div>
-              </div>
+              </button>
             ))}
             {filtered.length === 0 ? <div className="cp-empty-row">Aucun chant.</div> : null}
           </div>
