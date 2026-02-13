@@ -1,7 +1,7 @@
 import React from "react";
 import { LiveState, ScreenKey } from "./types";
-import { ActionRow, Panel } from "../../ui/primitives";
-import { LiveEnabledToggle, LiveLockChips, LiveTargetButtons, LiveTransportButtons } from "../../ui/liveControls";
+import { Panel } from "../../ui/primitives";
+import { LiveActionsRow, LiveLockChips, LiveTransportButtons } from "../../ui/liveControls";
 
 type PlanLiveToolbarProps = {
   liveEnabled: boolean;
@@ -20,31 +20,33 @@ export function PlanLiveToolbar(props: PlanLiveToolbarProps) {
 
   return (
     <Panel soft className="cp-mt-12">
-      <ActionRow>
-        <LiveEnabledToggle value={liveEnabled} onChange={(enabled) => onUpdateLive({ enabled })} />
+      <LiveActionsRow
+        useToolbarRow={false}
+        liveEnabled={liveEnabled}
+        onSetEnabled={(enabled) => onUpdateLive({ enabled })}
+        target={target}
+        onSetTarget={(screen) => onUpdateLive({ target: screen as ScreenKey })}
+        locked={live?.lockedScreens}
+        targetContainerClassName="cp-inline-row-tight"
+        targetButtonClassName="cp-target-btn-live"
+        afterTarget={
+          <>
+            <LiveLockChips
+              locked={live?.lockedScreens}
+              onToggle={(screen, isLocked) => onSetLocked(screen as ScreenKey, isLocked)}
+              className="cp-chip-row"
+              itemClassName="cp-inline-check cp-text-13"
+            />
 
-        <LiveTargetButtons
-          target={target}
-          locked={live?.lockedScreens}
-          onChange={(screen) => onUpdateLive({ target: screen as ScreenKey })}
-          className="cp-inline-row-tight"
-          buttonClassName="cp-target-btn-live"
-        />
+            <LiveTransportButtons onPrev={onPrev} onNext={onNext} />
 
-        <LiveLockChips
-          locked={live?.lockedScreens}
-          onToggle={(screen, isLocked) => onSetLocked(screen as ScreenKey, isLocked)}
-          className="cp-chip-row"
-          itemClassName="cp-inline-check cp-text-13"
-        />
-
-        <LiveTransportButtons onPrev={onPrev} onNext={onNext} />
-
-        <label className="cp-inline-field">
-          <input type="checkbox" checked={filterSongsOnly} onChange={(e) => onSetFilterSongsOnly(e.target.checked)} />
-          Chants uniquement
-        </label>
-      </ActionRow>
+            <label className="cp-inline-field">
+              <input type="checkbox" checked={filterSongsOnly} onChange={(e) => onSetFilterSongsOnly(e.target.checked)} />
+              Chants uniquement
+            </label>
+          </>
+        }
+      />
     </Panel>
   );
 }

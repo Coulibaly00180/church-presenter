@@ -1,4 +1,5 @@
 import React from "react";
+import { ActionRow, ToolbarRow } from "./primitives";
 
 type LiveScreenKey = "A" | "B" | "C";
 type LiveLocks = Partial<Record<LiveScreenKey, boolean>>;
@@ -151,4 +152,59 @@ export function LiveModeButtons(props: LiveModeButtonsProps) {
       ) : null}
     </div>
   );
+}
+
+type LiveActionsRowProps = {
+  liveEnabled: boolean;
+  onSetEnabled: (enabled: boolean) => void | Promise<unknown>;
+  target: LiveScreenKey;
+  onSetTarget: (screen: LiveScreenKey) => void | Promise<unknown>;
+  locked?: LiveLocks;
+  useToolbarRow?: boolean;
+  rowClassName?: string;
+  enabledLabel?: React.ReactNode;
+  targetContainerClassName?: string;
+  targetButtonClassName?: string;
+  targetActiveClassName?: string;
+  targetLabelFormatter?: (screen: LiveScreenKey, locked: boolean) => React.ReactNode;
+  afterTarget?: React.ReactNode;
+};
+
+export function LiveActionsRow(props: LiveActionsRowProps) {
+  const {
+    liveEnabled,
+    onSetEnabled,
+    target,
+    onSetTarget,
+    locked,
+    useToolbarRow = true,
+    rowClassName,
+    enabledLabel,
+    targetContainerClassName,
+    targetButtonClassName,
+    targetActiveClassName,
+    targetLabelFormatter,
+    afterTarget,
+  } = props;
+
+  const rowContent = (
+    <>
+      <LiveEnabledToggle value={liveEnabled} onChange={onSetEnabled} label={enabledLabel} />
+      <LiveTargetButtons
+        target={target}
+        onChange={onSetTarget}
+        locked={locked}
+        className={targetContainerClassName}
+        buttonClassName={targetButtonClassName}
+        activeClassName={targetActiveClassName}
+        formatLabel={targetLabelFormatter}
+      />
+      {afterTarget}
+    </>
+  );
+
+  if (useToolbarRow) {
+    return <ToolbarRow className={rowClassName}>{rowContent}</ToolbarRow>;
+  }
+  return <ActionRow className={rowClassName}>{rowContent}</ActionRow>;
 }

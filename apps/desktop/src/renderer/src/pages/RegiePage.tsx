@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Field, PageHeader, Panel, ToolbarRow } from "../ui/primitives";
-import { LiveEnabledToggle, LiveLockChips, LiveModeButtons, LiveTargetButtons } from "../ui/liveControls";
+import { LiveActionsRow, LiveLockChips, LiveModeButtons } from "../ui/liveControls";
 import { projectTextToScreen } from "../projection/target";
 
 type LivePatch = {
@@ -165,22 +165,21 @@ export function RegiePage() {
           subtitle={status}
           titleClassName="cp-page-title-lg"
           actions={
-            <ToolbarRow>
-              <LiveEnabledToggle value={!!live?.enabled} onChange={(enabled) => updateLive({ enabled })} />
-              <LiveTargetButtons
-                target={target}
-                locked={locked}
-                onChange={(screen) => updateLive({ target: screen as ScreenKey })}
-                className="cp-target-picker"
-                buttonClassName="cp-target-btn"
-                formatLabel={(screen, isLocked) => (
-                  <>
-                    {screen}
-                    {isLocked ? " [Lock]" : ""}
-                  </>
-                )}
-              />
-            </ToolbarRow>
+            <LiveActionsRow
+              liveEnabled={!!live?.enabled}
+              onSetEnabled={(enabled) => updateLive({ enabled })}
+              target={target}
+              onSetTarget={(screen) => updateLive({ target: screen as ScreenKey })}
+              locked={locked}
+              targetContainerClassName="cp-target-picker"
+              targetButtonClassName="cp-target-btn"
+              targetLabelFormatter={(screen, isLocked) => (
+                <>
+                  {screen}
+                  {isLocked ? " [Lock]" : ""}
+                </>
+              )}
+            />
           }
         />
 
