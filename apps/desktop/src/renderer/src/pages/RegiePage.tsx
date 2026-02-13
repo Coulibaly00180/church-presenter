@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
+import { LiveEnabledToggle, LiveLockChips, LiveTargetButtons } from "../ui/liveControls";
 
 type LivePatch = {
   planId?: string | null;
@@ -189,18 +190,20 @@ export function RegiePage() {
           titleClassName="cp-page-title-lg"
           actions={
             <ActionRow>
-              <label className="cp-inline-field">
-                <input type="checkbox" checked={!!live?.enabled} onChange={(e) => updateLive({ enabled: e.target.checked })} />
-                <span>Live</span>
-              </label>
-              <div className="cp-target-picker">
-                {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-                  <button key={k} onClick={() => updateLive({ target: k })} className={cls("cp-target-btn", target === k && "is-active")}>
-                    {k}
-                    {locked[k] ? " [LOCK]" : ""}
-                  </button>
-                ))}
-              </div>
+              <LiveEnabledToggle value={!!live?.enabled} onChange={(enabled) => updateLive({ enabled })} />
+              <LiveTargetButtons
+                target={target}
+                locked={locked}
+                onChange={(screen) => updateLive({ target: screen as ScreenKey })}
+                className="cp-target-picker"
+                buttonClassName="cp-target-btn"
+                formatLabel={(screen, isLocked) => (
+                  <>
+                    {screen}
+                    {isLocked ? " [LOCK]" : ""}
+                  </>
+                )}
+              />
             </ActionRow>
           }
         />
@@ -252,14 +255,12 @@ export function RegiePage() {
             />
           </div>
 
-          <div className="cp-chip-row cp-chip-row--offset">
-            {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-              <label key={k} className="cp-inline-check">
-                <input type="checkbox" checked={!!locked[k]} onChange={(e) => window.cp.live?.setLocked(k, e.target.checked)} />
-                Lock {k}
-              </label>
-            ))}
-          </div>
+          <LiveLockChips
+            locked={locked}
+            onToggle={(screen, isLocked) => window.cp.live?.setLocked(screen as ScreenKey, isLocked)}
+            className="cp-chip-row cp-chip-row--offset"
+            itemClassName="cp-inline-check"
+          />
         </ActionRow>
       </Panel>
 

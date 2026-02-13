@@ -1,6 +1,7 @@
 import React from "react";
 import { LiveState, ScreenKey } from "./types";
 import { ActionRow, Panel } from "../../ui/primitives";
+import { LiveEnabledToggle, LiveLockChips, LiveTargetButtons } from "../../ui/liveControls";
 
 type PlanLiveToolbarProps = {
   liveEnabled: boolean;
@@ -14,41 +15,28 @@ type PlanLiveToolbarProps = {
   onSetFilterSongsOnly: (value: boolean) => void;
 };
 
-function cls(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
-
 export function PlanLiveToolbar(props: PlanLiveToolbarProps) {
   const { liveEnabled, target, live, filterSongsOnly, onUpdateLive, onSetLocked, onPrev, onNext, onSetFilterSongsOnly } = props;
 
   return (
     <Panel soft className="cp-mt-12">
       <ActionRow>
-        <label className="cp-inline-field">
-          <input type="checkbox" checked={liveEnabled} onChange={(e) => onUpdateLive({ enabled: e.target.checked })} />
-          Live
-        </label>
+        <LiveEnabledToggle value={liveEnabled} onChange={(enabled) => onUpdateLive({ enabled })} />
 
-        <div className="cp-inline-row-tight">
-          {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-            <button
-              key={k}
-              onClick={() => onUpdateLive({ target: k })}
-              className={cls("cp-target-btn-live", target === k && "is-active")}
-            >
-              Ecran {k}
-            </button>
-          ))}
-        </div>
+        <LiveTargetButtons
+          target={target}
+          locked={live?.lockedScreens}
+          onChange={(screen) => onUpdateLive({ target: screen as ScreenKey })}
+          className="cp-inline-row-tight"
+          buttonClassName="cp-target-btn-live"
+        />
 
-        <div className="cp-chip-row">
-          {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-            <label key={k} className="cp-inline-check cp-text-13">
-              <input type="checkbox" checked={!!live?.lockedScreens?.[k]} onChange={(e) => onSetLocked(k, e.target.checked)} />
-              Lock {k}
-            </label>
-          ))}
-        </div>
+        <LiveLockChips
+          locked={live?.lockedScreens}
+          onToggle={(screen, isLocked) => onSetLocked(screen as ScreenKey, isLocked)}
+          className="cp-chip-row"
+          itemClassName="cp-inline-check cp-text-13"
+        />
 
         <div className="cp-inline-row-tight">
           <button onClick={onPrev}>{"< Prev"}</button>
