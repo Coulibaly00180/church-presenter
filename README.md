@@ -25,6 +25,7 @@ npm run dev
 ```bash
 npm run lint
 npm run typecheck
+npm run test
 npm run build
 ```
 
@@ -44,5 +45,5 @@ npm run build
 - `apps/desktop/prisma`: schema + migrations
 
 ## Current quality gates
-- typecheck and build are in place
-- no automated test suite yet
+- lint + typecheck + unit tests + build
+- CI workflow runs the same checks on push/PR

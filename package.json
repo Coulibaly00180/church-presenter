@@ -10,6 +10,7 @@
     "dev": "npm run dev -w @cp/desktop",
     "build": "npm run build -w @cp/desktop",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck -w @cp/desktop"
+    "typecheck": "npm run typecheck -w @cp/desktop",
+    "test": "npm run test -w @cp/desktop"
   }
 }

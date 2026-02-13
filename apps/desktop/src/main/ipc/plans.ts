@@ -9,6 +9,7 @@ import type {
   CpPlanRemoveItemPayload,
   CpPlanReorderPayload,
 } from "../../shared/ipc";
+import { validatePlanReorderPayload } from "./reorderValidation";
 
 function normalizeDateToMidnight(dateIso: string) {
   const ymd = dateIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -186,19 +187,7 @@ export function registerPlansIpc() {
 
     const currentIds = currentItems.map((it) => it.id);
     const requestedIds = payload.orderedItemIds ?? [];
-    if (requestedIds.length !== currentIds.length) {
-      throw new Error("Invalid reorder payload size");
-    }
-
-    const requestedSet = new Set(requestedIds);
-    if (requestedSet.size !== requestedIds.length) {
-      throw new Error("Duplicate item id in reorder payload");
-    }
-
-    const currentSet = new Set(currentIds);
-    for (const id of requestedSet) {
-      if (!currentSet.has(id)) throw new Error("Reorder payload contains item outside target plan");
-    }
+    validatePlanReorderPayload(currentIds, requestedIds);
 
     await prisma.$transaction(
       requestedIds.map((id, idx) => prisma.serviceItem.update({ where: { id }, data: { order: idx + 1 } }))

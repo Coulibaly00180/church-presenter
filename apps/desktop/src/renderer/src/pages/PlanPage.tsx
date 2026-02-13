@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DragEndEvent } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
 import { isoToYmd, localNowYmd } from "./plan/date";
 import { PlanComposerSection } from "./plan/PlanComposerSection";
 import { PlanItemsOrderSection } from "./plan/PlanItemsOrderSection";
 import { PlanLiveToolbar } from "./plan/PlanLiveToolbar";
 import { PlanSidebarSection } from "./plan/PlanSidebarSection";
 import { projectPlanItemToTarget } from "./plan/projection";
+import { reorderPlanItems } from "./plan/reorder";
 import { LiveState, Plan, PlanListItem } from "./plan/types";
 import { Alert, PageHeader, Panel, ToolbarRow } from "../ui/primitives";
 import { LiveModeButtons } from "../ui/liveControls";
@@ -98,47 +98,17 @@ export function PlanPage() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const activeId = String(active.id);
-    const overId = String(over.id);
+    const result = reorderPlanItems({
+      items: plan.items,
+      visibleItems,
+      filterSongsOnly,
+      activeId: String(active.id),
+      overId: String(over.id),
+    });
+    if (!result) return;
 
-    let orderedItemIds: string[] = [];
-
-    if (filterSongsOnly) {
-      const visibleIds = visibleItems.map((i) => i.id);
-      const oldVisibleIndex = visibleIds.indexOf(activeId);
-      const newVisibleIndex = visibleIds.indexOf(overId);
-      if (oldVisibleIndex < 0 || newVisibleIndex < 0) return;
-
-      const reorderedVisibleIds = arrayMove(visibleIds, oldVisibleIndex, newVisibleIndex);
-      const visibleSet = new Set(visibleIds);
-      let cursor = 0;
-
-      orderedItemIds = plan.items.map((item) => {
-        if (!visibleSet.has(item.id)) return item.id;
-        const nextId = reorderedVisibleIds[cursor];
-        cursor += 1;
-        return nextId;
-      });
-    } else {
-      const oldIndex = plan.items.findIndex((i) => i.id === activeId);
-      const newIndex = plan.items.findIndex((i) => i.id === overId);
-      if (oldIndex < 0 || newIndex < 0) return;
-      orderedItemIds = arrayMove(
-        plan.items.map((item) => item.id),
-        oldIndex,
-        newIndex
-      );
-    }
-
-    const byId = new Map(plan.items.map((item) => [item.id, item]));
-    const newItems = orderedItemIds.reduce<typeof plan.items>((acc, id, idx) => {
-      const item = byId.get(id);
-      if (item) acc.push({ ...item, order: idx + 1 });
-      return acc;
-    }, []);
-
-    setPlan({ ...plan, items: newItems });
-    await window.cp.plans.reorder({ planId: plan.id, orderedItemIds });
+    setPlan({ ...plan, items: result.newItems });
+    await window.cp.plans.reorder({ planId: plan.id, orderedItemIds: result.orderedItemIds });
     await loadPlan(plan.id);
   }
 

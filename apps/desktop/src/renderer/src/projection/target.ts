@@ -1,3 +1,5 @@
+import { resolveProjectionDestination, shouldSkipProjection } from "./routing";
+
 type ProjectionTargetOptions = {
   target: ScreenKey;
   lockedScreens?: Partial<Record<ScreenKey, boolean>>;
@@ -23,7 +25,7 @@ type ResolvedProjectionTarget = {
 
 async function resolveProjectionTarget(options: ProjectionTargetOptions): Promise<ResolvedProjectionTarget> {
   const { target, lockedScreens } = options;
-  if (lockedScreens?.[target]) {
+  if (shouldSkipProjection(target, lockedScreens)) {
     return { skip: true, destination: target, screensApi: window.cp.screens ?? null };
   }
 
@@ -37,8 +39,7 @@ async function resolveProjectionTarget(options: ProjectionTargetOptions): Promis
     await screensApi.open(target);
   }
 
-  const isMirrorOfA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
-  const destination: ScreenKey = isMirrorOfA ? "A" : target;
+  const destination = resolveProjectionDestination(target, meta);
   return { skip: false, destination, screensApi };
 }
 
