@@ -5,6 +5,20 @@ import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
+import {
+  parseDevtoolsTarget,
+  parseFilesDeleteMediaPayload,
+  parseLiveCursor,
+  parseLiveSetLockedPayload,
+  parseLiveSetPayload,
+  parseProjectionMode,
+  parseProjectionSetAppearancePayload,
+  parseProjectionSetMediaPayload,
+  parseProjectionSetTextPayload,
+  parseProjectionStatePatch,
+  parseScreenKey,
+  parseScreenMirrorMode,
+} from "./ipc/runtimeValidation";
 import type {
   CpDevtoolsTarget,
   CpLiveSetPayload,
@@ -311,7 +325,8 @@ ipcMain.handle("projectionWindow:isOpen", () => {
 });
 
 // Devtools opening
-ipcMain.handle("devtools:open", (_evt, target: CpDevtoolsTarget) => {
+ipcMain.handle("devtools:open", (_evt, rawTarget: unknown) => {
+  const target = parseDevtoolsTarget(rawTarget);
   if (target === "REGIE") regieWin?.webContents.openDevTools({ mode: "detach" });
   if (target === "PROJECTION" || target === "SCREEN_A") projWins.A?.webContents.openDevTools({ mode: "detach" });
   if (target === "SCREEN_B") projWins.B?.webContents.openDevTools({ mode: "detach" });
@@ -366,8 +381,9 @@ ipcMain.handle("files:listMedia", async () => {
   }
 });
 
-ipcMain.handle("files:deleteMedia", async (_evt, payload: { path: string }) => {
+ipcMain.handle("files:deleteMedia", async (_evt, rawPayload: unknown) => {
   try {
+    const payload = parseFilesDeleteMediaPayload(rawPayload);
     if (!payload?.path) return { ok: false, error: "Missing media path" };
     const mediaDir = getMediaDir();
     if (!isPathInDir(mediaDir, payload.path)) {
@@ -386,7 +402,8 @@ ipcMain.handle("files:deleteMedia", async (_evt, payload: { path: string }) => {
 // A-only projection state API (legacy)
 ipcMain.handle("projection:getState", () => screenStates.A);
 
-ipcMain.handle("projection:setState", (_evt, patch: Partial<ProjectionState>) => {
+ipcMain.handle("projection:setState", (_evt, rawPatch: unknown) => {
+  const patch = parseProjectionStatePatch(rawPatch);
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = { ...screenStates.A, ...patch, updatedAt: Date.now() };
   sendScreenState("A");
@@ -394,7 +411,8 @@ ipcMain.handle("projection:setState", (_evt, patch: Partial<ProjectionState>) =>
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setAppearance", (_evt, patch: CpProjectionSetAppearancePayload) => {
+ipcMain.handle("projection:setAppearance", (_evt, rawPatch: unknown) => {
+  const patch = parseProjectionSetAppearancePayload(rawPatch);
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
@@ -408,7 +426,8 @@ ipcMain.handle("projection:setAppearance", (_evt, patch: CpProjectionSetAppearan
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setContentText", (_evt, payload: CpProjectionSetTextPayload) => {
+ipcMain.handle("projection:setContentText", (_evt, rawPayload: unknown) => {
+  const payload = parseProjectionSetTextPayload(rawPayload);
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
@@ -421,7 +440,8 @@ ipcMain.handle("projection:setContentText", (_evt, payload: CpProjectionSetTextP
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setContentMedia", (_evt, payload: CpProjectionSetMediaPayload) => {
+ipcMain.handle("projection:setContentMedia", (_evt, rawPayload: unknown) => {
+  const payload = parseProjectionSetMediaPayload(rawPayload);
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = {
     ...screenStates.A,
@@ -434,7 +454,8 @@ ipcMain.handle("projection:setContentMedia", (_evt, payload: CpProjectionSetMedi
   return { ok: true, state: screenStates.A };
 });
 
-ipcMain.handle("projection:setMode", (_evt, mode: ProjectionMode) => {
+ipcMain.handle("projection:setMode", (_evt, rawMode: unknown) => {
+  const mode = parseProjectionMode(rawMode, "projection:setMode.mode");
   if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
   screenStates.A = { ...screenStates.A, mode, updatedAt: Date.now() };
   sendScreenState("A");
@@ -450,19 +471,26 @@ ipcMain.handle("screens:list", (): ScreenInfo[] => {
   return keys.map((k) => ({ key: k, isOpen: !!projWins[k], mirror: mirrors[k] }));
 });
 
-ipcMain.handle("screens:isOpen", (_evt, key: ScreenKey) => ({ isOpen: !!projWins[key] }));
+ipcMain.handle("screens:isOpen", (_evt, rawKey: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:isOpen.key");
+  return { isOpen: !!projWins[key] };
+});
 
-ipcMain.handle("screens:open", (_evt, key: ScreenKey) => {
+ipcMain.handle("screens:open", (_evt, rawKey: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:open.key");
   createScreenWindow(key);
   return { isOpen: !!projWins[key] };
 });
 
-ipcMain.handle("screens:close", (_evt, key: ScreenKey) => {
+ipcMain.handle("screens:close", (_evt, rawKey: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:close.key");
   closeScreenWindow(key);
   return { isOpen: !!projWins[key] };
 });
 
-ipcMain.handle("screens:setMirror", (_evt, key: ScreenKey, mirror: ScreenMirrorMode) => {
+ipcMain.handle("screens:setMirror", (_evt, rawKey: unknown, rawMirror: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:setMirror.key");
+  const mirror = parseScreenMirrorMode(rawMirror);
   mirrors[key] = mirror;
   // If switching to mirror, sync immediately
   if (mirror.kind === "MIRROR") {
@@ -474,9 +502,14 @@ ipcMain.handle("screens:setMirror", (_evt, key: ScreenKey, mirror: ScreenMirrorM
   return { ok: true, mirror };
 });
 
-ipcMain.handle("screens:getState", (_evt, key: ScreenKey) => screenStates[key]);
+ipcMain.handle("screens:getState", (_evt, rawKey: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:getState.key");
+  return screenStates[key];
+});
 
-ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: CpProjectionSetTextPayload) => {
+ipcMain.handle("screens:setContentText", (_evt, rawKey: unknown, rawPayload: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:setContentText.key");
+  const payload = parseProjectionSetTextPayload(rawPayload);
   // If screen is mirroring, ignore direct set (safety)
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
   if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
@@ -494,7 +527,9 @@ ipcMain.handle("screens:setContentText", (_evt, key: ScreenKey, payload: CpProje
 
 ipcMain.handle(
   "screens:setContentMedia",
-  (_evt, key: ScreenKey, payload: CpProjectionSetMediaPayload) => {
+  (_evt, rawKey: unknown, rawPayload: unknown) => {
+    const key = parseScreenKey(rawKey, "screens:setContentMedia.key");
+    const payload = parseProjectionSetMediaPayload(rawPayload);
     if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
     if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
     screenStates[key] = {
@@ -509,7 +544,9 @@ ipcMain.handle(
   }
 );
 
-ipcMain.handle("screens:setMode", (_evt, key: ScreenKey, mode: ProjectionMode) => {
+ipcMain.handle("screens:setMode", (_evt, rawKey: unknown, rawMode: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:setMode.key");
+  const mode = parseProjectionMode(rawMode, "screens:setMode.mode");
   // If screen is mirroring, ignore
   if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
   if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
@@ -596,8 +633,9 @@ ipcMain.handle(
   "live:set",
   async (
     _evt,
-    payload: CpLiveSetPayload
+    rawPayload: unknown
   ) => {
+    const payload = parseLiveSetPayload(rawPayload);
     const patch: Partial<LiveState> = {};
     if ("planId" in payload) patch.planId = payload.planId ?? null;
     if ("cursor" in payload && typeof payload.cursor === "number") patch.cursor = payload.cursor;
@@ -615,9 +653,15 @@ ipcMain.handle("live:next", () => mergeLive({ cursor: (liveState.cursor ?? 0) + 
 
 ipcMain.handle("live:prev", () => mergeLive({ cursor: Math.max((liveState.cursor ?? 0) - 1, 0), enabled: true }));
 
-ipcMain.handle("live:setCursor", (_evt, cursor: number) => mergeLive({ cursor, enabled: true }));
+ipcMain.handle("live:setCursor", (_evt, rawCursor: unknown) => {
+  const cursor = parseLiveCursor(rawCursor);
+  return mergeLive({ cursor, enabled: true });
+});
 
-ipcMain.handle("live:setTarget", (_evt, target: ScreenKey) => mergeLive({ target }));
+ipcMain.handle("live:setTarget", (_evt, rawTarget: unknown) => {
+  const target = parseScreenKey(rawTarget, "live:setTarget.target");
+  return mergeLive({ target });
+});
 
 ipcMain.handle("live:toggleBlack", () => mergeLive({ black: !liveState.black, enabled: true }));
 
@@ -625,7 +669,8 @@ ipcMain.handle("live:toggleWhite", () => mergeLive({ white: !liveState.white, en
 
 ipcMain.handle("live:resume", () => mergeLive({ black: false, white: false, enabled: true }));
 
-ipcMain.handle("live:setLocked", (_evt, payload: { key: ScreenKey; locked: boolean }) => {
+ipcMain.handle("live:setLocked", (_evt, rawPayload: unknown) => {
+  const payload = parseLiveSetLockedPayload(rawPayload);
   const next = { ...liveState.lockedScreens, [payload.key]: payload.locked };
   return mergeLive({ lockedScreens: next });
 });

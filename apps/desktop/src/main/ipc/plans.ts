@@ -1,15 +1,16 @@
 import { dialog, ipcMain } from "electron";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
-import type {
-  CpPlanAddItemPayload,
-  CpPlanCreatePayload,
-  CpPlanDuplicatePayload,
-  CpPlanExportPayload,
-  CpPlanRemoveItemPayload,
-  CpPlanReorderPayload,
-} from "../../shared/ipc";
 import { validatePlanReorderPayload } from "./reorderValidation";
+import {
+  parseNonEmptyString,
+  parsePlanAddItemPayload,
+  parsePlanCreatePayload,
+  parsePlanDuplicatePayload,
+  parsePlanExportPayload,
+  parsePlanRemoveItemPayload,
+  parsePlanReorderPayload,
+} from "./runtimeValidation";
 
 function normalizeDateToMidnight(dateIso: string) {
   const ymd = dateIso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -45,16 +46,18 @@ export function registerPlansIpc() {
     });
   });
 
-  ipcMain.handle("plans:get", async (_evt, planId: string) => {
+  ipcMain.handle("plans:get", async (_evt, rawPlanId: unknown) => {
     const prisma = getPrisma();
+    const planId = parseNonEmptyString(rawPlanId, "plans:get.planId");
     return prisma.servicePlan.findUnique({
       where: { id: planId },
       include: { items: { orderBy: { order: "asc" } } },
     });
   });
 
-  ipcMain.handle("plans:duplicate", async (_evt, payload: CpPlanDuplicatePayload) => {
+  ipcMain.handle("plans:duplicate", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parsePlanDuplicatePayload(rawPayload);
     const base = await prisma.servicePlan.findUnique({
       where: { id: payload.planId },
       include: { items: { orderBy: { order: "asc" } } },
@@ -100,8 +103,9 @@ export function registerPlansIpc() {
     throw new Error("Unable to find an available plan date");
   });
 
-  ipcMain.handle("plans:create", async (_evt, payload: CpPlanCreatePayload) => {
+  ipcMain.handle("plans:create", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parsePlanCreatePayload(rawPayload);
     let candidateDate = normalizeDateToMidnight(payload.dateIso);
     const title = payload.title ?? "Culte";
 
@@ -120,8 +124,9 @@ export function registerPlansIpc() {
     throw new Error("Unable to find an available plan date");
   });
 
-  ipcMain.handle("plans:delete", async (_evt, planId: string) => {
+  ipcMain.handle("plans:delete", async (_evt, rawPlanId: unknown) => {
     const prisma = getPrisma();
+    const planId = parseNonEmptyString(rawPlanId, "plans:delete.planId");
     await prisma.servicePlan.delete({ where: { id: planId } });
     return { ok: true };
   });
@@ -130,9 +135,10 @@ export function registerPlansIpc() {
     "plans:addItem",
     async (
       _evt,
-      payload: CpPlanAddItemPayload
+      rawPayload: unknown
     ) => {
       const prisma = getPrisma();
+      const payload = parsePlanAddItemPayload(rawPayload);
       const count = await prisma.serviceItem.count({ where: { planId: payload.planId } });
       const order = count + 1;
 
@@ -151,8 +157,9 @@ export function registerPlansIpc() {
     }
   );
 
-  ipcMain.handle("plans:removeItem", async (_evt, payload: CpPlanRemoveItemPayload) => {
+  ipcMain.handle("plans:removeItem", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parsePlanRemoveItemPayload(rawPayload);
     const item = await prisma.serviceItem.findUnique({
       where: { id: payload.itemId },
       select: { id: true, planId: true },
@@ -177,8 +184,9 @@ export function registerPlansIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("plans:reorder", async (_evt, payload: CpPlanReorderPayload) => {
+  ipcMain.handle("plans:reorder", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parsePlanReorderPayload(rawPayload);
     const currentItems = await prisma.serviceItem.findMany({
       where: { planId: payload.planId },
       orderBy: { order: "asc" },
@@ -195,8 +203,9 @@ export function registerPlansIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle("plans:export", async (_evt, payload: CpPlanExportPayload) => {
+  ipcMain.handle("plans:export", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parsePlanExportPayload(rawPayload);
     const plan = await prisma.servicePlan.findUnique({
       where: { id: payload.planId },
       include: { items: { orderBy: { order: "asc" } } },

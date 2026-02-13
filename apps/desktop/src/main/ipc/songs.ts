@@ -7,6 +7,13 @@ import fs from "fs";
 import path from "path";
 import AdmZip from "adm-zip";
 import type { CpSongBlockType } from "../../shared/ipc";
+import {
+  parseNonEmptyString,
+  parseOptionalQuery,
+  parseSongCreatePayload,
+  parseSongReplaceBlocksPayload,
+  parseSongUpdateMetaPayload,
+} from "./runtimeValidation";
 
 const SUPPORTED_DOC_EXTENSIONS = [".docx", ".odt"];
 type PrismaClientType = ReturnType<typeof getPrisma>;
@@ -312,9 +319,9 @@ type BlockInput = {
 };
 
 export function registerSongsIpc() {
-  ipcMain.handle("songs:list", async (_evt, q?: string) => {
+  ipcMain.handle("songs:list", async (_evt, rawQ?: unknown) => {
     const prisma = getPrisma();
-    const query = (q ?? "").trim();
+    const query = (parseOptionalQuery(rawQ, "songs:list.query") ?? "").trim();
 
     if (query.length > 0) {
       return prisma.song.findMany({
@@ -340,16 +347,18 @@ export function registerSongsIpc() {
     });
   });
 
-  ipcMain.handle("songs:get", async (_evt, id: string) => {
+  ipcMain.handle("songs:get", async (_evt, rawId: unknown) => {
     const prisma = getPrisma();
+    const id = parseNonEmptyString(rawId, "songs:get.id");
     return prisma.song.findUnique({
       where: { id },
       include: { blocks: { orderBy: { order: "asc" } } },
     });
   });
 
-  ipcMain.handle("songs:create", async (_evt, payload: { title: string; artist?: string; album?: string }) => {
+  ipcMain.handle("songs:create", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parseSongCreatePayload(rawPayload);
     return prisma.song.create({
       data: {
         title: payload.title,
@@ -366,8 +375,9 @@ export function registerSongsIpc() {
     });
   });
 
-  ipcMain.handle("songs:updateMeta", async (_evt, payload: { id: string; title: string; artist?: string; album?: string }) => {
+  ipcMain.handle("songs:updateMeta", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parseSongUpdateMetaPayload(rawPayload);
     return prisma.song.update({
       where: { id: payload.id },
       data: { title: payload.title, artist: payload.artist, album: payload.album },
@@ -375,8 +385,9 @@ export function registerSongsIpc() {
     });
   });
 
-  ipcMain.handle("songs:replaceBlocks", async (_evt, payload: { songId: string; blocks: BlockInput[] }) => {
+  ipcMain.handle("songs:replaceBlocks", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parseSongReplaceBlocksPayload(rawPayload);
     return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.songBlock.deleteMany({ where: { songId: payload.songId } });
       await tx.songBlock.createMany({
@@ -396,14 +407,16 @@ export function registerSongsIpc() {
     });
   });
 
-  ipcMain.handle("songs:delete", async (_evt, id: string) => {
+  ipcMain.handle("songs:delete", async (_evt, rawId: unknown) => {
     const prisma = getPrisma();
+    const id = parseNonEmptyString(rawId, "songs:delete.id");
     await prisma.song.delete({ where: { id } });
     return { ok: true };
   });
 
-  ipcMain.handle("songs:exportWord", async (_evt, songId: string) => {
+  ipcMain.handle("songs:exportWord", async (_evt, rawSongId: unknown) => {
     const prisma = getPrisma();
+    const songId = parseNonEmptyString(rawSongId, "songs:exportWord.songId");
     const song = await prisma.song.findUnique({ where: { id: songId }, include: { blocks: { orderBy: { order: "asc" } } } });
     if (!song) throw new Error("Song not found");
 

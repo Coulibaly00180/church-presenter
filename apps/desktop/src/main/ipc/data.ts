@@ -2,7 +2,8 @@ import { ipcMain, dialog } from "electron";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
 import fs from "fs";
-import type { CpDataImportError, CpDataImportMode } from "../../shared/ipc";
+import type { CpDataImportError } from "../../shared/ipc";
+import { parseDataImportPayload } from "./runtimeValidation";
 
 type ImportedSongBlock = {
   order?: number;
@@ -247,8 +248,9 @@ export function registerDataIpc() {
     return { ok: true, path: res.filePath };
   });
 
-  ipcMain.handle("data:importAll", async (_evt, payload: { mode: CpDataImportMode }) => {
+  ipcMain.handle("data:importAll", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
+    const payload = parseDataImportPayload(rawPayload);
     const res = await dialog.showOpenDialog({
       title: "Importer une base",
       filters: [{ name: "JSON", extensions: ["json"] }],
@@ -266,7 +268,7 @@ export function registerDataIpc() {
       return { ok: false, error: "Invalid JSON file" };
     }
 
-    const mode = payload?.mode || "MERGE";
+    const mode = payload.mode || "MERGE";
     const validationErrors: CpDataImportError[] = [];
     const songs = normalizeSongs(data.songs, validationErrors);
     const plans = normalizePlans(data.plans, validationErrors);
