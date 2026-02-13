@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { PageHeader, Panel } from "../ui/primitives";
+import { Alert, PageHeader, Panel } from "../ui/primitives";
 
 type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
 
@@ -27,6 +27,7 @@ export function CalendarPage() {
 
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [cursor, setCursor] = useState<Date>(() => new Date());
+  const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!canUse) return;
@@ -84,6 +85,7 @@ export function CalendarPage() {
           </>
         }
       />
+      {msg ? <Alert tone="success">{msg}</Alert> : null}
 
       <Panel>
         <div className="cp-calendar-grid">
@@ -106,7 +108,8 @@ export function CalendarPage() {
                       await window.cp.plans.create({ dateIso: key, title: "Culte" });
                       const next = await window.cp.plans.list();
                       setPlans(next);
-                      alert("Plan cree. Va dans Plan pour l'editer.");
+                      setMsg("Plan cree. Va dans Plan pour l'editer.");
+                      setTimeout(() => setMsg(null), 2400);
                     }}
                     className="cp-btn-compact"
                   >

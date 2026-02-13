@@ -1086,6 +1086,17 @@
     align-items: flex-start;
   }
 
+  .cp-actions .cp-inline-field {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .cp-actions .cp-inline-field > input,
+  .cp-actions .cp-inline-field > select {
+    flex: 1;
+    min-width: 0;
+  }
+
   .cp-projection-meta-badge {
     max-width: 95%;
     white-space: normal;
