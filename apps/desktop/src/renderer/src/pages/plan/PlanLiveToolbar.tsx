@@ -1,7 +1,7 @@
 import React from "react";
 import { LiveState, ScreenKey } from "./types";
 import { ActionRow, Panel } from "../../ui/primitives";
-import { LiveEnabledToggle, LiveLockChips, LiveTargetButtons } from "../../ui/liveControls";
+import { LiveEnabledToggle, LiveLockChips, LiveTargetButtons, LiveTransportButtons } from "../../ui/liveControls";
 
 type PlanLiveToolbarProps = {
   liveEnabled: boolean;
@@ -38,10 +38,7 @@ export function PlanLiveToolbar(props: PlanLiveToolbarProps) {
           itemClassName="cp-inline-check cp-text-13"
         />
 
-        <div className="cp-inline-row-tight">
-          <button onClick={onPrev}>{"< Prev"}</button>
-          <button onClick={onNext}>{"Next >"}</button>
-        </div>
+        <LiveTransportButtons onPrev={onPrev} onNext={onNext} />
 
         <label className="cp-inline-field">
           <input type="checkbox" checked={filterSongsOnly} onChange={(e) => onSetFilterSongsOnly(e.target.checked)} />

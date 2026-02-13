@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
-import { LiveEnabledToggle, LiveLockChips, LiveTargetButtons } from "../ui/liveControls";
+import { LiveEnabledToggle, LiveLockChips, LiveModeButtons, LiveTargetButtons } from "../ui/liveControls";
 import { projectTextToScreen } from "../projection/target";
 
 type LivePatch = {
@@ -185,9 +185,11 @@ export function RegiePage() {
         />
 
         <ActionRow className="cp-mt-10">
-          <button onClick={() => window.cp.live?.toggleBlack()}>Noir (B)</button>
-          <button onClick={() => window.cp.live?.toggleWhite()}>Blanc (W)</button>
-          <button onClick={() => window.cp.live?.resume()}>Reprendre (R)</button>
+          <LiveModeButtons
+            onBlack={() => window.cp.live?.toggleBlack()}
+            onWhite={() => window.cp.live?.toggleWhite()}
+            onResume={() => window.cp.live?.resume()}
+          />
           <button onClick={() => window.cp.projection.setState({ lowerThirdEnabled: !(stateA?.lowerThirdEnabled ?? false) })}>Lower Third (L)</button>
 
           <div className="cp-inline-row-tight">

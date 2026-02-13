@@ -88,3 +88,67 @@ export function LiveLockChips(props: LiveLockChipsProps) {
     </div>
   );
 }
+
+type LiveTransportButtonsProps = {
+  onPrev: () => void | Promise<unknown>;
+  onNext: () => void | Promise<unknown>;
+  className?: string;
+  prevLabel?: React.ReactNode;
+  nextLabel?: React.ReactNode;
+};
+
+export function LiveTransportButtons(props: LiveTransportButtonsProps) {
+  const { onPrev, onNext, className = "cp-inline-row-tight", prevLabel = "< Prev", nextLabel = "Next >" } = props;
+  return (
+    <div className={className}>
+      <button type="button" onClick={onPrev}>
+        {prevLabel}
+      </button>
+      <button type="button" onClick={onNext}>
+        {nextLabel}
+      </button>
+    </div>
+  );
+}
+
+type LiveModeButtonsProps = {
+  onBlack?: () => void | Promise<unknown>;
+  onWhite?: () => void | Promise<unknown>;
+  onResume?: () => void | Promise<unknown>;
+  className?: string;
+  blackLabel?: React.ReactNode;
+  whiteLabel?: React.ReactNode;
+  resumeLabel?: React.ReactNode;
+};
+
+export function LiveModeButtons(props: LiveModeButtonsProps) {
+  const {
+    onBlack,
+    onWhite,
+    onResume,
+    className = "cp-inline-row-tight",
+    blackLabel = "Noir (B)",
+    whiteLabel = "Blanc (W)",
+    resumeLabel = "Reprendre (R)",
+  } = props;
+
+  return (
+    <div className={className}>
+      {onBlack ? (
+        <button type="button" onClick={onBlack}>
+          {blackLabel}
+        </button>
+      ) : null}
+      {onWhite ? (
+        <button type="button" onClick={onWhite}>
+          {whiteLabel}
+        </button>
+      ) : null}
+      {onResume ? (
+        <button type="button" onClick={onResume}>
+          {resumeLabel}
+        </button>
+      ) : null}
+    </div>
+  );
+}

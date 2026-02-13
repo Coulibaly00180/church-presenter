@@ -9,6 +9,7 @@ import { PlanSidebarSection } from "./plan/PlanSidebarSection";
 import { projectPlanItemToTarget } from "./plan/projection";
 import { LiveState, Plan, PlanListItem } from "./plan/types";
 import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
+import { LiveModeButtons } from "../ui/liveControls";
 
 export function PlanPage() {
   const canUse = !!window.cp?.plans && !!window.cp?.projection && !!window.cp?.projectionWindow;
@@ -140,7 +141,7 @@ export function PlanPage() {
           >
             {projOpen ? "Fermer" : "Ouvrir"}
           </button>
-          <button onClick={() => window.cp.live?.resume()}>Reprendre live</button>
+          <LiveModeButtons onResume={() => window.cp.live?.resume()} resumeLabel="Reprendre live" />
           </>
         }
       />
