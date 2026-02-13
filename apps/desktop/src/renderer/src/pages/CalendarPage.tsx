@@ -51,7 +51,7 @@ export function CalendarPage() {
     return (
       <div className="cp-page">
         <h1 className="cp-page-title">Calendrier</h1>
-        <p style={{ color: "crimson", margin: 0 }}>Preload non charge (window.cp.plans indisponible).</p>
+        <p className="cp-error-text cp-mb-0">Preload non charge (window.cp.plans indisponible).</p>
       </div>
     );
   }
@@ -79,22 +79,16 @@ export function CalendarPage() {
         actions={
           <>
           <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>{"<"}</button>
-          <div style={{ fontWeight: 900, minWidth: 220, textAlign: "center" }}>{title}</div>
+          <div className="cp-calendar-month-title">{title}</div>
           <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>{">"}</button>
           </>
         }
       />
 
       <Panel>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: 8,
-          }}
-        >
+        <div className="cp-calendar-grid">
           {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((d) => (
-            <div key={d} style={{ fontSize: 12, opacity: 0.7, fontWeight: 800 }}>
+            <div key={d} className="cp-calendar-weekday">
               {d}
             </div>
           ))}
@@ -104,19 +98,9 @@ export function CalendarPage() {
             const inMonth = d.getMonth() === cursor.getMonth();
             const list = byDate.get(key) ?? [];
             return (
-              <div
-                key={key}
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  padding: 10,
-                  minHeight: 90,
-                  background: inMonth ? "white" : "#f8fafc",
-                  opacity: inMonth ? 1 : 0.72,
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                  <div style={{ fontWeight: 900 }}>{d.getDate()}</div>
+              <div key={key} className={inMonth ? "cp-calendar-day" : "cp-calendar-day is-outside-month"}>
+                <div className="cp-calendar-day-head">
+                  <div className="cp-title-strong">{d.getDate()}</div>
                   <button
                     onClick={async () => {
                       await window.cp.plans.create({ dateIso: key, title: "Culte" });
@@ -124,19 +108,19 @@ export function CalendarPage() {
                       setPlans(next);
                       alert("Plan cree. Va dans Plan pour l'editer.");
                     }}
-                    style={{ padding: "4px 8px", fontSize: 12 }}
+                    className="cp-btn-compact"
                   >
                     + Plan
                   </button>
                 </div>
 
-                <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                <div className="cp-calendar-plan-list">
                   {list.slice(0, 2).map((p) => (
-                    <div key={p.id} style={{ fontSize: 12, borderLeft: "3px solid #111", paddingLeft: 8 }}>
+                    <div key={p.id} className="cp-calendar-plan-item">
                       {p.title || "Culte"}
                     </div>
                   ))}
-                  {list.length > 2 && <div style={{ fontSize: 12, opacity: 0.7 }}>+{list.length - 2}</div>}
+                  {list.length > 2 && <div className="cp-help-text-flat">+{list.length - 2}</div>}
                 </div>
               </div>
             );
@@ -144,7 +128,7 @@ export function CalendarPage() {
         </div>
       </Panel>
 
-      <div className="cp-page-subtitle" style={{ fontSize: 12 }}>
+      <div className="cp-page-subtitle cp-subtitle-xs">
         (Prochaine etape) ouvrir directement un plan depuis le calendrier + filtrer passe/avenir.
       </div>
     </div>

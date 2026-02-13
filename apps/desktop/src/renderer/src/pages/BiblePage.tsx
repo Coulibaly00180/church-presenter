@@ -46,6 +46,10 @@ function formatPlanLabel(plan: PlanListItem) {
   return plan.id;
 }
 
+function cls(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
+
 async function projectText(target: ScreenKey, title: string | undefined, body: string) {
   const screens = window.cp.screens;
   const list: CpScreenMeta[] = screens ? await screens.list() : [];
@@ -349,7 +353,7 @@ export function BiblePage() {
                 const g = groups.find((x) => x.language === lang);
                 if (g?.translations[0]) setTranslation(g.translations[0].code);
               }}
-              style={{ minWidth: 200 }}
+              className="cp-input-min-200"
             >
               {groups.map((g) => (
                 <option key={g.language} value={g.language}>
@@ -362,7 +366,7 @@ export function BiblePage() {
             <select
               value={translation}
               onChange={(e) => setTranslation(e.target.value)}
-              style={{ minWidth: 260 }}
+              className="cp-input-min-260"
             >
               {(groups.find((g) => g.language === translationLanguage)?.translations || []).map((t) => (
                 <option key={t.code} value={t.code}>
@@ -397,8 +401,8 @@ export function BiblePage() {
       <div className="cp-grid-main">
         <div className="cp-stack">
           <Panel>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Naviguer</div>
-            <div style={{ display: "grid", gap: 8 }}>
+            <div className="cp-section-label">Naviguer</div>
+            <div className="cp-stack-8">
             <Field label="Livre">
               <select
                 value={bookId ?? ""}
@@ -424,32 +428,14 @@ export function BiblePage() {
               />
             </Field>
             {currentBook?.chapters ? (
-              <div style={{ display: "grid", gap: 6 }}>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Chapitres de {currentBook.name}</div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(48px, 1fr))",
-                    gap: 6,
-                    maxHeight: 220,
-                    overflow: "auto",
-                    padding: 4,
-                    border: "1px solid #e2e8f0",
-                    borderRadius: 10,
-                    background: "#f8fafc",
-                  }}
-                >
+              <div className="cp-stack-6">
+                <div className="cp-help-text-flat">Chapitres de {currentBook.name}</div>
+                <div className="cp-chapter-grid">
                   {Array.from({ length: currentBook.chapters }, (_, i) => i + 1).map((c) => (
                     <button
                       key={c}
                       onClick={() => loadChapter(currentBook.bookid, c)}
-                      style={{
-                        padding: "6px 4px",
-                        borderRadius: 8,
-                        border: c === chapter ? "2px solid var(--primary)" : "1px solid #e2e8f0",
-                        background: c === chapter ? "#eef2ff" : "white",
-                        fontWeight: 700,
-                      }}
+                      className={cls("cp-chapter-btn", c === chapter && "is-active")}
                     >
                       {c}
                     </button>
@@ -472,43 +458,43 @@ export function BiblePage() {
           </Panel>
 
           <Panel>
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>Recherche texte (API bolls)</div>
+            <div className="cp-section-label cp-mb-6">Recherche texte (API bolls)</div>
             <input
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="mot ou expression"
               className="cp-input-full"
             />
-            {searchLoading ? <div style={{ opacity: 0.7 }}>Recherche…</div> : null}
-            <div style={{ maxHeight: 240, overflow: "auto", marginTop: 8, display: "grid", gap: 6 }}>
+            {searchLoading ? <div className="cp-muted">Recherche...</div> : null}
+            <div className="cp-bible-search-list">
               {searchResults.map((r) => (
                 <button
                   key={verseKey(r)}
                   onClick={() => jumpToResult(r)}
-                  style={{ textAlign: "left", padding: 10, borderRadius: 10, border: "1px solid var(--border)" }}
+                  className="cp-search-result-btn"
                 >
                   <b>
                     Livre {r.book} {r.chapter}:{r.verse}
                   </b>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>{r.text}</div>
+                  <div className="cp-search-result-text">{r.text}</div>
                 </button>
               ))}
               {searchText && !searchResults.length && !searchLoading ? (
-                <div style={{ opacity: 0.6, fontSize: 12 }}>Aucun resultat.</div>
+                <div className="cp-help-text-muted">Aucun resultat.</div>
               ) : null}
             </div>
           </Panel>
         </div>
 
         <Panel>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div className="cp-panel-header-split">
             <div>
-              <div style={{ fontWeight: 900 }}>{currentBook?.name ?? "—"}</div>
-              <div style={{ opacity: 0.7 }}>
+              <div className="cp-title-strong">{currentBook?.name ?? "—"}</div>
+              <div className="cp-muted">
                 {referenceLabel} ({activeTranslation})
               </div>
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="cp-actions">
               <InlineField label="Mode ajout">
                 <select value={addMode} onChange={(e) => setAddMode(e.target.value === "PASSAGE" ? "PASSAGE" : "VERSES")}>
                   <option value="PASSAGE">Passage</option>
@@ -524,32 +510,25 @@ export function BiblePage() {
             </div>
           </div>
 
-          <div style={{ marginTop: 12, maxHeight: "60vh", overflow: "auto", display: "grid", gap: 8 }}>
+          <div className="cp-verse-list">
             {verses.map((v) => (
               <label
                 key={verseKey(v)}
-                style={{
-                  border: "1px solid " + (selectedVerses.has(v.verse) ? "var(--primary)" : "var(--border)"),
-                  padding: 10,
-                  borderRadius: 10,
-                  background: selectedVerses.has(v.verse) ? "#eef2ff" : "#fff",
-                  display: "grid",
-                  gap: 4,
-                }}
+                className={cls("cp-verse-card", selectedVerses.has(v.verse) && "is-selected")}
               >
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div className="cp-verse-head">
                   <input type="checkbox" checked={selectedVerses.has(v.verse)} onChange={() => toggleVerse(v.verse)} />
                   <b>
                     {v.chapter}:{v.verse}
                   </b>
                 </div>
-                <div style={{ opacity: 0.85, lineHeight: 1.4 }}>{stripHtml(v.text)}</div>
+                <div className="cp-verse-text">{stripHtml(v.text)}</div>
               </label>
             ))}
-            {!verses.length ? <div style={{ opacity: 0.7 }}>Charge un chapitre pour voir les versets.</div> : null}
+            {!verses.length ? <div className="cp-muted">Charge un chapitre pour voir les versets.</div> : null}
           </div>
 
-          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.7 }}>
+          <div className="cp-help-text">
             Passage = un seul item avec tout le texte. Verset par verset = un item par verset pour faciliter la navigation live.
           </div>
         </Panel>

@@ -9,6 +9,10 @@ type SortableRowProps = {
   onRemove: () => void;
 };
 
+function cls(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
+
 export function SortableRow(props: SortableRowProps) {
   const { item, onProject, onRemove } = props;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
@@ -16,20 +20,13 @@ export function SortableRow(props: SortableRowProps) {
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    border: "1px solid #ddd",
-    borderRadius: 10,
-    padding: 10,
-    background: isDragging ? "#f0f0f0" : "white",
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
   };
 
   const badge = (() => {
-    if (item.kind === "SONG_BLOCK") return { label: "Chant", color: "#eef2ff", border: "#cbd5ff", text: "#303e82" };
-    if (item.kind === "BIBLE_VERSE") return { label: "Verset", color: "#e6fffa", border: "#9ae6b4", text: "#13624d" };
-    if (item.kind === "BIBLE_PASSAGE") return { label: "Passage", color: "#e0f4ff", border: "#a7dcff", text: "#0f4c75" };
-    if (item.kind === "ANNOUNCEMENT_TEXT") return { label: "Annonce", color: "#f4f4f5", border: "#d4d4d8", text: "#3f3f46" };
+    if (item.kind === "SONG_BLOCK") return { label: "Chant", className: "cp-kind-badge--song" };
+    if (item.kind === "BIBLE_VERSE") return { label: "Verset", className: "cp-kind-badge--verse" };
+    if (item.kind === "BIBLE_PASSAGE") return { label: "Passage", className: "cp-kind-badge--passage" };
+    if (item.kind === "ANNOUNCEMENT_TEXT") return { label: "Annonce", className: "cp-kind-badge--announce" };
     return null;
   })();
 
@@ -39,54 +36,31 @@ export function SortableRow(props: SortableRowProps) {
       : item.kind;
 
   return (
-    <div ref={setNodeRef} style={style} title={titleAttr}>
+    <div ref={setNodeRef} style={style} title={titleAttr} className={cls("cp-sort-row", isDragging && "is-dragging")}>
       <div
         {...attributes}
         {...listeners}
         title="Drag"
-        style={{
-          cursor: "grab",
-          userSelect: "none",
-          fontWeight: 800,
-          padding: "6px 10px",
-          border: "1px solid #ddd",
-          borderRadius: 8,
-          background: "#fafafa",
-        }}
+        className="cp-sort-handle"
       >
         #
       </div>
 
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 800 }}>
+      <div className="cp-flex-1">
+        <div className="cp-field-label">
           #{item.order} - {item.title || item.kind}{" "}
-          {badge ? (
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 800,
-                padding: "2px 6px",
-                borderRadius: 999,
-                background: badge.color,
-                border: "1px solid " + badge.border,
-                color: badge.text,
-                marginLeft: 6,
-              }}
-            >
-              {badge.label}
-            </span>
-          ) : null}
+          {badge ? <span className={cls("cp-kind-badge", badge.className)}>{badge.label}</span> : null}
         </div>
-        <div style={{ opacity: 0.75, fontSize: 13 }}>
+        <div className="cp-date-muted">
           {item.kind}
           {item.content ? ` * ${item.content.slice(0, 80)}${item.content.length > 80 ? "..." : ""}` : ""}
         </div>
       </div>
 
-      <button onClick={onProject} style={{ padding: "8px 10px" }}>
+      <button onClick={onProject} className="cp-btn-slim">
         Projeter
       </button>
-      <button onClick={onRemove} style={{ padding: "8px 10px" }}>
+      <button onClick={onRemove} className="cp-btn-slim">
         Suppr
       </button>
     </div>

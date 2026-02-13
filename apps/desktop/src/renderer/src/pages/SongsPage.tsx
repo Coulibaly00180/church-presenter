@@ -37,6 +37,10 @@ function splitBlocks(text: string) {
     .filter(Boolean);
 }
 
+function cls(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
+
 async function projectTextToTarget(target: ScreenKey, title: string | undefined, body: string, metaSong?: CpSongMeta) {
   // Always ensure A exists when needed
   const screens: CpScreenMeta[] = await window.cp.screens.list();
@@ -327,7 +331,7 @@ export function SongsPage() {
       <PageHeader
         title="Chants"
         subtitle="Bibliotheque, projection, ajout au plan"
-        style={{ justifyContent: "flex-start" }}
+        className="cp-page-header-start"
         actions={
           <>
             <InlineField label="Projeter vers" wide>
@@ -352,7 +356,7 @@ export function SongsPage() {
           value={newSongTitle}
           onChange={(e) => setNewSongTitle(e.target.value)}
           placeholder="Titre du nouveau chant"
-          style={{ minWidth: 180 }}
+          className="cp-input-min-180"
         />
         <button className="btn-primary" onClick={onCreate}>
           + Nouveau chant
@@ -403,33 +407,24 @@ export function SongsPage() {
 
       <div className="cp-grid-main cp-grid-main--songs">
         {/* LEFT list */}
-        <Panel style={{ padding: 0 }}>
-          <div style={{ padding: 14, borderBottom: "1px solid var(--border)" }}>
+        <Panel className="cp-panel-flat">
+          <div className="cp-song-list-head">
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Rechercher (titre, artiste, paroles…)"
-              style={{ width: "100%" }}
+              className="cp-input-full"
             />
-            <ActionRow style={{ marginTop: 8 }}>
+            <ActionRow className="cp-mt-8">
               <button onClick={() => refresh(q)}>Rechercher</button>
               <button onClick={() => { setQ(""); refresh(""); }}>Reset</button>
             </ActionRow>
             {filtered.length > 0 && q.trim().length > 0 ? (
-              <div style={{ marginTop: 8, border: "1px solid #eee", borderRadius: 8, maxHeight: 200, overflow: "auto", background: "white" }}>
+              <div className="cp-song-suggest-list">
                 {filtered.slice(0, 8).map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() => loadSong(s.id)}
-                    style={{
-                      padding: 8,
-                      cursor: "pointer",
-                      borderBottom: "1px solid #f2f2f2",
-                      background: s.id === selectedId ? "#eef6ff" : "transparent",
-                    }}
-                  >
-                    <div style={{ fontWeight: 800 }}>{s.title}</div>
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>
+                  <div key={s.id} onClick={() => loadSong(s.id)} className={cls("cp-song-suggest-item", s.id === selectedId && "is-active")}>
+                    <div className="cp-song-item-title">{s.title}</div>
+                    <div className="cp-help-text-flat">
                       {(s.artist || "—")} {s.album ? `• ${s.album}` : ""}
                     </div>
                   </div>
@@ -438,40 +433,27 @@ export function SongsPage() {
             ) : null}
           </div>
 
-          <div style={{ maxHeight: "70vh", overflow: "auto", padding: 8 }}>
+          <div className="cp-song-list-scroll">
             {filtered.map((s) => (
-              <div
-                key={s.id}
-                onClick={() => loadSong(s.id)}
-                style={{
-                  padding: 10,
-                  cursor: "pointer",
-                  borderRadius: 10,
-                  border: "1px solid " + (s.id === selectedId ? "var(--primary)" : "var(--border)"),
-                  background: s.id === selectedId ? "#eef6ff" : "transparent",
-                  marginBottom: 6,
-                }}
-              >
-                <div style={{ fontWeight: 900 }}>{s.title}</div>
-                <div style={{ opacity: 0.7, fontSize: 13 }}>
+              <div key={s.id} onClick={() => loadSong(s.id)} className={cls("cp-song-list-item", s.id === selectedId && "is-active")}>
+                <div className="cp-song-list-title">{s.title}</div>
+                <div className="cp-song-list-meta">
                   {(s.artist || "—")} {s.album ? `• ${s.album}` : ""}
                 </div>
               </div>
             ))}
-            {filtered.length === 0 ? (
-              <div style={{ padding: 10, opacity: 0.7 }}>Aucun chant.</div>
-            ) : null}
+            {filtered.length === 0 ? <div className="cp-empty-row">Aucun chant.</div> : null}
           </div>
         </Panel>
 
         {/* RIGHT editor */}
         <Panel>
           {!song ? (
-            <div style={{ opacity: 0.7 }}>Sélectionne un chant à gauche ou crée-en un.</div>
+            <div className="cp-muted">Sélectionne un chant à gauche ou crée-en un.</div>
           ) : (
             <>
-              <ActionRow style={{ marginBottom: 10 }}>
-                <b style={{ flex: 1 }}>Édition</b>
+              <ActionRow className="cp-mb-10">
+                <b className="cp-flex-1">Édition</b>
                 <button onClick={onSaveMeta} disabled={saving}>
                   Sauver meta
                 </button>
@@ -483,7 +465,7 @@ export function SongsPage() {
                 </button>
               </ActionRow>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+              <div className="cp-song-meta-grid">
                 <Field label="Titre">
                   <input value={title} onChange={(e) => setTitle(e.target.value)} />
                 </Field>
@@ -495,7 +477,7 @@ export function SongsPage() {
                 </Field>
               </div>
 
-              <ActionRow style={{ marginBottom: 12 }}>
+              <ActionRow className="cp-mb-12">
                 <button onClick={() => addBlock("VERSE")}>+ Couplet</button>
                 <button onClick={() => addBlock("CHORUS")}>+ Refrain</button>
                 <button onClick={() => addBlock("BRIDGE")}>+ Pont</button>
@@ -505,12 +487,12 @@ export function SongsPage() {
                 </button>
               </ActionRow>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div className="cp-song-block-stack">
                 {song.blocks.map((b, idx) => (
-                  <div key={idx} style={{ border: "1px solid #eee", borderRadius: 12, padding: 10 }}>
-                    <ActionRow style={{ marginBottom: 8 }}>
-                      <b style={{ flex: 1 }}>
-                        {b.title || b.type} <span style={{ opacity: 0.5, fontWeight: 600 }}>#{idx + 1}</span>
+                  <div key={idx} className="cp-song-block-card">
+                    <ActionRow className="cp-mb-8">
+                      <b className="cp-flex-1">
+                        {b.title || b.type} <span className="cp-song-block-index">#{idx + 1}</span>
                       </b>
                       <button onClick={() => projectBlock(idx)}>Projeter</button>
                       <button onClick={() => addBlockToPlan(idx)} disabled={!planId}>
@@ -519,7 +501,7 @@ export function SongsPage() {
                       <button onClick={() => removeBlock(idx)}>Supprimer</button>
                     </ActionRow>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8, marginBottom: 8 }}>
+                    <div className="cp-song-block-fields">
                       <Field label="Type">
                         <select
                           value={b.type}
@@ -559,12 +541,12 @@ export function SongsPage() {
                       className="cp-input-full"
                       placeholder="Tape les paroles de ce bloc…"
                     />
-                    <div style={{ marginTop: 8, opacity: 0.7, fontSize: 13 }}>
+                    <div className="cp-help-text-sm">
                       Astuce : laisse une ligne vide pour séparer des sous-blocs lors de la projection (si tu veux).
                     </div>
                   </div>
                 ))}
-                {song.blocks.length === 0 ? <div style={{ opacity: 0.7 }}>Aucun bloc.</div> : null}
+                {song.blocks.length === 0 ? <div className="cp-muted">Aucun bloc.</div> : null}
               </div>
             </>
           )}

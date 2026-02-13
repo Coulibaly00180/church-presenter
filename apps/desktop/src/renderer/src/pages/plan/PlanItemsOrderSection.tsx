@@ -18,11 +18,11 @@ export function PlanItemsOrderSection(props: PlanItemsOrderSectionProps) {
 
   return (
     <>
-      <div style={{ fontWeight: 800, marginBottom: 8 }}>Ordre</div>
+      <div className="cp-section-label">Ordre</div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
-          <div style={{ display: "grid", gap: 10 }}>
+          <div className="cp-stack-10">
             {items.map((it) => (
               <SortableRow key={it.id} item={it} onProject={() => onProject(it)} onRemove={() => onRemove(it)} />
             ))}

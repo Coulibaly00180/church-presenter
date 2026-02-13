@@ -14,30 +14,27 @@ type PlanLiveToolbarProps = {
   onSetFilterSongsOnly: (value: boolean) => void;
 };
 
+function cls(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
+
 export function PlanLiveToolbar(props: PlanLiveToolbarProps) {
   const { liveEnabled, target, live, filterSongsOnly, onUpdateLive, onSetLocked, onPrev, onNext, onSetFilterSongsOnly } = props;
 
   return (
-    <Panel soft style={{ marginTop: 12 }}>
+    <Panel soft className="cp-mt-12">
       <ActionRow>
-        <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <label className="cp-inline-field">
           <input type="checkbox" checked={liveEnabled} onChange={(e) => onUpdateLive({ enabled: e.target.checked })} />
           Live
         </label>
 
-        <div style={{ display: "flex", gap: 6 }}>
+        <div className="cp-inline-row-tight">
           {(["A", "B", "C"] as ScreenKey[]).map((k) => (
             <button
               key={k}
               onClick={() => onUpdateLive({ target: k })}
-              style={{
-                padding: "6px 10px",
-                borderRadius: 10,
-                border: target === k ? "2px solid var(--primary)" : "1px solid var(--border)",
-                background: target === k ? "var(--primary-soft)" : "#fff",
-                color: "#0f172a",
-                fontWeight: 800,
-              }}
+              className={cls("cp-target-btn-live", target === k && "is-active")}
             >
               Ecran {k}
             </button>
@@ -46,19 +43,19 @@ export function PlanLiveToolbar(props: PlanLiveToolbarProps) {
 
         <div className="cp-chip-row">
           {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-            <label key={k} style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 13 }}>
+            <label key={k} className="cp-inline-check cp-text-13">
               <input type="checkbox" checked={!!live?.lockedScreens?.[k]} onChange={(e) => onSetLocked(k, e.target.checked)} />
               Lock {k}
             </label>
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 6 }}>
+        <div className="cp-inline-row-tight">
           <button onClick={onPrev}>{"< Prev"}</button>
           <button onClick={onNext}>{"Next >"}</button>
         </div>
 
-        <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <label className="cp-inline-field">
           <input type="checkbox" checked={filterSongsOnly} onChange={(e) => onSetFilterSongsOnly(e.target.checked)} />
           Chants uniquement
         </label>

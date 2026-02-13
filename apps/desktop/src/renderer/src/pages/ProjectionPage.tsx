@@ -14,6 +14,10 @@ function getScreenKey(): "A" | "B" | "C" {
   return "A";
 }
 
+function cls(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
+
 export function ProjectionPage() {
   const screenKey = useMemo(() => getScreenKey(), []);
   const [state, setState] = useState<CpProjectionState | null>(null);
@@ -213,6 +217,7 @@ export function ProjectionPage() {
   }, [pdfPageCount, pdfPage]);
 
   const containerStyle: React.CSSProperties = {
+    position: "relative",
     width: "100vw",
     height: "100vh",
     background: bg,
@@ -251,7 +256,7 @@ export function ProjectionPage() {
   return (
     <div
       ref={containerRef}
-      style={{ ...containerStyle, position: "relative" }}
+      style={containerStyle}
       onWheel={(e) => {
         if (isPdf) {
           e.preventDefault();
@@ -270,48 +275,22 @@ export function ProjectionPage() {
         onClick={() => {
           if (!isPdf) window.cp.live?.prev?.();
         }}
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          width: "50%",
-          height: "100%",
-          cursor: isPdf ? "default" : "pointer",
-          pointerEvents: isPdf ? "none" : "auto",
-        }}
+        className={cls("cp-projection-click", "cp-projection-click--left", isPdf && "is-disabled")}
       />
       <div
         onClick={() => {
           if (!isPdf) window.cp.live?.next?.();
         }}
-        style={{
-          position: "absolute",
-          right: 0,
-          top: 0,
-          width: "50%",
-          height: "100%",
-          cursor: isPdf ? "default" : "pointer",
-          pointerEvents: isPdf ? "none" : "auto",
-        }}
+        className={cls("cp-projection-click", "cp-projection-click--right", isPdf && "is-disabled")}
       />
       <div style={cardStyle} key={animKey}>
         {/* watermark screen id */}
-        <div
-          style={{
-            position: "fixed",
-            top: 12,
-            right: 12,
-            opacity: 0.35,
-            fontFamily: "system-ui",
-            fontWeight: 900,
-            letterSpacing: 2,
-          }}
-        >
+        <div className="cp-projection-watermark">
           SCREEN {screenKey}
         </div>
 
         {current.kind === "EMPTY" ? (
-          <div style={{ opacity: 0.7, fontSize: 28 }}>Pret.</div>
+          <div className="cp-projection-empty">Pret.</div>
         ) : current.kind === "MEDIA" && current.mediaPath ? (
           <>
             {/* Pas de titre pour les PDF, seulement l'image rendue */}
@@ -320,35 +299,23 @@ export function ProjectionPage() {
                 <>
                   <img
                     src={pdfImage}
-                    style={{ width: "100%", maxHeight: "92vh", objectFit: "contain", borderRadius: 12 }}
+                    className="cp-projection-pdf-image"
                   />
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 14,
-                      right: 16,
-                      background: "rgba(0,0,0,0.55)",
-                      color: "white",
-                      padding: "6px 10px",
-                      borderRadius: 10,
-                      fontWeight: 800,
-                      fontSize: 14,
-                    }}
-                  >
+                  <div className="cp-projection-page-indicator">
                     {pdfPage} / {pdfPageCount || "?"}
                   </div>
                 </>
               ) : pdfLoading ? (
-                <div style={{ opacity: 0.8 }}>Chargement du PDF...</div>
+                <div className="cp-muted-80">Chargement du PDF...</div>
               ) : pdfError ? (
-                <div style={{ color: "#f87171" }}>PDF: {pdfError}</div>
+                <div className="cp-error-pdf">PDF: {pdfError}</div>
               ) : null
             ) : (
               <>
                 {current.title ? <div style={titleStyle}>{current.title}</div> : null}
                 <img
                   src={toFileUrl(current.mediaPath)}
-                  style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain", borderRadius: 12 }}
+                  className="cp-projection-media-image"
                 />
               </>
             )}
@@ -357,25 +324,7 @@ export function ProjectionPage() {
           <>
             <div style={bodyStyle}>{projectedBody}</div>
             {(current.metaSong || current.title) ? (
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 20,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  background: "rgba(0,0,0,0.55)",
-                  color: "white",
-                  padding: "8px 14px",
-                  borderRadius: 999,
-                  fontSize: 14,
-                  fontWeight: 700,
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "center",
-                  maxWidth: "90%",
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <div className="cp-projection-meta-badge">
                 <span>{current.metaSong?.title || current.title || "Chant"}</span>
                 {current.metaSong?.artist ? <span>• {current.metaSong.artist}</span> : null}
                 {current.metaSong?.album ? <span>• {current.metaSong.album}</span> : null}

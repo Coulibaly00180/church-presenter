@@ -113,7 +113,7 @@ export function PlanPage() {
     return (
       <div className="cp-page">
         <h1 className="cp-page-title">Plan</h1>
-        <p style={{ color: "crimson", margin: 0 }}>Preload non charge (window.cp.plans indisponible).</p>
+        <p className="cp-error-text cp-mb-0">Preload non charge (window.cp.plans indisponible).</p>
       </div>
     );
   }
@@ -166,15 +166,15 @@ export function PlanPage() {
 
         <Panel>
           {!plan ? (
-            <div style={{ opacity: 0.75 }}>Selectionne un plan a gauche.</div>
+            <div className="cp-muted">Selectionne un plan a gauche.</div>
           ) : (
             <>
-              <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center", flexWrap: "wrap" }}>
+              <div className="cp-panel-header-split">
                 <div>
-                  <div style={{ fontWeight: 900, fontSize: 18 }}>{plan.title || "Culte"}</div>
-                  <div style={{ opacity: 0.75 }}>{isoToYmd(plan.date)}</div>
+                  <div className="cp-plan-title-lg">{plan.title || "Culte"}</div>
+                  <div className="cp-date-muted">{isoToYmd(plan.date)}</div>
                   {livePlanId === plan.id ? (
-                    <div style={{ marginTop: 4, fontSize: 12, fontWeight: 800, color: "#0a6847" }}>LIVE (curseur {liveCursor + 1})</div>
+                    <div className="cp-live-tag-md">LIVE (curseur {liveCursor + 1})</div>
                   ) : null}
                 </div>
 
@@ -215,7 +215,7 @@ export function PlanPage() {
 
               <PlanComposerSection plan={plan} reloadPlan={loadPlan} showToast={showToast} />
 
-              <hr style={{ margin: "14px 0" }} />
+              <hr className="cp-separator-14" />
 
               <PlanItemsOrderSection
                 items={visibleItems}

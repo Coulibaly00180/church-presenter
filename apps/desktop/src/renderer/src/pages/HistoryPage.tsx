@@ -52,7 +52,7 @@ export function HistoryPage() {
     return (
       <div className="cp-page">
         <h1 className="cp-page-title">Historique</h1>
-        <p style={{ color: "crimson", margin: 0 }}>Preload non charge (window.cp.plans indisponible).</p>
+        <p className="cp-error-text cp-mb-0">Preload non charge (window.cp.plans indisponible).</p>
       </div>
     );
   }
@@ -65,21 +65,21 @@ export function HistoryPage() {
 
       {importDetail ? (
         <Panel soft>
-          <div style={{ fontWeight: 800, marginBottom: 6 }}>
+          <div className="cp-section-label cp-mb-6">
             Recap import: {importDetail.counts.songs} chants, {importDetail.counts.plans} plans
           </div>
           {importDetail.errors.length === 0 ? (
-            <div style={{ color: "#166534" }}>Aucune erreur.</div>
+            <div className="cp-success-text">Aucune erreur.</div>
           ) : (
-            <div style={{ maxHeight: 200, overflow: "auto", borderTop: "1px solid var(--border)", paddingTop: 6 }}>
+            <div className="cp-import-error-list">
               {importDetail.errors.map((e, idx) => (
-                <div key={idx} style={{ fontSize: 13, marginBottom: 4, color: "#b91c1c" }}>
+                <div key={idx} className="cp-import-error-item">
                   [{e.kind}] {e.title || "??"} - {e.message}
                 </div>
               ))}
             </div>
           )}
-          <button onClick={() => setImportDetail(null)} style={{ marginTop: 6 }}>
+          <button onClick={() => setImportDetail(null)} className="cp-mt-6">
             Fermer
           </button>
         </Panel>
@@ -154,9 +154,9 @@ export function HistoryPage() {
       <div className="cp-stack">
         {plans.map((p) => (
           <Panel key={p.id}>
-            <div style={{ fontWeight: 900 }}>{p.title || "Culte"}</div>
-            <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
-            <ActionRow style={{ marginTop: 10 }}>
+            <div className="cp-title-strong">{p.title || "Culte"}</div>
+            <div className="cp-date-muted">{isoToYmd(p.date)}</div>
+            <ActionRow className="cp-mt-10">
               <button
                 onClick={async () => {
                   try {
@@ -192,7 +192,7 @@ export function HistoryPage() {
             </ActionRow>
           </Panel>
         ))}
-        {plans.length === 0 && <div style={{ opacity: 0.7 }}>Aucun plan.</div>}
+        {plans.length === 0 && <div className="cp-muted">Aucun plan.</div>}
       </div>
     </div>
   );

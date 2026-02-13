@@ -1,7 +1,7 @@
 import React from "react";
 import { isoToYmd } from "./date";
 import { PlanListItem } from "./types";
-import { Panel } from "../../ui/primitives";
+import { Field, Panel } from "../../ui/primitives";
 
 type PlanSidebarSectionProps = {
   newDate: string;
@@ -15,22 +15,24 @@ type PlanSidebarSectionProps = {
   onSelectPlan: (planId: string) => void | Promise<void>;
 };
 
+function cls(...parts: Array<string | false | null | undefined>) {
+  return parts.filter(Boolean).join(" ");
+}
+
 export function PlanSidebarSection(props: PlanSidebarSectionProps) {
   const { newDate, newTitle, plans, selectedPlanId, livePlanId, onSetNewDate, onSetNewTitle, onCreatePlan, onSelectPlan } = props;
 
   return (
     <div className="cp-stack">
       <Panel>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Creer un plan</div>
-        <div style={{ display: "grid", gap: 8 }}>
-          <label>
-            <div style={{ fontWeight: 600 }}>Date</div>
+        <div className="cp-section-label">Creer un plan</div>
+        <div className="cp-stack-8">
+          <Field label="Date">
             <input value={newDate} onChange={(e) => onSetNewDate(e.target.value)} type="date" className="cp-input-full" />
-          </label>
-          <label>
-            <div style={{ fontWeight: 600 }}>Titre</div>
+          </Field>
+          <Field label="Titre">
             <input value={newTitle} onChange={(e) => onSetNewTitle(e.target.value)} className="cp-input-full" />
-          </label>
+          </Field>
           <button onClick={() => onCreatePlan()} className="btn-primary">
             + Creer
           </button>
@@ -38,28 +40,20 @@ export function PlanSidebarSection(props: PlanSidebarSectionProps) {
       </Panel>
 
       <Panel>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-          <div style={{ fontWeight: 800 }}>Plans</div>
-          <span style={{ fontSize: 12, opacity: 0.6 }}>{plans.length} plan(s)</span>
+        <div className="cp-panel-header-split cp-mb-8">
+          <div className="cp-section-label cp-mb-0">Plans</div>
+          <span className="cp-count-muted">{plans.length} plan(s)</span>
         </div>
-        <div style={{ display: "grid", gap: 8, maxHeight: "70vh", overflow: "auto" }}>
+        <div className="cp-scroll-list-70">
           {plans.map((p) => (
             <button
               key={p.id}
               onClick={() => onSelectPlan(p.id)}
-              className="panel"
-              style={{
-                textAlign: "left",
-                padding: 12,
-                borderRadius: 12,
-                border: selectedPlanId === p.id ? "2px solid var(--primary)" : "1px solid var(--border)",
-                background: selectedPlanId === p.id ? "var(--primary-soft)" : "white",
-                boxShadow: "none",
-              }}
+              className={cls("panel", "cp-plan-card", selectedPlanId === p.id && "is-active")}
             >
-              <div style={{ fontWeight: 800 }}>{p.title || "Culte"}</div>
-              <div style={{ opacity: 0.75, fontSize: 13 }}>{isoToYmd(p.date)}</div>
-              {livePlanId === p.id ? <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800, color: "#0a6847" }}>LIVE</div> : null}
+              <div className="cp-field-label">{p.title || "Culte"}</div>
+              <div className="cp-date-muted">{isoToYmd(p.date)}</div>
+              {livePlanId === p.id ? <div className="cp-live-tag">LIVE</div> : null}
             </button>
           ))}
         </div>
