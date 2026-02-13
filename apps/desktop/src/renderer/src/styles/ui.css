@@ -1046,3 +1046,63 @@
     min-width: 160px;
   }
 }
+
+@media (max-width: 760px) {
+  .cp-page {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .cp-shell {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .cp-calendar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cp-calendar-month-title {
+    min-width: 0;
+  }
+
+  .cp-input-min-180,
+  .cp-input-min-200,
+  .cp-input-min-260,
+  .cp-w-220 {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .cp-media-card {
+    grid-template-columns: 1fr;
+  }
+
+  .cp-media-actions {
+    justify-content: flex-start;
+  }
+
+  .cp-panel-header-split {
+    align-items: flex-start;
+  }
+
+  .cp-projection-meta-badge {
+    max-width: 95%;
+    white-space: normal;
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+  }
+
+  .cp-projection-page-indicator {
+    bottom: 8px;
+    right: 8px;
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .cp-projection-empty {
+    font-size: 22px;
+  }
+}
