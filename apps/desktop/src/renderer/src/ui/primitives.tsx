@@ -85,3 +85,39 @@ export function ActionRow(props: ActionRowProps) {
     </div>
   );
 }
+
+type FieldProps = {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  labelClassName?: string;
+  style?: React.CSSProperties;
+};
+
+export function Field(props: FieldProps) {
+  const { label, children, className, labelClassName, style } = props;
+  return (
+    <label className={cls("cp-field", className)} style={style}>
+      <span className={cls("cp-field-label", labelClassName)}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+type InlineFieldProps = {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  wide?: boolean;
+  style?: React.CSSProperties;
+};
+
+export function InlineField(props: InlineFieldProps) {
+  const { label, children, className, wide = false, style } = props;
+  return (
+    <label className={cls("cp-inline-field", wide && "cp-inline-field--wide", className)} style={style}>
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}

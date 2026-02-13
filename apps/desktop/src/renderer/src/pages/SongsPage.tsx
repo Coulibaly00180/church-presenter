@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, PageHeader, Panel } from "../ui/primitives";
+import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
 
 type ScreenKey = "A" | "B" | "C";
 
@@ -330,26 +330,23 @@ export function SongsPage() {
         style={{ justifyContent: "flex-start" }}
         actions={
           <>
+            <InlineField label="Projeter vers" wide>
+              <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
+                <option value="A">Ecran A</option>
+                <option value="B">Ecran B</option>
+                <option value="C">Ecran C</option>
+              </select>
+            </InlineField>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          Projeter vers
-          <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
-            <option value="A">Ecran A</option>
-            <option value="B">Ecran B</option>
-            <option value="C">Ecran C</option>
-          </select>
-        </label>
-
-        <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          Plan
-          <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
-            {plans.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.title || "Culte"} {formatPlanDate(p) ? `(${formatPlanDate(p)})` : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+            <InlineField label="Plan" wide>
+              <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title || "Culte"} {formatPlanDate(p) ? `(${formatPlanDate(p)})` : ""}
+                  </option>
+                ))}
+              </select>
+            </InlineField>
 
         <input
           value={newSongTitle}
@@ -414,10 +411,10 @@ export function SongsPage() {
               placeholder="Rechercher (titre, artiste, paroles…)"
               style={{ width: "100%" }}
             />
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <ActionRow style={{ marginTop: 8 }}>
               <button onClick={() => refresh(q)}>Rechercher</button>
               <button onClick={() => { setQ(""); refresh(""); }}>Reset</button>
-            </div>
+            </ActionRow>
             {filtered.length > 0 && q.trim().length > 0 ? (
               <div style={{ marginTop: 8, border: "1px solid #eee", borderRadius: 8, maxHeight: 200, overflow: "auto", background: "white" }}>
                 {filtered.slice(0, 8).map((s) => (
@@ -473,7 +470,7 @@ export function SongsPage() {
             <div style={{ opacity: 0.7 }}>Sélectionne un chant à gauche ou crée-en un.</div>
           ) : (
             <>
-              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
+              <ActionRow style={{ marginBottom: 10 }}>
                 <b style={{ flex: 1 }}>Édition</b>
                 <button onClick={onSaveMeta} disabled={saving}>
                   Sauver meta
@@ -484,24 +481,21 @@ export function SongsPage() {
                 <button onClick={onDelete} disabled={saving}>
                   Supprimer
                 </button>
-              </div>
+              </ActionRow>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  Titre
-                  <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
-                </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  Artiste
-                  <input value={artist} onChange={(e) => setArtist(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
-                </label>
-                <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  Album
-                  <input value={album} onChange={(e) => setAlbum(e.target.value)} style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }} />
-                </label>
+                <Field label="Titre">
+                  <input value={title} onChange={(e) => setTitle(e.target.value)} />
+                </Field>
+                <Field label="Artiste">
+                  <input value={artist} onChange={(e) => setArtist(e.target.value)} />
+                </Field>
+                <Field label="Album">
+                  <input value={album} onChange={(e) => setAlbum(e.target.value)} />
+                </Field>
               </div>
 
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+              <ActionRow style={{ marginBottom: 12 }}>
                 <button onClick={() => addBlock("VERSE")}>+ Couplet</button>
                 <button onClick={() => addBlock("CHORUS")}>+ Refrain</button>
                 <button onClick={() => addBlock("BRIDGE")}>+ Pont</button>
@@ -509,12 +503,12 @@ export function SongsPage() {
                 <button onClick={addAllBlocksToPlan} disabled={!planId}>
                   Ajouter tout au plan
                 </button>
-              </div>
+              </ActionRow>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {song.blocks.map((b, idx) => (
                   <div key={idx} style={{ border: "1px solid #eee", borderRadius: 12, padding: 10 }}>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                    <ActionRow style={{ marginBottom: 8 }}>
                       <b style={{ flex: 1 }}>
                         {b.title || b.type} <span style={{ opacity: 0.5, fontWeight: 600 }}>#{idx + 1}</span>
                       </b>
@@ -523,11 +517,10 @@ export function SongsPage() {
                         Ajouter au plan
                       </button>
                       <button onClick={() => removeBlock(idx)}>Supprimer</button>
-                    </div>
+                    </ActionRow>
 
                     <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 8, marginBottom: 8 }}>
-                      <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        Type
+                      <Field label="Type">
                         <select
                           value={b.type}
                           onChange={(e) => {
@@ -541,10 +534,9 @@ export function SongsPage() {
                           <option value="BRIDGE">BRIDGE</option>
                           <option value="TAG">TAG</option>
                         </select>
-                      </label>
+                      </Field>
 
-                      <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        Titre du bloc
+                      <Field label="Titre du bloc">
                         <input
                           value={b.title ?? ""}
                           onChange={(e) => {
@@ -552,9 +544,8 @@ export function SongsPage() {
                             blocks[idx] = { ...blocks[idx], title: e.target.value };
                             setSong({ ...song, blocks });
                           }}
-                          style={{ padding: 10, borderRadius: 10, border: "1px solid #ddd" }}
                         />
-                      </label>
+                      </Field>
                     </div>
 
                     <textarea
@@ -565,7 +556,7 @@ export function SongsPage() {
                         setSong({ ...song, blocks });
                       }}
                       rows={6}
-                      style={{ width: "100%", padding: 10, borderRadius: 12, border: "1px solid #ddd", fontFamily: "system-ui" }}
+                      className="cp-input-full"
                       placeholder="Tape les paroles de ce bloc…"
                     />
                     <div style={{ marginTop: 8, opacity: 0.7, fontSize: 13 }}>

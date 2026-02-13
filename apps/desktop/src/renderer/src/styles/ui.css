@@ -30,6 +30,26 @@
   flex-wrap: wrap;
 }
 
+.cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cp-field-label {
+  font-weight: 600;
+}
+
+.cp-inline-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cp-inline-field--wide {
+  gap: 8px;
+}
+
 .cp-grid-main {
   display: grid;
   gap: 12px;

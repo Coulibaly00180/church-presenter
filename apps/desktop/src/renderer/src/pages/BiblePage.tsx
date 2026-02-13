@@ -12,7 +12,7 @@ import {
   versesToText,
   listTranslations,
 } from "../bible/bollsApi";
-import { Alert, PageHeader, Panel } from "../ui/primitives";
+import { ActionRow, Alert, Field, InlineField, PageHeader, Panel } from "../ui/primitives";
 
 type ScreenKey = "A" | "B" | "C";
 type PlanListItem = { id: string; title?: string | null; date?: string | Date };
@@ -340,8 +340,7 @@ export function BiblePage() {
         subtitle="Rechercher, projeter et envoyer vers le plan (bolls.life)."
         actions={
           <>
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            Langue
+          <InlineField label="Langue">
             <select
               value={translationLanguage}
               onChange={(e) => {
@@ -358,9 +357,8 @@ export function BiblePage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            Traduction
+          </InlineField>
+          <InlineField label="Traduction">
             <select
               value={translation}
               onChange={(e) => setTranslation(e.target.value)}
@@ -372,9 +370,8 @@ export function BiblePage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            Plan
+          </InlineField>
+          <InlineField label="Plan">
             <select value={planId} onChange={(e) => setPlanId(e.target.value)}>
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -382,15 +379,14 @@ export function BiblePage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            Projeter vers
+          </InlineField>
+          <InlineField label="Projeter vers">
             <select value={target} onChange={(e) => setTarget(e.target.value as ScreenKey)}>
               <option value="A">Ecran A</option>
               <option value="B">Ecran B</option>
               <option value="C">Ecran C</option>
             </select>
-          </label>
+          </InlineField>
           </>
         }
       />
@@ -403,13 +399,12 @@ export function BiblePage() {
           <Panel>
             <div style={{ fontWeight: 800, marginBottom: 8 }}>Naviguer</div>
             <div style={{ display: "grid", gap: 8 }}>
-            <label>
-              Livre
+            <Field label="Livre">
               <select
                 value={bookId ?? ""}
                 onChange={(e) => setBookId(Number(e.target.value))}
                 disabled={loadingBooks || !books.length}
-                style={{ width: "100%" }}
+                className="cp-input-full"
               >
                 {books.map((b) => (
                   <option key={b.bookid} value={b.bookid}>
@@ -417,18 +412,17 @@ export function BiblePage() {
                   </option>
                 ))}
               </select>
-            </label>
-            <label>
-              Chapitre
+            </Field>
+            <Field label="Chapitre">
               <input
                 type="number"
                 min={1}
                 max={currentBook?.chapters || 150}
                 value={chapter}
                 onChange={(e) => setChapter(Math.max(1, Number(e.target.value)))}
-                style={{ width: "100%" }}
+                className="cp-input-full"
               />
-            </label>
+            </Field>
             {currentBook?.chapters ? (
               <div style={{ display: "grid", gap: 6 }}>
                 <div style={{ fontSize: 12, opacity: 0.7 }}>Chapitres de {currentBook.name}</div>
@@ -463,7 +457,7 @@ export function BiblePage() {
                 </div>
               </div>
             ) : null}
-            <div style={{ display: "flex", gap: 8 }}>
+            <ActionRow>
               <button onClick={() => bookId && loadChapter(bookId, Math.max(1, chapter))} disabled={!bookId || loadingChapter}>
                 {loadingChapter ? "Chargement..." : "Charger chapitre"}
               </button>
@@ -473,7 +467,7 @@ export function BiblePage() {
                 <button onClick={() => selectAllVerses(false)} disabled={!verses.length}>
                   Vider
                 </button>
-              </div>
+              </ActionRow>
             </div>
           </Panel>
 
@@ -483,7 +477,7 @@ export function BiblePage() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               placeholder="mot ou expression"
-              style={{ width: "100%" }}
+              className="cp-input-full"
             />
             {searchLoading ? <div style={{ opacity: 0.7 }}>Recherche…</div> : null}
             <div style={{ maxHeight: 240, overflow: "auto", marginTop: 8, display: "grid", gap: 6 }}>
@@ -515,13 +509,12 @@ export function BiblePage() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                Mode ajout
+              <InlineField label="Mode ajout">
                 <select value={addMode} onChange={(e) => setAddMode(e.target.value === "PASSAGE" ? "PASSAGE" : "VERSES")}>
                   <option value="PASSAGE">Passage</option>
                   <option value="VERSES">Verset par verset</option>
                 </select>
-              </label>
+              </InlineField>
               <button onClick={projectNow} disabled={!verses.length}>
                 Projeter
               </button>

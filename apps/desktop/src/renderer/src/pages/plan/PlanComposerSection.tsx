@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { lookupLSG1910 } from "../../bible/lookupLSG1910";
 import { BollsBook, buildReferenceLabel, findBookIdByName, getBooks, getChapter, maxChapter, searchVerses } from "../../bible/bollsApi";
 import { Plan } from "./types";
+import { ActionRow, Field } from "../../ui/primitives";
 
 type ToastKind = "info" | "success" | "error";
 type BibleTranslation = "LSG1910" | "LSG" | "WEB" | "FRLSG";
@@ -204,8 +205,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
       <div style={{ fontWeight: 800 }}>Ajouter un element</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 8 }}>
-        <label>
-          <div style={{ fontWeight: 600 }}>Type</div>
+        <Field label="Type">
           <select value={addKind} onChange={(e) => setAddKind(e.target.value)} className="cp-input-full">
             <option value="ANNOUNCEMENT_TEXT">ANNOUNCEMENT_TEXT</option>
             <option value="VERSE_MANUAL">VERSE_MANUAL</option>
@@ -214,17 +214,15 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
             <option value="ANNOUNCEMENT_IMAGE">ANNOUNCEMENT_IMAGE</option>
             <option value="ANNOUNCEMENT_PDF">ANNOUNCEMENT_PDF</option>
           </select>
-        </label>
-        <label>
-          <div style={{ fontWeight: 600 }}>Titre</div>
+        </Field>
+        <Field label="Titre">
           <input value={addTitle} onChange={(e) => setAddTitle(e.target.value)} className="cp-input-full" />
-        </label>
+        </Field>
       </div>
 
-      <label>
-        <div style={{ fontWeight: 600 }}>Contenu</div>
+      <Field label="Contenu">
         <textarea value={addContent} onChange={(e) => setAddContent(e.target.value)} rows={4} className="cp-input-full" />
-      </label>
+      </Field>
 
       {(addKind === "ANNOUNCEMENT_IMAGE" || addKind === "ANNOUNCEMENT_PDF") && (
         <button
@@ -240,8 +238,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
         </button>
       )}
       {addKind === "ANNOUNCEMENT_PDF" ? (
-        <label>
-          <div style={{ fontWeight: 600 }}>Page PDF</div>
+        <Field label="Page PDF">
           <input
             type="number"
             min={1}
@@ -249,7 +246,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
             onChange={(e) => setAddPdfPage(e.target.value)}
             className="cp-input-full"
           />
-        </label>
+        </Field>
       ) : null}
 
       <button
@@ -325,7 +322,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
 
       <div style={{ borderTop: "1px solid var(--border)", paddingTop: 8 }}>
         <div style={{ fontWeight: 800, marginBottom: 6 }}>Ajouter un verset/passage</div>
-        <div className="cp-actions" style={{ marginBottom: 6 }}>
+        <ActionRow style={{ marginBottom: 6 }}>
           <input
             value={bibleRef}
             onChange={(e) => setBibleRef(e.target.value)}
@@ -348,7 +345,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
           <button onClick={fetchBible} disabled={bibleLoading}>
             {bibleLoading ? "..." : "Chercher"}
           </button>
-        </div>
+        </ActionRow>
         <div style={{ marginBottom: 8 }}>
           <div style={{ fontWeight: 700, marginBottom: 4 }}>Recherche texte (bolls)</div>
           <input
@@ -376,7 +373,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                 >
                   <div style={{ fontWeight: 700 }}>{refLbl}</div>
                   <div style={{ fontSize: 12, opacity: 0.75 }}>{r.text}</div>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <ActionRow>
                     <button
                       onClick={async () => {
                         await window.cp.plans.addItem({
@@ -407,7 +404,7 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
                     >
                       Passage
                     </button>
-                  </div>
+                  </ActionRow>
                 </div>
               );
             })}
@@ -422,14 +419,14 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
             {bibleReference || bibleRef}: {bibleVerses.length} versets
           </div>
         ) : null}
-        <div className="cp-actions">
+        <ActionRow>
           <button className="btn-primary" onClick={() => addBibleToPlan("PASSAGE")} disabled={bibleVerses.length === 0}>
             Ajouter passage
           </button>
           <button onClick={() => addBibleToPlan("VERSES")} disabled={bibleVerses.length === 0}>
             Verset par verset
           </button>
-        </div>
+        </ActionRow>
       </div>
     </div>
   );
