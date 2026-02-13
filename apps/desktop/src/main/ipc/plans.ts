@@ -152,24 +152,56 @@ export function registerPlansIpc() {
 
   ipcMain.handle("plans:removeItem", async (_evt, payload: CpPlanRemoveItemPayload) => {
     const prisma = getPrisma();
-    await prisma.serviceItem.delete({ where: { id: payload.itemId } });
-
-    const items = await prisma.serviceItem.findMany({
-      where: { planId: payload.planId },
-      orderBy: { order: "asc" },
+    const item = await prisma.serviceItem.findUnique({
+      where: { id: payload.itemId },
+      select: { id: true, planId: true },
     });
+    if (!item) throw new Error("Plan item not found");
+    if (item.planId !== payload.planId) throw new Error("Item does not belong to this plan");
 
-    await prisma.$transaction(
-      items.map((it, idx: number) => prisma.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } }))
-    );
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.serviceItem.delete({ where: { id: payload.itemId } });
+
+      const items = await tx.serviceItem.findMany({
+        where: { planId: payload.planId },
+        orderBy: { order: "asc" },
+        select: { id: true },
+      });
+
+      for (const [idx, it] of items.entries()) {
+        await tx.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } });
+      }
+    });
 
     return { ok: true };
   });
 
   ipcMain.handle("plans:reorder", async (_evt, payload: CpPlanReorderPayload) => {
     const prisma = getPrisma();
+    const currentItems = await prisma.serviceItem.findMany({
+      where: { planId: payload.planId },
+      orderBy: { order: "asc" },
+      select: { id: true },
+    });
+
+    const currentIds = currentItems.map((it) => it.id);
+    const requestedIds = payload.orderedItemIds ?? [];
+    if (requestedIds.length !== currentIds.length) {
+      throw new Error("Invalid reorder payload size");
+    }
+
+    const requestedSet = new Set(requestedIds);
+    if (requestedSet.size !== requestedIds.length) {
+      throw new Error("Duplicate item id in reorder payload");
+    }
+
+    const currentSet = new Set(currentIds);
+    for (const id of requestedSet) {
+      if (!currentSet.has(id)) throw new Error("Reorder payload contains item outside target plan");
+    }
+
     await prisma.$transaction(
-      payload.orderedItemIds.map((id, idx) => prisma.serviceItem.update({ where: { id }, data: { order: idx + 1 } }))
+      requestedIds.map((id, idx) => prisma.serviceItem.update({ where: { id }, data: { order: idx + 1 } }))
     );
     return { ok: true };
   });
