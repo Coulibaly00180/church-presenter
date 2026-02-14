@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   CpApi,
+  CpDataImportAtomicity,
   CpDataImportMode,
   CpDevtoolsTarget,
   CpLiveSetPayload,
   CpLiveState,
-  CpMediaType,
   CpPlanAddItemPayload,
   CpPlanCreatePayload,
   CpPlanDuplicatePayload,
@@ -95,8 +95,8 @@ const cpApi: CpApi = {
   songs: {
     list: (q?: string) => ipcRenderer.invoke("songs:list", q),
     get: (id: string) => ipcRenderer.invoke("songs:get", id),
-    create: (payload: { title: string; artist?: string; album?: string }) => ipcRenderer.invoke("songs:create", payload),
-    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) =>
+    create: (payload: { title: string; artist?: string; album?: string; year?: string }) => ipcRenderer.invoke("songs:create", payload),
+    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string; year?: string }) =>
       ipcRenderer.invoke("songs:updateMeta", payload),
     replaceBlocks: (payload: {
       songId: string;
@@ -124,7 +124,7 @@ const cpApi: CpApi = {
 
   data: {
     exportAll: () => ipcRenderer.invoke("data:exportAll"),
-    importAll: (payload: { mode: CpDataImportMode }) => ipcRenderer.invoke("data:importAll", payload),
+    importAll: (payload: { mode: CpDataImportMode; atomicity?: CpDataImportAtomicity }) => ipcRenderer.invoke("data:importAll", payload),
   },
 
   bible: {

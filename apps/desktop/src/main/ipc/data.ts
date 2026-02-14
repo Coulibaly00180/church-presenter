@@ -1,7 +1,8 @@
-import { ipcMain, dialog } from "electron";
+import { app, ipcMain, dialog } from "electron";
 import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
-import fs from "fs";
+import { copyFile, mkdir, readFile, stat, writeFile } from "fs/promises";
+import { basename, dirname, join } from "path";
 import type { CpDataImportError } from "../../shared/ipc";
 import { parseDataImportPayload } from "./runtimeValidation";
 
@@ -16,6 +17,7 @@ type ImportedSong = {
   title?: string;
   artist?: string;
   album?: string;
+  year?: string | number;
   language?: string;
   tags?: string;
   blocks?: ImportedSongBlock[];
@@ -53,10 +55,12 @@ type NormalizedSong = {
   title: string;
   artist?: string;
   album?: string;
+  year?: string;
   language?: string;
   tags?: string;
   blocks: NormalizedSongBlock[];
 };
+export type DataNormalizedSong = NormalizedSong;
 
 type NormalizedPlanItem = {
   order: number;
@@ -73,6 +77,7 @@ type NormalizedPlan = {
   title: string;
   items: NormalizedPlanItem[];
 };
+export type DataNormalizedPlan = NormalizedPlan;
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) return err.message;
@@ -147,12 +152,154 @@ function normalizeSongs(rawSongs: unknown, errors: CpDataImportError[]): Normali
       title,
       artist: asStringLike(s.artist),
       album: asStringLike(s.album),
+      year: asStringLike(s.year),
       language: asStringLike(s.language),
       tags: asStringLike(s.tags),
       blocks,
     });
   }
   return songs;
+}
+
+function sqlitePathFromUrl(databaseUrl: string | undefined): string | null {
+  if (!databaseUrl) return null;
+  if (!databaseUrl.startsWith("file:")) return null;
+  const raw = databaseUrl.slice("file:".length).trim();
+  if (!raw) return null;
+  return raw;
+}
+
+async function backupDatabaseSnapshot(reason: string) {
+  const databasePath = sqlitePathFromUrl(process.env["DATABASE_URL"]);
+  if (!databasePath) return null;
+  try {
+    await stat(databasePath);
+  } catch {
+    return null;
+  }
+  const backupsDir = join(app.getPath("userData"), "backups");
+  await mkdir(backupsDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const outputPath = join(backupsDir, `${basename(databasePath)}.${reason}.${stamp}.bak`);
+  await copyFile(databasePath, outputPath);
+  return outputPath;
+}
+
+export async function createSongWithBlocks(tx: Prisma.TransactionClient, songData: DataNormalizedSong) {
+  const song = await tx.song.create({
+    data: {
+      title: songData.title || "Sans titre",
+      artist: songData.artist,
+      album: songData.album,
+      year: songData.year,
+      language: songData.language,
+      tags: songData.tags,
+    },
+  });
+  for (const b of songData.blocks) {
+    await tx.songBlock.create({
+      data: {
+        songId: song.id,
+        order: b.order,
+        type: b.type,
+        title: b.title,
+        content: b.content,
+      },
+    });
+  }
+  return song;
+}
+
+export async function createPlanWithItems(tx: Prisma.TransactionClient, planData: DataNormalizedPlan) {
+  const plan = await tx.servicePlan.create({
+    data: {
+      date: normalizeDateToMidnight(planData.date),
+      title: planData.title,
+    },
+  });
+  for (const it of planData.items) {
+    await tx.serviceItem.create({
+      data: {
+        planId: plan.id,
+        order: it.order,
+        kind: it.kind,
+        refId: it.refId,
+        refSubId: it.refSubId,
+        title: it.title,
+        content: it.content,
+        mediaPath: it.mediaPath,
+      },
+    });
+  }
+  return plan;
+}
+
+type DataImportPrisma = Pick<ReturnType<typeof getPrisma>, "$transaction">;
+export type DataMergeImportOutcome =
+  | { ok: true; imported: true; partial: boolean; counts: { songs: number; plans: number }; errors: CpDataImportError[] }
+  | { ok: false; rolledBack: true; error: string };
+
+export async function importNormalizedDataMerge(
+  prisma: DataImportPrisma,
+  songs: DataNormalizedSong[],
+  plans: DataNormalizedPlan[],
+  atomicity: "ENTITY" | "STRICT",
+  validationErrors: CpDataImportError[]
+): Promise<DataMergeImportOutcome> {
+  if (atomicity === "STRICT") {
+    try {
+      const counts = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        let strictSongsImported = 0;
+        let strictPlansImported = 0;
+        for (const s of songs) {
+          await createSongWithBlocks(tx, s);
+          strictSongsImported += 1;
+        }
+        for (const p of plans) {
+          await createPlanWithItems(tx, p);
+          strictPlansImported += 1;
+        }
+        return { songs: strictSongsImported, plans: strictPlansImported };
+      });
+      return {
+        ok: true,
+        imported: true,
+        partial: validationErrors.length > 0,
+        counts,
+        errors: validationErrors,
+      };
+    } catch (e: unknown) {
+      return { ok: false, rolledBack: true, error: getErrorMessage(e) };
+    }
+  }
+
+  const errors: CpDataImportError[] = [...validationErrors];
+  let songsImported = 0;
+  let plansImported = 0;
+
+  for (const s of songs) {
+    try {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await createSongWithBlocks(tx, s);
+      });
+      songsImported += 1;
+    } catch (e: unknown) {
+      errors.push({ kind: "song", title: s.title, message: getErrorMessage(e) });
+    }
+  }
+
+  for (const p of plans) {
+    try {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await createPlanWithItems(tx, p);
+      });
+      plansImported += 1;
+    } catch (e: unknown) {
+      errors.push({ kind: "plan", title: p.title, message: getErrorMessage(e) });
+    }
+  }
+
+  return { ok: true, imported: true, partial: errors.length > 0, counts: { songs: songsImported, plans: plansImported }, errors };
 }
 
 function normalizePlans(rawPlans: unknown, errors: CpDataImportError[]): NormalizedPlan[] {
@@ -244,7 +391,8 @@ export function registerDataIpc() {
       filters: [{ name: "JSON", extensions: ["json"] }],
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
-    fs.writeFileSync(res.filePath, JSON.stringify(payload, null, 2), "utf-8");
+    await mkdir(dirname(res.filePath), { recursive: true });
+    await writeFile(res.filePath, JSON.stringify(payload, null, 2), "utf-8");
     return { ok: true, path: res.filePath };
   });
 
@@ -258,7 +406,7 @@ export function registerDataIpc() {
     });
     if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
     const path = res.filePaths[0];
-    const raw = fs.readFileSync(path, "utf-8");
+    const raw = await readFile(path, "utf-8");
     let data: ImportedDataPayload;
     try {
       const parsed = JSON.parse(raw) as unknown;
@@ -269,12 +417,14 @@ export function registerDataIpc() {
     }
 
     const mode = payload.mode || "MERGE";
+    const atomicity = payload.atomicity;
     const validationErrors: CpDataImportError[] = [];
     const songs = normalizeSongs(data.songs, validationErrors);
     const plans = normalizePlans(data.plans, validationErrors);
 
     if (mode === "REPLACE") {
       try {
+        await backupDatabaseSnapshot("before-replace-import");
         const counts = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
           await tx.songBlock.deleteMany({});
           await tx.song.deleteMany({});
@@ -285,50 +435,12 @@ export function registerDataIpc() {
           let plansImported = 0;
 
           for (const s of songs) {
-            const song = await tx.song.create({
-              data: {
-                title: s.title || "Sans titre",
-                artist: s.artist,
-                album: s.album,
-                language: s.language,
-                tags: s.tags,
-              },
-            });
-            for (const b of s.blocks) {
-              await tx.songBlock.create({
-                data: {
-                  songId: song.id,
-                  order: b.order,
-                  type: b.type,
-                  title: b.title,
-                  content: b.content,
-                },
-              });
-            }
+            await createSongWithBlocks(tx, s);
             songsImported += 1;
           }
 
           for (const p of plans) {
-            const plan = await tx.servicePlan.create({
-              data: {
-                date: normalizeDateToMidnight(p.date),
-                title: p.title,
-              },
-            });
-            for (const it of p.items) {
-              await tx.serviceItem.create({
-                data: {
-                  planId: plan.id,
-                  order: it.order,
-                  kind: it.kind,
-                  refId: it.refId,
-                  refSubId: it.refSubId,
-                  title: it.title,
-                  content: it.content,
-                  mediaPath: it.mediaPath,
-                },
-              });
-            }
+            await createPlanWithItems(tx, p);
             plansImported += 1;
           }
 
@@ -341,66 +453,6 @@ export function registerDataIpc() {
       }
     }
 
-    const errors: CpDataImportError[] = [...validationErrors];
-    let songsImported = 0;
-    let plansImported = 0;
-
-    for (const s of songs) {
-      try {
-        const song = await prisma.song.create({
-          data: {
-            title: s.title || "Sans titre",
-            artist: s.artist,
-            album: s.album,
-            language: s.language,
-            tags: s.tags,
-          },
-        });
-        for (const b of s.blocks) {
-          await prisma.songBlock.create({
-            data: {
-              songId: song.id,
-              order: b.order,
-              type: b.type,
-              title: b.title,
-              content: b.content,
-            },
-          });
-        }
-        songsImported += 1;
-      } catch (e: unknown) {
-        errors.push({ kind: "song", title: s.title, message: getErrorMessage(e) });
-      }
-    }
-
-    for (const p of plans) {
-      try {
-        const plan = await prisma.servicePlan.create({
-          data: {
-            date: normalizeDateToMidnight(p.date),
-            title: p.title,
-          },
-        });
-        for (const it of p.items) {
-          await prisma.serviceItem.create({
-            data: {
-              planId: plan.id,
-              order: it.order,
-              kind: it.kind,
-              refId: it.refId,
-              refSubId: it.refSubId,
-              title: it.title,
-              content: it.content,
-              mediaPath: it.mediaPath,
-            },
-          });
-        }
-        plansImported += 1;
-      } catch (e: unknown) {
-        errors.push({ kind: "plan", title: p.title, message: getErrorMessage(e) });
-      }
-    }
-
-    return { ok: true, imported: true, partial: errors.length > 0, counts: { songs: songsImported, plans: plansImported }, errors };
+    return importNormalizedDataMerge(prisma, songs, plans, atomicity, validationErrors);
   });
 }

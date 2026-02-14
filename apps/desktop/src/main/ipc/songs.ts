@@ -3,10 +3,9 @@ import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import mammoth from "mammoth";
-import fs from "fs";
+import { readFile, writeFile } from "fs/promises";
 import path from "path";
 import AdmZip from "adm-zip";
-import type { CpSongBlockType } from "../../shared/ipc";
 import {
   parseNonEmptyString,
   parseOptionalQuery,
@@ -17,6 +16,7 @@ import {
 
 const SUPPORTED_DOC_EXTENSIONS = [".docx", ".odt"];
 type PrismaClientType = ReturnType<typeof getPrisma>;
+type SongImportPrisma = Pick<PrismaClientType, "$transaction">;
 type ImportSongBlock = { order?: number; type?: string; title?: string; content?: string };
 type ImportSongMeta = {
   paroles?: string;
@@ -52,10 +52,13 @@ type NormalizedImportSong = {
   title: string;
   artist?: string;
   album?: string;
+  year?: string;
   language?: string;
   tags?: string;
   blocks: NormalizedImportSongBlock[];
 };
+
+export type SongImportEntity = NormalizedImportSong;
 
 function getErrorMessage(err: unknown) {
   if (err instanceof Error) return err.message;
@@ -172,30 +175,54 @@ async function extractTextFromDoc(buffer: Buffer, ext: string) {
   throw new Error("Extension non supportee");
 }
 
+export async function createSongWithBlocksAtomic(prisma: SongImportPrisma, songEntry: SongImportEntity) {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const song = await tx.song.create({
+      data: {
+        title: songEntry.title,
+        artist: songEntry.artist,
+        album: songEntry.album,
+        year: songEntry.year,
+        language: songEntry.language,
+        tags: songEntry.tags,
+      },
+    });
+    for (const b of songEntry.blocks) {
+      await tx.songBlock.create({
+        data: {
+          songId: song.id,
+          order: b.order,
+          type: b.type || "VERSE",
+          title: b.title,
+          content: b.content.trim(),
+        },
+      });
+    }
+    return song;
+  });
+}
+
 async function importDocSong(prisma: PrismaClientType, filePath: string) {
-  const buffer = fs.readFileSync(filePath);
+  const buffer = Buffer.from(await readFile(filePath));
   const ext = path.extname(filePath).toLowerCase();
   if (!SUPPORTED_DOC_EXTENSIONS.includes(ext)) throw new Error("Extension non supportee (docx / odt)");
 
   const raw = await extractTextFromDoc(buffer, ext);
   const parsed = parseSongText(raw, path.basename(filePath));
 
-  const song = await prisma.song.create({
-    data: {
-      title: parsed.title,
-      artist: parsed.artist,
-      album: parsed.album,
-      tags: parsed.year,
-    },
-  });
-  await prisma.songBlock.createMany({
-    data: parsed.blocks.map((b) => ({ ...b, songId: song.id })),
+  const song = await createSongWithBlocksAtomic(prisma, {
+    title: parsed.title,
+    artist: parsed.artist,
+    album: parsed.album,
+    year: parsed.year,
+    tags: parsed.year,
+    blocks: parsed.blocks,
   });
   return song;
 }
 
 async function importJsonFile(prisma: PrismaClientType, filePath: string) {
-  const raw = fs.readFileSync(filePath, "utf-8");
+  const raw = await readFile(filePath, "utf-8");
   let payload: unknown = JSON.parse(raw);
 
   if (isRecord(payload) && "songs" in payload) {
@@ -273,6 +300,7 @@ async function importJsonFile(prisma: PrismaClientType, filePath: string) {
       title,
       artist,
       album,
+      year,
       language,
       tags,
       blocks,
@@ -282,26 +310,7 @@ async function importJsonFile(prisma: PrismaClientType, filePath: string) {
   let imported = 0;
   for (const songEntry of normalizedSongs) {
     try {
-      const song = await prisma.song.create({
-        data: {
-          title: songEntry.title,
-          artist: songEntry.artist,
-          album: songEntry.album,
-          language: songEntry.language,
-          tags: songEntry.tags,
-        },
-      });
-      for (const b of songEntry.blocks) {
-        await prisma.songBlock.create({
-          data: {
-            songId: song.id,
-            order: b.order,
-            type: b.type || "VERSE",
-            title: b.title,
-            content: b.content.trim(),
-          },
-        });
-      }
+      await createSongWithBlocksAtomic(prisma, songEntry);
       imported += 1;
     } catch (e: unknown) {
       errors.push({ path: filePath, title: songEntry.title, message: getErrorMessage(e) });
@@ -310,13 +319,6 @@ async function importJsonFile(prisma: PrismaClientType, filePath: string) {
 
   return { imported, errors };
 }
-
-type BlockInput = {
-  order: number;
-  type: CpSongBlockType;
-  title?: string;
-  content: string;
-};
 
 export function registerSongsIpc() {
   ipcMain.handle("songs:list", async (_evt, rawQ?: unknown) => {
@@ -335,14 +337,14 @@ export function registerSongsIpc() {
           ],
         },
         orderBy: { updatedAt: "desc" },
-        select: { id: true, title: true, artist: true, album: true, updatedAt: true },
+        select: { id: true, title: true, artist: true, album: true, year: true, updatedAt: true },
         take: 200,
       });
     }
 
     return prisma.song.findMany({
       orderBy: { updatedAt: "desc" },
-      select: { id: true, title: true, artist: true, album: true, updatedAt: true },
+      select: { id: true, title: true, artist: true, album: true, year: true, updatedAt: true },
       take: 200,
     });
   });
@@ -364,6 +366,7 @@ export function registerSongsIpc() {
         title: payload.title,
         artist: payload.artist,
         album: payload.album,
+        year: payload.year,
         blocks: {
           create: [
             { order: 1, type: "VERSE", title: "Couplet 1", content: "" },
@@ -380,7 +383,7 @@ export function registerSongsIpc() {
     const payload = parseSongUpdateMetaPayload(rawPayload);
     return prisma.song.update({
       where: { id: payload.id },
-      data: { title: payload.title, artist: payload.artist, album: payload.album },
+      data: { title: payload.title, artist: payload.artist, album: payload.album, year: payload.year },
       include: { blocks: { orderBy: { order: "asc" } } },
     });
   });
@@ -431,7 +434,7 @@ export function registerSongsIpc() {
           children: [
             new Paragraph({ children: [new TextRun({ text: `Titre : ${song.title}`, bold: true })] }),
             new Paragraph(`Auteur : ${song.artist || ""}`),
-            new Paragraph(`Annee de parution : ${""}`),
+            new Paragraph(`Annee de parution : ${song.year || song.tags || ""}`),
             new Paragraph(`Album : ${song.album || ""}`),
             new Paragraph(""),
             new Paragraph({ children: [new TextRun({ text: "Paroles :", bold: true })] }),
@@ -449,7 +452,7 @@ export function registerSongsIpc() {
       filters: [{ name: "Word", extensions: ["docx"] }],
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
-    fs.writeFileSync(res.filePath, buffer);
+    await writeFile(res.filePath, buffer);
     return { ok: true, path: res.filePath };
   });
 
@@ -471,6 +474,7 @@ export function registerSongsIpc() {
         title: parsed.title,
         artist: parsed.artist,
         album: parsed.album,
+        year: parsed.year,
         tags: parsed.year,
         blocks: {
           create: parsed.blocks,

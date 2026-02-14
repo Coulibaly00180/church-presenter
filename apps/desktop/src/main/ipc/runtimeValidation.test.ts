@@ -59,8 +59,10 @@ describe("runtime validation", () => {
   });
 
   it("defaults data import mode to MERGE", () => {
-    expect(parseDataImportPayload(undefined)).toEqual({ mode: "MERGE" });
-    expect(parseDataImportPayload({})).toEqual({ mode: "MERGE" });
+    expect(parseDataImportPayload(undefined)).toEqual({ mode: "MERGE", atomicity: "ENTITY" });
+    expect(parseDataImportPayload({})).toEqual({ mode: "MERGE", atomicity: "ENTITY" });
+    expect(parseDataImportPayload({ mode: "REPLACE" })).toEqual({ mode: "REPLACE", atomicity: "STRICT" });
+    expect(parseDataImportPayload({ mode: "MERGE", atomicity: "STRICT" })).toEqual({ mode: "MERGE", atomicity: "STRICT" });
     expect(() => parseDataImportPayload({ mode: "INVALID" })).toThrow("must be one of");
   });
 

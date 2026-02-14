@@ -1,10 +1,12 @@
 import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
 import { join, basename, extname, resolve, sep } from "path";
-import fs from "fs";
+import { access, copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
+import { openDevtoolsWithGuard } from "./ipc/devtools";
+import { ensureRuntimeDatabaseUrl } from "./db";
 import {
   parseDevtoolsTarget,
   parseFilesDeleteMediaPayload,
@@ -20,14 +22,9 @@ import {
   parseScreenMirrorMode,
 } from "./ipc/runtimeValidation";
 import type {
-  CpDevtoolsTarget,
-  CpLiveSetPayload,
   CpLiveState,
   CpMediaType,
   CpProjectionMode,
-  CpProjectionSetAppearancePayload,
-  CpProjectionSetMediaPayload,
-  CpProjectionSetTextPayload,
   CpProjectionState,
   CpScreenMeta,
   ScreenKey,
@@ -104,6 +101,15 @@ function getMediaDir() {
   return join(app.getPath("userData"), "media");
 }
 
+async function pathExists(pathToCheck: string) {
+  try {
+    await access(pathToCheck);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function isPathInDir(baseDir: string, candidatePath: string) {
   const base = (resolve(baseDir) + sep).toLowerCase();
   const candidate = resolve(candidatePath).toLowerCase();
@@ -158,8 +164,8 @@ function createRegieWindow() {
   regieWin.setMenuBarVisibility(false);
 
   const base = process.env.ELECTRON_RENDERER_URL;
-  if (base) regieWin.loadURL(`${base}/#/regie`);
-  else regieWin.loadFile(join(__dirname, "../renderer/index.html"), { hash: "/regie" });
+  if (base) void regieWin.loadURL(`${base}/#/regie`);
+  else void regieWin.loadFile(join(__dirname, "../renderer/index.html"), { hash: "/regie" });
 
   if (!app.isPackaged) {
     regieWin.webContents.openDevTools({ mode: "detach" });
@@ -240,9 +246,9 @@ function createScreenWindow(key: ScreenKey) {
   // Load
   const url = getProjectionUrlForKey(key);
   if (typeof url === "string") {
-    win.loadURL(url);
+    void win.loadURL(url);
   } else {
-    win.loadFile(url.file, { hash: url.hash });
+    void win.loadFile(url.file, { hash: url.hash });
   }
 
   win.webContents.on("did-finish-load", () => {
@@ -267,7 +273,9 @@ function closeScreenWindow(key: ScreenKey) {
   projWins[key]?.close();
 }
 
-app.whenReady().then(() => {
+void app.whenReady().then(async () => {
+  await ensureRuntimeDatabaseUrl();
+
   try {
     registerSongsIpc();
   } catch (e) {
@@ -301,6 +309,8 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createRegieWindow();
   });
+}).catch((e: unknown) => {
+  console.error("app.whenReady failed", e);
 });
 
 app.on("window-all-closed", () => {
@@ -327,11 +337,16 @@ ipcMain.handle("projectionWindow:isOpen", () => {
 // Devtools opening
 ipcMain.handle("devtools:open", (_evt, rawTarget: unknown) => {
   const target = parseDevtoolsTarget(rawTarget);
-  if (target === "REGIE") regieWin?.webContents.openDevTools({ mode: "detach" });
-  if (target === "PROJECTION" || target === "SCREEN_A") projWins.A?.webContents.openDevTools({ mode: "detach" });
-  if (target === "SCREEN_B") projWins.B?.webContents.openDevTools({ mode: "detach" });
-  if (target === "SCREEN_C") projWins.C?.webContents.openDevTools({ mode: "detach" });
-  return { ok: true };
+  return openDevtoolsWithGuard(target, {
+    isPackaged: app.isPackaged,
+    openers: {
+      REGIE: () => regieWin?.webContents.openDevTools({ mode: "detach" }),
+      PROJECTION: () => projWins.A?.webContents.openDevTools({ mode: "detach" }),
+      SCREEN_A: () => projWins.A?.webContents.openDevTools({ mode: "detach" }),
+      SCREEN_B: () => projWins.B?.webContents.openDevTools({ mode: "detach" }),
+      SCREEN_C: () => projWins.C?.webContents.openDevTools({ mode: "detach" }),
+    },
+  });
 });
 
 ipcMain.handle("files:pickMedia", async () => {
@@ -349,10 +364,10 @@ ipcMain.handle("files:pickMedia", async () => {
   if (!mediaType) return { ok: false, error: "Unsupported media extension" };
 
   const mediaDir = getMediaDir();
-  if (!fs.existsSync(mediaDir)) fs.mkdirSync(mediaDir, { recursive: true });
+  await mkdir(mediaDir, { recursive: true });
   const target = join(mediaDir, basename(p));
   try {
-    fs.copyFileSync(p, target);
+    await copyFile(p, target);
     return { ok: true, path: target, mediaType };
   } catch (e) {
     console.error("copy media failed", e);
@@ -363,17 +378,19 @@ ipcMain.handle("files:pickMedia", async () => {
 ipcMain.handle("files:listMedia", async () => {
   try {
     const mediaDir = getMediaDir();
-    if (!fs.existsSync(mediaDir)) return { ok: true, files: [] };
-    const entries = fs.readdirSync(mediaDir);
-    const files = entries
-      .filter((f) => fs.statSync(join(mediaDir, f)).isFile())
-      .map((name): { name: string; path: string; mediaType: CpMediaType } | null => {
+    if (!(await pathExists(mediaDir))) return { ok: true, files: [] };
+    const entries = await readdir(mediaDir);
+    const filesRaw = await Promise.all(
+      entries.map(async (name): Promise<{ name: string; path: string; mediaType: CpMediaType } | null> => {
         const full = join(mediaDir, name);
+        const st = await stat(full);
+        if (!st.isFile()) return null;
         const mediaType = inferMediaType(name);
         if (!mediaType) return null;
         return { name, path: full, mediaType };
       })
-      .filter((x): x is { name: string; path: string; mediaType: CpMediaType } => !!x);
+    );
+    const files = filesRaw.filter((x): x is { name: string; path: string; mediaType: CpMediaType } => !!x);
     return { ok: true, files };
   } catch (e: unknown) {
     console.error("listMedia failed", e);
@@ -389,8 +406,8 @@ ipcMain.handle("files:deleteMedia", async (_evt, rawPayload: unknown) => {
     if (!isPathInDir(mediaDir, payload.path)) {
       return { ok: false, error: "Path outside media directory" };
     }
-    if (fs.existsSync(payload.path)) {
-      fs.unlinkSync(payload.path);
+    if (await pathExists(payload.path)) {
+      await unlink(payload.path);
     }
     return { ok: true };
   } catch (e: unknown) {

@@ -12,6 +12,7 @@ model Song {
   title     String
   artist    String?
   album     String?
+  year      String?
   language  String?
   tags      String?
   createdAt DateTime    @default(now())
@@ -33,6 +34,7 @@ model SongBlock {
   song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
 
   @@index([songId, order])
+  @@unique([songId, order])
 }
 
 model ServicePlan {
@@ -61,4 +63,5 @@ model ServiceItem {
   plan      ServicePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@index([planId, order])
+  @@unique([planId, order])
 }

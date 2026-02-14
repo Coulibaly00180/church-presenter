@@ -64,6 +64,7 @@ export type CpSongListItem = {
   title: string;
   artist?: string | null;
   album?: string | null;
+  year?: string | null;
   updatedAt: string | Date;
 };
 
@@ -72,6 +73,7 @@ export type CpSongDetail = {
   title: string;
   artist?: string | null;
   album?: string | null;
+  year?: string | null;
   language?: string | null;
   tags?: string | null;
   blocks: CpSongBlock[];
@@ -159,6 +161,7 @@ export type CpPlanReorderResult = { ok: true };
 export type CpPlanExportResult = { ok: true; path: string } | { ok: false; canceled: true };
 
 export type CpDataImportMode = "MERGE" | "REPLACE";
+export type CpDataImportAtomicity = "ENTITY" | "STRICT";
 export type CpDataExportResult = { ok: true; path: string } | { ok: false; canceled: true };
 export type CpDataImportCounts = { songs: number; plans: number };
 export type CpDataImportError = { kind: string; title?: string; message: string };
@@ -172,7 +175,7 @@ export type CpBibleLanguageGroup = { language: string; translations: CpBibleTran
 export type CpBibleListTranslationsResult = { ok: true; data: CpBibleLanguageGroup[] } | { ok: false; error: string };
 
 export type CpDevtoolsTarget = "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C";
-export type CpDevtoolsOpenResult = { ok: true };
+export type CpDevtoolsOpenResult = { ok: true } | { ok: false; reason: "DISABLED_IN_PROD" };
 
 export type CpMediaFile = { name: string; path: string; mediaType: CpMediaType };
 export type CpFilesPickMediaResult =
@@ -229,8 +232,8 @@ export interface CpApi {
   songs: {
     list: (q?: string) => Promise<CpSongListItem[]>;
     get: (id: string) => Promise<CpSongDetail | null>;
-    create: (payload: { title: string; artist?: string; album?: string }) => Promise<CpSongDetail>;
-    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string }) => Promise<CpSongDetail>;
+    create: (payload: { title: string; artist?: string; album?: string; year?: string }) => Promise<CpSongDetail>;
+    updateMeta: (payload: { id: string; title: string; artist?: string; album?: string; year?: string }) => Promise<CpSongDetail>;
     replaceBlocks: (payload: { songId: string; blocks: Array<{ order: number; type: CpSongBlockType; title?: string; content: string }> }) => Promise<CpSongDetail | null>;
     delete: (id: string) => Promise<CpSongDeleteResult>;
     exportWord: (id: string) => Promise<CpSongExportWordResult>;
@@ -252,7 +255,7 @@ export interface CpApi {
   };
   data: {
     exportAll: () => Promise<CpDataExportResult>;
-    importAll: (payload: { mode: CpDataImportMode }) => Promise<CpDataImportResult>;
+    importAll: (payload: { mode: CpDataImportMode; atomicity?: CpDataImportAtomicity }) => Promise<CpDataImportResult>;
   };
   bible: {
     listTranslations: () => Promise<CpBibleListTranslationsResult>;

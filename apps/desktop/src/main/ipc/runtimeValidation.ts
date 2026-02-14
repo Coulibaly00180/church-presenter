@@ -1,4 +1,5 @@
 import type {
+  CpDataImportAtomicity,
   CpDataImportMode,
   CpDevtoolsTarget,
   CpLiveSetPayload,
@@ -27,6 +28,7 @@ const PROJECTION_MODES = ["NORMAL", "BLACK", "WHITE"] as const;
 const MEDIA_TYPES = ["IMAGE", "PDF"] as const;
 const DEVTOOLS_TARGETS = ["REGIE", "PROJECTION", "SCREEN_A", "SCREEN_B", "SCREEN_C"] as const;
 const DATA_IMPORT_MODES = ["MERGE", "REPLACE"] as const;
+const DATA_IMPORT_ATOMICITY = ["ENTITY", "STRICT"] as const;
 const SCREEN_MIRROR_MODES = ["FREE", "MIRROR"] as const;
 const CURRENT_KINDS = ["EMPTY", "TEXT", "MEDIA"] as const;
 
@@ -262,22 +264,24 @@ export function parseLiveSetLockedPayload(value: unknown): { key: ScreenKey; loc
   };
 }
 
-export function parseSongCreatePayload(value: unknown): { title: string; artist?: string; album?: string } {
+export function parseSongCreatePayload(value: unknown): { title: string; artist?: string; album?: string; year?: string } {
   const rec = expectRecord(value, "songs:create payload");
   return {
     title: expectString(rec.title, "songs:create.title"),
     artist: expectOptionalString(rec.artist, "songs:create.artist"),
     album: expectOptionalString(rec.album, "songs:create.album"),
+    year: expectOptionalString(rec.year, "songs:create.year"),
   };
 }
 
-export function parseSongUpdateMetaPayload(value: unknown): { id: string; title: string; artist?: string; album?: string } {
+export function parseSongUpdateMetaPayload(value: unknown): { id: string; title: string; artist?: string; album?: string; year?: string } {
   const rec = expectRecord(value, "songs:updateMeta payload");
   return {
     id: expectString(rec.id, "songs:updateMeta.id"),
     title: expectString(rec.title, "songs:updateMeta.title"),
     artist: expectOptionalString(rec.artist, "songs:updateMeta.artist"),
     album: expectOptionalString(rec.album, "songs:updateMeta.album"),
+    year: expectOptionalString(rec.year, "songs:updateMeta.year"),
   };
 }
 
@@ -356,9 +360,15 @@ export function parsePlanExportPayload(value: unknown): CpPlanExportPayload {
   };
 }
 
-export function parseDataImportPayload(value: unknown): { mode: CpDataImportMode } {
-  if (value == null) return { mode: "MERGE" };
+export function parseDataImportPayload(value: unknown): { mode: CpDataImportMode; atomicity: CpDataImportAtomicity } {
+  if (value == null) return { mode: "MERGE", atomicity: "ENTITY" };
   const rec = expectRecord(value, "data:importAll payload");
   const mode = rec.mode == null ? "MERGE" : expectEnum(rec.mode, "data:importAll.mode", DATA_IMPORT_MODES);
-  return { mode };
+  const atomicity =
+    rec.atomicity == null
+      ? mode === "REPLACE"
+        ? "STRICT"
+        : "ENTITY"
+      : expectEnum(rec.atomicity, "data:importAll.atomicity", DATA_IMPORT_ATOMICITY);
+  return { mode, atomicity };
 }

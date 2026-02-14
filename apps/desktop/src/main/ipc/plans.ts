@@ -1,5 +1,6 @@
 import { dialog, ipcMain } from "electron";
 import type { Prisma } from "@prisma/client";
+import { writeFile } from "fs/promises";
 import { getPrisma } from "../db";
 import { validatePlanReorderPayload } from "./reorderValidation";
 import {
@@ -34,6 +35,42 @@ function addUtcDays(date: Date, days: number) {
 
 function isUniqueConstraintError(err: unknown) {
   return typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "P2002";
+}
+
+export async function createPlanItemWithRetry(
+  prisma: ReturnType<typeof getPrisma>,
+  payload: ReturnType<typeof parsePlanAddItemPayload>,
+  maxRetries = 20
+) {
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+    try {
+      return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const lastItem = await tx.serviceItem.findFirst({
+          where: { planId: payload.planId },
+          orderBy: { order: "desc" },
+          select: { order: true },
+        });
+        const order = (lastItem?.order ?? 0) + 1;
+        return tx.serviceItem.create({
+          data: {
+            planId: payload.planId,
+            order,
+            kind: payload.kind,
+            title: payload.title,
+            content: payload.content,
+            refId: payload.refId,
+            refSubId: payload.refSubId,
+            mediaPath: payload.mediaPath,
+          },
+        });
+      });
+    } catch (e: unknown) {
+      if (!isUniqueConstraintError(e) || attempt === maxRetries - 1) {
+        throw e;
+      }
+    }
+  }
+  throw new Error("Unable to allocate a unique plan item order");
 }
 
 export function registerPlansIpc() {
@@ -139,21 +176,7 @@ export function registerPlansIpc() {
     ) => {
       const prisma = getPrisma();
       const payload = parsePlanAddItemPayload(rawPayload);
-      const count = await prisma.serviceItem.count({ where: { planId: payload.planId } });
-      const order = count + 1;
-
-      return prisma.serviceItem.create({
-        data: {
-          planId: payload.planId,
-          order,
-          kind: payload.kind,
-          title: payload.title,
-          content: payload.content,
-          refId: payload.refId,
-          refSubId: payload.refSubId,
-          mediaPath: payload.mediaPath,
-        },
-      });
+      return createPlanItemWithRetry(prisma, payload);
     }
   );
 
@@ -221,8 +244,7 @@ export function registerPlansIpc() {
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
 
-    const fs = await import("fs");
-    fs.writeFileSync(res.filePath, data, "utf-8");
+    await writeFile(res.filePath, data, "utf-8");
 
     return { ok: true, path: res.filePath };
   });
