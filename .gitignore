@@ -45,6 +45,7 @@ apps/**/node_modules
 apps/**/dist
 apps/**/out
 apps/**/build
+apps/**/release
 apps/**/.env.local
 apps/**/.env.development
 apps/**/.env.test
@@ -60,3 +61,4 @@ apps/desktop/data/app.db
 apps/**/data/*.db
 apps/**/data/*.db-shm
 apps/**/data/*.db-wal
+apps/**/data/backups
