@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { ActionRow, Alert, PageHeader, Panel } from "../ui/primitives";
+import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
 
 type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
 type ImportDetail = { counts: CpDataImportCounts; errors: CpDataImportError[] };
+type ImportMode = "MERGE" | "REPLACE";
+type ImportAtomicity = "ENTITY" | "STRICT";
 
 function isoToYmd(iso: string | Date) {
   if (iso instanceof Date) {
@@ -42,6 +44,8 @@ export function HistoryPage() {
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("MERGE");
+  const [importAtomicity, setImportAtomicity] = useState<ImportAtomicity>("ENTITY");
 
   useEffect(() => {
     if (!canUse) return;
@@ -86,6 +90,30 @@ export function HistoryPage() {
       ) : null}
 
       <ActionRow>
+        <Field label="Mode">
+          <select
+            value={importMode}
+            onChange={(e) => setImportMode(e.target.value === "REPLACE" ? "REPLACE" : "MERGE")}
+            className="cp-input-min-180"
+          >
+            <option value="MERGE">MERGE</option>
+            <option value="REPLACE">REPLACE</option>
+          </select>
+        </Field>
+        <Field label="Atomicite">
+          <select
+            value={importMode === "REPLACE" ? "STRICT" : importAtomicity}
+            onChange={(e) => setImportAtomicity(e.target.value === "STRICT" ? "STRICT" : "ENTITY")}
+            disabled={importMode === "REPLACE"}
+            className="cp-input-min-180"
+          >
+            <option value="ENTITY">ENTITY</option>
+            <option value="STRICT">STRICT</option>
+          </select>
+        </Field>
+      </ActionRow>
+
+      <ActionRow>
         <button
           onClick={async () => {
             try {
@@ -112,7 +140,8 @@ export function HistoryPage() {
                 return;
               }
 
-              const replace = window.confirm("Remplacer les donnees existantes ? OK = REPLACE, Annuler = MERGE");
+              const replace = importMode === "REPLACE";
+              const atomicity: ImportAtomicity = replace ? "STRICT" : importAtomicity;
               let backupPath: string | undefined;
 
               if (replace) {
@@ -128,11 +157,11 @@ export function HistoryPage() {
                 backupPath = bk.path;
               }
 
-              const r = await window.cp.data.importAll({ mode: replace ? "REPLACE" : "MERGE" });
+              const r = await window.cp.data.importAll({ mode: importMode, atomicity });
               if (r.ok) {
                 setPlans(await window.cp.plans.list());
                 setMsg(
-                  `Import global termine (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
+                  `Import global termine (${importMode}/${atomicity}) (${r.counts?.songs || 0} chants, ${r.counts?.plans || 0} plans)${
                     backupPath ? ` | Sauvegarde: ${backupPath}` : ""
                   }.`
                 );
