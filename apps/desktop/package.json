@@ -15,6 +15,7 @@
     "db:migrate:safe": "node scripts/prisma-migrate-safe.mjs",
     "bible:build-offline": "node scripts/build-lsg1910-offline.mjs",
     "postinstall": "prisma generate",
+    "audit:high": "npm audit --omit=optional --audit-level=high",
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts"
   },
@@ -72,7 +73,6 @@
     "@vitejs/plugin-react": "^5.1.2",
     "electron": "^40.0.0",
     "electron-builder": "^26.7.0",
-    "electron-rebuild": "^3.2.9",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.4",

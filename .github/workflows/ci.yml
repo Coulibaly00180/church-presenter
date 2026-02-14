@@ -5,6 +5,9 @@ on:
     branches:
       - "**"
   pull_request:
+  release:
+    types:
+      - published
 
 jobs:
   verify:
@@ -35,9 +38,12 @@ jobs:
       - name: Build
         run: npm run build
 
-  package-win:
+      - name: Security audit (high)
+        run: npm run audit:high -w @cp/desktop
+
+  package-win-unsigned:
     needs: verify
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: windows-latest
     timeout-minutes: 45
     env:
@@ -61,5 +67,35 @@ jobs:
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: church-presenter-windows
+          name: church-presenter-windows-unsigned
+          path: apps/desktop/release/**
+
+  package-win-signed:
+    needs: verify
+    if: (github.event_name == 'release' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && secrets.CSC_LINK != '' && secrets.CSC_KEY_PASSWORD != ''
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows signed installer
+        run: npm run dist:win
+
+      - name: Upload Windows signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: church-presenter-windows-signed
           path: apps/desktop/release/**
