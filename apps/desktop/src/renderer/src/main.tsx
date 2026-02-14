@@ -1,6 +1,10 @@
-import React from "react";
+﻿import React from "react";
 import ReactDOM from "react-dom/client";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import "@fontsource/space-grotesk/400.css";
+import "@fontsource/space-grotesk/500.css";
+import "@fontsource/space-grotesk/600.css";
+import "@fontsource/space-grotesk/700.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/ui.css";
@@ -38,13 +42,11 @@ function App() {
   );
 }
 
-// logs + fallback global (très utile en Electron)
+// logs + fallback global (trÃ¨s utile en Electron)
 window.addEventListener("error", (e) => {
-  // eslint-disable-next-line no-console
   console.error("window error", e.error || e.message);
 });
 window.addEventListener("unhandledrejection", (e) => {
-  // eslint-disable-next-line no-console
   console.error("unhandledrejection", e.reason);
 });
 

@@ -1,20 +1,25 @@
-import data from "./ls1910-mini.json";
+import data from "./ls1910-full.json";
 import { parseReference } from "./parseRef";
 
-type MiniBook = {
+type OfflineBook = {
   name: string;
   chapters: Record<string, Record<string, string>>;
 };
 
-type MiniData = {
-  books: Record<string, MiniBook>;
+type OfflineData = {
+  meta: {
+    id: string;
+    name: string;
+    cacheVersion: string;
+  };
+  books: Record<string, OfflineBook>;
 };
 
-const lsgData = data as unknown as MiniData;
+const lsgData = data as unknown as OfflineData;
 
 export type OfflineVerse = { bookId: string; bookName: string; chapter: number; verse: number; text: string };
 
-function getBook(d: MiniData, bookId: string) {
+function getBook(d: OfflineData, bookId: string) {
   return d.books[bookId];
 }
 

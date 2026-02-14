@@ -10,6 +10,7 @@ type SongListItem = {
   title: string;
   artist?: string | null;
   album?: string | null;
+  year?: string | null;
   updatedAt: string | Date;
 };
 
@@ -26,18 +27,12 @@ type SongDetail = {
   title: string;
   artist?: string | null;
   album?: string | null;
+  year?: string | null;
   tags?: string | null;
   blocks: SongBlock[];
 };
 
 type PlanWithItems = { id: string; date?: string | Date; title?: string | null; items?: Array<{ id: string; kind: string; refId?: string | null; refSubId?: string | null }> };
-
-function splitBlocks(text: string) {
-  return text
-    .split(/\n\s*\n/g)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
 
 function cls(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -58,6 +53,7 @@ export function SongsPage() {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [album, setAlbum] = useState("");
+  const [year, setYear] = useState("");
 
   const [err, setErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -96,6 +92,7 @@ export function SongsPage() {
     setTitle(s.title ?? "");
     setArtist(s.artist ?? "");
     setAlbum(s.album ?? "");
+    setYear(s.year ?? "");
   }
 
   function formatPlanDate(p: PlanWithItems) {
@@ -160,6 +157,7 @@ export function SongsPage() {
         title: title.trim() || "Sans titre",
         artist: artist.trim() || undefined,
         album: album.trim() || undefined,
+        year: year.trim() || undefined,
       });
       setSong(updated);
       await refresh(q);
@@ -216,7 +214,7 @@ export function SongsPage() {
       title: song.title,
       artist: song.artist ?? undefined,
       album: song.album ?? undefined,
-      year: song.tags ?? song.album ?? undefined, // tags often used for year import
+      year: song.year ?? song.tags ?? undefined,
     };
     await projectTextToScreen({ target, title: song.title, body: b.content || "", metaSong });
   }
@@ -292,7 +290,7 @@ export function SongsPage() {
       title: song.title,
       artist: song.artist ?? undefined,
       album: song.album ?? undefined,
-      year: song.tags ?? song.album ?? undefined,
+      year: song.year ?? song.tags ?? undefined,
     };
     await projectTextToScreen({ target, title: song.title, body: text, metaSong });
   }
@@ -452,6 +450,9 @@ export function SongsPage() {
                 </Field>
                 <Field label="Album">
                   <input value={album} onChange={(e) => setAlbum(e.target.value)} />
+                </Field>
+                <Field label="Annee">
+                  <input value={year} onChange={(e) => setYear(e.target.value)} />
                 </Field>
               </div>
 

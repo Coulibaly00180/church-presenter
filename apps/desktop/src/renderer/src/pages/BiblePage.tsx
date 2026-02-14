@@ -1,12 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BollsBook,
   BollsVerse,
   buildReferenceLabel,
-  findBookIdByName,
   getBooks,
   getChapter,
-  maxChapter,
   searchVerses,
   versesToText,
   listTranslations,
@@ -57,7 +55,7 @@ type TranslationGroup = {
 };
 
 export function BiblePage() {
-  const [translationLanguage, setTranslationLanguage] = useState<string>("French Français"); // default language
+  const [translationLanguage, setTranslationLanguage] = useState<string>("French FranÃ§ais"); // default language
   const [translation, setTranslation] = useState<string>("FRLSG"); // default translation code
   const activeTranslation = translation;
   const [groups, setGroups] = useState<TranslationGroup[]>([]);
@@ -100,7 +98,7 @@ export function BiblePage() {
           g.translations.push({ code: t.short_name, label: `${t.full_name} (${t.short_name})`, dir: t.dir });
         });
         setGroups(grouped);
-        const defaultLang = "French Français";
+        const defaultLang = "French FranÃ§ais";
         const defaultCode = "FRLSG";
         const langExists = grouped.find((g) => g.language === defaultLang);
         if (langExists) {
@@ -235,7 +233,6 @@ export function BiblePage() {
     }
 
     for (const it of items) {
-      // eslint-disable-next-line no-await-in-loop
       await window.cp.plans.addItem(it);
     }
     setInfo(`${items.length} element(s) ajoute(s) au plan.`);
@@ -286,36 +283,6 @@ export function BiblePage() {
       setSelectedVerses(new Set([v.verse]));
     } catch (e: unknown) {
       setErr(getErrorMessage(e));
-    }
-  }
-
-  async function handleManualRef(input: string) {
-    // Accepts patterns like "Jean 3:16-18" or "John 3:16"
-    if (!books.length) return;
-    const m = input.match(/^(.+?)\\s+(\\d+)(?::(\\d+)(?:-(\\d+))?)?$/i);
-    if (!m) {
-      setErr("Reference non comprise (ex: Jean 3:16-18).");
-      return;
-    }
-    const [, bookName, chapStr, vStartStr, vEndStr] = m;
-    const book = findBookIdByName(books, bookName);
-    if (!book) {
-      setErr("Livre non trouve pour cette traduction.");
-      return;
-    }
-    const chap = parseInt(chapStr, 10);
-    const max = maxChapter(books, book.bookid);
-    if (max && chap > max) {
-      setErr(`Ce livre n'a que ${max} chapitres.`);
-      return;
-    }
-    await loadChapter(book.bookid, chap);
-    if (vStartStr) {
-      const start = parseInt(vStartStr, 10);
-      const end = vEndStr ? parseInt(vEndStr, 10) : start;
-      const range = [];
-      for (let i = start; i <= end; i += 1) range.push(i);
-      setSelectedVerses(new Set(range));
     }
   }
 
@@ -459,7 +426,7 @@ export function BiblePage() {
         <Panel>
           <div className="cp-panel-header-split">
             <div>
-              <div className="cp-title-strong">{currentBook?.name ?? "—"}</div>
+              <div className="cp-title-strong">{currentBook?.name ?? "â€”"}</div>
               <div className="cp-muted">
                 {referenceLabel} ({activeTranslation})
               </div>

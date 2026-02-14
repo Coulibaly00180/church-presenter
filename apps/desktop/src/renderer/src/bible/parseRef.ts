@@ -1,37 +1,101 @@
+import { bcv_parser } from "bible-passage-reference-parser/esm/bcv_parser.js";
+import * as fr from "bible-passage-reference-parser/esm/lang/fr.js";
+
 export type VerseRange = { bookId: string; bookName: string; chapter: number; from: number; to: number };
 
-type BookEntry = { id: string; name: string; aliases: string[] };
+const parser = new bcv_parser(fr);
 
-const BOOKS: BookEntry[] = [
-  { id: "JHN", name: "Jean", aliases: ["jean", "jn", "jhn", "john"] },
-  { id: "PSA", name: "Psaumes", aliases: ["psaume", "psaumes", "ps", "psa", "psalm", "psalms"] },
-];
+const BOOK_NAMES: Record<string, string> = {
+  Gen: "Genèse",
+  Exod: "Exode",
+  Lev: "Lévitique",
+  Num: "Nombres",
+  Deut: "Deutéronome",
+  Josh: "Josué",
+  Judg: "Juges",
+  Ruth: "Ruth",
+  "1Sam": "1 Samuel",
+  "2Sam": "2 Samuel",
+  "1Kgs": "1 Rois",
+  "2Kgs": "2 Rois",
+  "1Chr": "1 Chroniques",
+  "2Chr": "2 Chroniques",
+  Ezra: "Esdras",
+  Neh: "Néhémie",
+  Esth: "Esther",
+  Job: "Job",
+  Ps: "Psaumes",
+  Prov: "Proverbes",
+  Eccl: "Ecclésiaste",
+  Song: "Cantique",
+  Isa: "Ésaïe",
+  Jer: "Jérémie",
+  Lam: "Lamentations",
+  Ezek: "Ézékiel",
+  Dan: "Daniel",
+  Hos: "Osée",
+  Joel: "Joël",
+  Amos: "Amos",
+  Obad: "Abdias",
+  Jonah: "Jonas",
+  Mic: "Michée",
+  Nah: "Nahum",
+  Hab: "Habacuc",
+  Zeph: "Sophonie",
+  Hag: "Aggée",
+  Zech: "Zacharie",
+  Mal: "Malachie",
+  Matt: "Matthieu",
+  Mark: "Marc",
+  Luke: "Luc",
+  John: "Jean",
+  Acts: "Actes",
+  Rom: "Romains",
+  "1Cor": "1 Corinthiens",
+  "2Cor": "2 Corinthiens",
+  Gal: "Galates",
+  Eph: "Éphésiens",
+  Phil: "Philippiens",
+  Col: "Colossiens",
+  "1Thess": "1 Thessaloniciens",
+  "2Thess": "2 Thessaloniciens",
+  "1Tim": "1 Timothée",
+  "2Tim": "2 Timothée",
+  Titus: "Tite",
+  Phlm: "Philémon",
+  Heb: "Hébreux",
+  Jas: "Jacques",
+  "1Pet": "1 Pierre",
+  "2Pet": "2 Pierre",
+  "1John": "1 Jean",
+  "2John": "2 Jean",
+  "3John": "3 Jean",
+  Jude: "Jude",
+  Rev: "Apocalypse",
+};
 
-// Parse formats:
-// - "Jean 3:16-18"
-// - "Jn 3:16"
-// - "Psaume 23" (=> verses 1-999; caller may clamp)
 export function parseReference(input: string): VerseRange | null {
   const raw = (input || "").trim();
   if (!raw) return null;
 
-  // Normalize separators
-  const s = raw.replace(/\./g, ":").replace(/\s+/g, " ").trim();
+  const envelopes = parser.parse(raw).parsed_entities();
+  const firstEnvelope = envelopes[0];
+  const firstEntity = firstEnvelope?.entities?.[0];
+  const start = firstEntity?.start;
+  const end = firstEntity?.end ?? start;
 
-  // Split book part and the rest
-  const m = s.match(/^(.+?)\s+(\d+)(?::(\d+)(?:-(\d+))?)?$/i);
-  if (!m) {
-    // maybe "Psaume 23" already matches; if not, give up
-    return null;
-  }
+  const bookId = start?.b;
+  const chapter = Number(start?.c);
+  const from = Number(start?.v ?? 1);
+  const to = Number(end?.v ?? from);
+  const endBookId = end?.b ?? bookId;
+  const endChapter = Number(end?.c ?? chapter);
 
-  const bookPart = m[1].trim().toLowerCase();
-  const chapter = Number(m[2]);
-  const from = m[3] ? Number(m[3]) : 1;
-  const to = m[4] ? Number(m[4]) : (m[3] ? Number(m[3]) : 999);
+  if (!bookId || !BOOK_NAMES[bookId]) return null;
+  if (!Number.isFinite(chapter) || chapter <= 0) return null;
+  if (!Number.isFinite(from) || from <= 0) return null;
+  if (!Number.isFinite(to) || to < from) return null;
+  if (endBookId !== bookId || endChapter !== chapter) return null;
 
-  const book = BOOKS.find((b) => b.aliases.includes(bookPart) || b.name.toLowerCase() === bookPart);
-  if (!book || !Number.isFinite(chapter) || chapter <= 0) return null;
-
-  return { bookId: book.id, bookName: book.name, chapter, from, to };
+  return { bookId, bookName: BOOK_NAMES[bookId], chapter, from, to };
 }

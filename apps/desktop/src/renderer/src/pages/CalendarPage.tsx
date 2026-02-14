@@ -35,7 +35,6 @@ export function CalendarPage() {
   }, [canUse]);
 
   const monthStart = useMemo(() => new Date(cursor.getFullYear(), cursor.getMonth(), 1), [cursor]);
-  const monthEnd = useMemo(() => new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0), [cursor]);
 
   const byDate = useMemo(() => {
     const map = new Map<string, PlanListItem[]>();

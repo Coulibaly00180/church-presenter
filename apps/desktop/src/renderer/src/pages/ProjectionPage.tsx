@@ -108,7 +108,6 @@ export function ProjectionPage() {
   useEffect(() => {
     setAnimKey((k) => k + 1);
     setBlockCursor(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state?.current?.kind, state?.current?.title, state?.current?.body]);
 
   const mode = state?.mode ?? "NORMAL";

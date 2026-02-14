@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { lookupLSG1910 } from "../../bible/lookupLSG1910";
 import { BollsBook, buildReferenceLabel, findBookIdByName, getBooks, getChapter, maxChapter, searchVerses } from "../../bible/bollsApi";
 import { Plan } from "./types";
@@ -186,7 +186,6 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
       for (const v of bibleVerses) {
         const verseRef = `${ref.split(":")[0]}:${v.verse}`;
         const body = `${v.chapter}:${v.verse}  ${v.text.trim()}`;
-        // eslint-disable-next-line no-await-in-loop
         await window.cp.plans.addItem({
           planId: plan.id,
           kind: "BIBLE_VERSE",

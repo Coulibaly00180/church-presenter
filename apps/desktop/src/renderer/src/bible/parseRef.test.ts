@@ -4,7 +4,7 @@ import { parseReference } from "./parseRef";
 describe("parseReference", () => {
   it("parses a range reference", () => {
     expect(parseReference("Jean 3:16-18")).toEqual({
-      bookId: "JHN",
+      bookId: "John",
       bookName: "Jean",
       chapter: 3,
       from: 16,
@@ -14,7 +14,7 @@ describe("parseReference", () => {
 
   it("parses short alias and single verse", () => {
     expect(parseReference("Jn 3:16")).toEqual({
-      bookId: "JHN",
+      bookId: "John",
       bookName: "Jean",
       chapter: 3,
       from: 16,
@@ -24,15 +24,19 @@ describe("parseReference", () => {
 
   it("parses chapter-only references", () => {
     expect(parseReference("Psaume 23")).toEqual({
-      bookId: "PSA",
+      bookId: "Ps",
       bookName: "Psaumes",
       chapter: 23,
       from: 1,
-      to: 999,
+      to: 6,
     });
   });
 
   it("returns null for unknown books", () => {
-    expect(parseReference("Genese 1:1")).toBeNull();
+    expect(parseReference("LivreInconnu 1:1")).toBeNull();
+  });
+
+  it("returns null for cross-chapter ranges", () => {
+    expect(parseReference("Jean 3:16-4:2")).toBeNull();
   });
 });

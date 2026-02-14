@@ -49,6 +49,7 @@ declare global {
   type CpPlanExportResult = Shared.CpPlanExportResult;
 
   type CpDataImportMode = Shared.CpDataImportMode;
+  type CpDataImportAtomicity = Shared.CpDataImportAtomicity;
   type CpDataExportResult = Shared.CpDataExportResult;
   type CpDataImportCounts = Shared.CpDataImportCounts;
   type CpDataImportError = Shared.CpDataImportError;

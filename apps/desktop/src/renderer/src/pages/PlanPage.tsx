@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { DragEndEvent } from "@dnd-kit/core";
 import { isoToYmd, localNowYmd } from "./plan/date";
 import { PlanComposerSection } from "./plan/PlanComposerSection";
@@ -70,7 +70,6 @@ export function PlanPage() {
       offWin?.();
       offLive?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-projection when live cursor changes on the active plan
