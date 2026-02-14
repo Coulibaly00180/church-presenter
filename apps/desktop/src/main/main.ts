@@ -6,7 +6,7 @@ import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
 import { openDevtoolsWithGuard } from "./ipc/devtools";
-import { ensureRuntimeDatabaseUrl } from "./db";
+import { ensureRuntimeDatabaseUrl, runSafeMigrationForPackagedRuntime } from "./db";
 import {
   parseDevtoolsTarget,
   parseFilesDeleteMediaPayload,
@@ -275,6 +275,36 @@ function closeScreenWindow(key: ScreenKey) {
 
 void app.whenReady().then(async () => {
   await ensureRuntimeDatabaseUrl();
+
+  if (app.isPackaged) {
+    try {
+      const migrationSummary = await runSafeMigrationForPackagedRuntime();
+      console.info(
+        "[db:migrate-safe]",
+        JSON.stringify({
+          status: "ok",
+          backupPath: migrationSummary.backupPath,
+          appliedCount: migrationSummary.appliedMigrations.length,
+          skippedCount: migrationSummary.skippedMigrations.length,
+        })
+      );
+    } catch (e: unknown) {
+      const errorMessage = getErrorMessage(e);
+      console.error(
+        "[db:migrate-safe]",
+        JSON.stringify({
+          status: "failed",
+          error: errorMessage,
+        })
+      );
+      dialog.showErrorBox(
+        "Migration base de donnees echouee",
+        `Le demarrage est interrompu pour proteger les donnees.\n\nCause: ${errorMessage}\n\nRestaure la sauvegarde puis relance l'application.`
+      );
+      app.exit(1);
+      return;
+    }
+  }
 
   try {
     registerSongsIpc();

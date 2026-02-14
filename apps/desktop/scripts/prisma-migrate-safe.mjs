@@ -1,6 +1,7 @@
 import { access, copyFile, mkdir } from "fs/promises";
 import { dirname, join, resolve } from "path";
 import { spawn } from "child_process";
+import { pathToFileURL } from "url";
 
 const DEFAULT_DATABASE_URL = "file:../data/app.db";
 
@@ -36,12 +37,13 @@ async function backupIfNeeded() {
 }
 
 function runPrismaMigrateDeploy() {
-  const npxCmd = process.platform === "win32" ? "npx.cmd" : "npx";
+  const command = "npx prisma migrate deploy";
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(npxCmd, ["prisma", "migrate", "deploy"], {
+    const child = spawn(command, [], {
       stdio: "inherit",
       cwd: process.cwd(),
       env: process.env,
+      shell: true,
     });
     child.on("error", rejectPromise);
     child.on("exit", (code) => {
@@ -51,17 +53,30 @@ function runPrismaMigrateDeploy() {
   });
 }
 
-async function main() {
-  const backupPath = await backupIfNeeded();
-  if (backupPath) {
-    console.log(`Backup database created: ${backupPath}`);
-  } else {
-    console.log("No local SQLite database found to backup.");
+export async function runSafePrismaMigrate(options = {}) {
+  const { cwd = process.cwd() } = options;
+  const previousCwd = process.cwd();
+  try {
+    if (cwd && cwd !== previousCwd) {
+      process.chdir(cwd);
+    }
+    const backupPath = await backupIfNeeded();
+    if (backupPath) {
+      console.log(`Backup database created: ${backupPath}`);
+    } else {
+      console.log("No local SQLite database found to backup.");
+    }
+    await runPrismaMigrateDeploy();
+  } finally {
+    if (process.cwd() !== previousCwd) {
+      process.chdir(previousCwd);
+    }
   }
-  await runPrismaMigrateDeploy();
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runSafePrismaMigrate().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}
