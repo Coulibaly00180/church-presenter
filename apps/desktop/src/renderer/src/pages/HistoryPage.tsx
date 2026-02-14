@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ActionRow, Alert, Field, PageHeader, Panel } from "../ui/primitives";
 
-type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
 type ImportDetail = { counts: CpDataImportCounts; errors: CpDataImportError[] };
-type ImportMode = "MERGE" | "REPLACE";
-type ImportAtomicity = "ENTITY" | "STRICT";
 
 function isoToYmd(iso: string | Date) {
   if (iso instanceof Date) {
@@ -41,11 +38,11 @@ function getErrorMessage(err: unknown) {
 export function HistoryPage() {
   const canUse = !!window.cp?.plans;
 
-  const [plans, setPlans] = useState<PlanListItem[]>([]);
+  const [plans, setPlans] = useState<CpPlanListItem[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
   const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
-  const [importMode, setImportMode] = useState<ImportMode>("MERGE");
-  const [importAtomicity, setImportAtomicity] = useState<ImportAtomicity>("ENTITY");
+  const [importMode, setCpDataImportMode] = useState<CpDataImportMode>("MERGE");
+  const [importAtomicity, setCpDataImportAtomicity] = useState<CpDataImportAtomicity>("ENTITY");
 
   useEffect(() => {
     if (!canUse) return;
@@ -93,7 +90,7 @@ export function HistoryPage() {
         <Field label="Mode">
           <select
             value={importMode}
-            onChange={(e) => setImportMode(e.target.value === "REPLACE" ? "REPLACE" : "MERGE")}
+            onChange={(e) => setCpDataImportMode(e.target.value === "REPLACE" ? "REPLACE" : "MERGE")}
             className="cp-input-min-180"
           >
             <option value="MERGE">MERGE</option>
@@ -103,7 +100,7 @@ export function HistoryPage() {
         <Field label="Atomicite">
           <select
             value={importMode === "REPLACE" ? "STRICT" : importAtomicity}
-            onChange={(e) => setImportAtomicity(e.target.value === "STRICT" ? "STRICT" : "ENTITY")}
+            onChange={(e) => setCpDataImportAtomicity(e.target.value === "STRICT" ? "STRICT" : "ENTITY")}
             disabled={importMode === "REPLACE"}
             className="cp-input-min-180"
           >
@@ -141,7 +138,7 @@ export function HistoryPage() {
               }
 
               const replace = importMode === "REPLACE";
-              const atomicity: ImportAtomicity = replace ? "STRICT" : importAtomicity;
+              const atomicity: CpDataImportAtomicity = replace ? "STRICT" : importAtomicity;
               let backupPath: string | undefined;
 
               if (replace) {

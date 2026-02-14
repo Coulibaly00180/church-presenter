@@ -13,17 +13,7 @@ import { ActionRow, Alert, Field, InlineField, PageHeader, Panel, ToolbarPanel }
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 import { projectTextToScreen } from "../projection/target";
 
-type ScreenKey = "A" | "B" | "C";
-type PlanListItem = { id: string; title?: string | null; date?: string | Date };
-
-type PlanItemPayload = {
-  planId: string;
-  kind: "BIBLE_PASSAGE" | "BIBLE_VERSE";
-  title?: string;
-  content?: string;
-  refId?: string;
-  refSubId?: string;
-};
+type PlanItemPayload = Omit<CpPlanAddItemPayload, "kind"> & { kind: "BIBLE_PASSAGE" | "BIBLE_VERSE" };
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]+>/g, "").trim();
@@ -38,7 +28,7 @@ function getErrorMessage(err: unknown) {
   return String(err);
 }
 
-function formatPlanLabel(plan: PlanListItem) {
+function formatPlanLabel(plan: CpPlanListItem) {
   if (plan.title && plan.title.trim()) return plan.title;
   if (typeof plan.date === "string") return plan.date;
   if (plan.date instanceof Date && !Number.isNaN(plan.date.getTime())) return plan.date.toISOString().slice(0, 10);
@@ -66,7 +56,7 @@ export function BiblePage() {
   const [verses, setVerses] = useState<BollsVerse[]>([]);
   const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
 
-  const [plans, setPlans] = useState<PlanListItem[]>([]);
+  const [plans, setPlans] = useState<CpPlanListItem[]>([]);
   const [planId, setPlanId] = useState<string>("");
   const [addMode, setAddMode] = useState<"PASSAGE" | "VERSES">("VERSES");
   const [target, setTarget] = useState<ScreenKey>("A");
@@ -97,8 +87,10 @@ export function BiblePage() {
 
   // Load translations once
   useEffect(() => {
+    let cancelled = false;
     listTranslations()
       .then((ts) => {
+        if (cancelled) return;
         const grouped: TranslationGroup[] = [];
         ts.forEach((t) => {
           let g = grouped.find((gg) => gg.language === t.language);
@@ -121,24 +113,29 @@ export function BiblePage() {
         }
       })
       .catch((e) => {
-        setErr(e?.message || String(e));
+        if (!cancelled) setErr(e?.message || String(e));
       });
+    return () => { cancelled = true; };
   }, []);
 
   // Load plans on mount
   useEffect(() => {
+    let cancelled = false;
     window.cp.plans
       ?.list?.()
-      .then((ps: PlanListItem[]) => {
+      .then((ps: CpPlanListItem[]) => {
+        if (cancelled) return;
         setPlans(ps || []);
         if (ps?.length) setPlanId(ps[0].id);
       })
       .catch(() => null);
+    return () => { cancelled = true; };
   }, []);
 
   // Load books when translation changes
   useEffect(() => {
     if (!activeTranslation) return;
+    let cancelled = false;
     (async () => {
       setErr(null);
       setInfo(null);
@@ -146,6 +143,7 @@ export function BiblePage() {
       setLoadingBooks(true);
       try {
         const list = await getBooks(activeTranslation);
+        if (cancelled) return;
         setBooks(list);
         setBookId(list[0]?.bookid ?? null);
         setChapter(1);
@@ -153,6 +151,7 @@ export function BiblePage() {
         setSelectedVerses(new Set());
         setInfo(`Traduction ${activeTranslation} chargee (${list.length} livres).`);
       } catch (e: unknown) {
+        if (cancelled) return;
         const message = getErrorMessage(e);
         setErr(message);
         setBooks([]);
@@ -161,9 +160,10 @@ export function BiblePage() {
           setOfflineFallbackHint(`La traduction ${activeTranslation} requiert le reseau. Tu peux basculer en FRLSG offline.`);
         }
       } finally {
-        setLoadingBooks(false);
+        if (!cancelled) setLoadingBooks(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [activeTranslation]);
 
   // Auto-load chapter when book changes
@@ -268,20 +268,24 @@ export function BiblePage() {
       setSearchResults([]);
       return;
     }
+    let cancelled = false;
     searchTimer.current = setTimeout(async () => {
       setSearchLoading(true);
       setErr(null);
       try {
         const res = await searchVerses(activeTranslation, searchText.trim(), { limit: 30 });
-        setSearchResults(res.results);
+        if (!cancelled) setSearchResults(res.results);
       } catch (e: unknown) {
-        setErr(getErrorMessage(e));
-        setSearchResults([]);
+        if (!cancelled) {
+          setErr(getErrorMessage(e));
+          setSearchResults([]);
+        }
       } finally {
-        setSearchLoading(false);
+        if (!cancelled) setSearchLoading(false);
       }
     }, 350);
     return () => {
+      cancelled = true;
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
   }, [searchText, activeTranslation]);

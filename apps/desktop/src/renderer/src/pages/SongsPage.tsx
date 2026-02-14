@@ -3,36 +3,7 @@ import { ActionRow, Alert, Field, PageHeader, Panel, ToolbarPanel } from "../ui/
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
 import { projectTextToScreen } from "../projection/target";
 
-type ScreenKey = "A" | "B" | "C";
-
-type SongListItem = {
-  id: string;
-  title: string;
-  artist?: string | null;
-  album?: string | null;
-  year?: string | null;
-  updatedAt: string | Date;
-};
-
-type SongBlock = {
-  id?: string;
-  order: number;
-  type: string;
-  title?: string | null;
-  content: string;
-};
-
-type SongDetail = {
-  id: string;
-  title: string;
-  artist?: string | null;
-  album?: string | null;
-  year?: string | null;
-  tags?: string | null;
-  blocks: SongBlock[];
-};
-
-type PlanWithItems = { id: string; date?: string | Date; title?: string | null; items?: Array<{ id: string; kind: string; refId?: string | null; refSubId?: string | null }> };
+type PlanEntry = { id: string; date?: string | Date; title?: string | null; items?: CpPlanItem[] };
 
 function cls(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -41,12 +12,12 @@ function cls(...parts: Array<string | false | null | undefined>) {
 
 export function SongsPage() {
   const [q, setQ] = useState("");
-  const [list, setList] = useState<SongListItem[]>([]);
+  const [list, setList] = useState<CpSongListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [song, setSong] = useState<SongDetail | null>(null);
+  const [song, setSong] = useState<CpSongDetail | null>(null);
 
   const [target, setTarget] = useState<ScreenKey>("A");
-  const [plans, setPlans] = useState<PlanWithItems[]>([]);
+  const [plans, setPlans] = useState<PlanEntry[]>([]);
   const [planId, setPlanId] = useState<string>("");
 
   // Meta form
@@ -60,7 +31,7 @@ export function SongsPage() {
   const [info, setInfo] = useState<{ kind: "info" | "success"; text: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [newSongTitle, setNewSongTitle] = useState("");
-  async function loadPlanItems(id: string): Promise<PlanWithItems | null> {
+  async function loadPlanItems(id: string): Promise<PlanEntry | null> {
     try {
       const p = await window.cp.plans.get(id);
       return p;
@@ -69,7 +40,7 @@ export function SongsPage() {
     }
   }
 
-  function isDuplicate(plan: PlanWithItems | null, refId: string, refSubId?: string) {
+  function isDuplicate(plan: PlanEntry | null, refId: string, refSubId?: string) {
     if (!plan?.items) return false;
     return !!plan.items.find((it) => it.kind === "SONG_BLOCK" && it.refId === refId && it.refSubId === refSubId);
   }
@@ -95,21 +66,24 @@ export function SongsPage() {
     setYear(s.year ?? "");
   }
 
-  function formatPlanDate(p: PlanWithItems) {
+  function formatPlanDate(p: PlanEntry) {
     if (!p.date) return "";
     const d = p.date instanceof Date ? p.date : new Date(p.date);
     return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
   }
 
   useEffect(() => {
-    refresh("").catch((e) => setErr(String(e)));
+    let cancelled = false;
+    refresh("").catch((e) => { if (!cancelled) setErr(String(e)); });
     window.cp.plans
       ?.list?.()
-      .then((ps: PlanWithItems[]) => {
+      .then((ps: CpPlanListItem[]) => {
+        if (cancelled) return;
         setPlans(ps || []);
         if ((ps || []).length > 0) setPlanId(ps[0].id);
       })
       .catch(() => void 0);
+    return () => { cancelled = true; };
   }, []);
 
   const filtered = useMemo(() => list, [list]);
@@ -194,7 +168,7 @@ export function SongsPage() {
   function addBlock(type: string) {
     if (!song) return;
     const nextOrder = (song.blocks?.length ?? 0) + 1;
-    const nb: SongBlock = { order: nextOrder, type, title: type === "CHORUS" ? "Refrain" : `Couplet ${nextOrder}`, content: "" };
+    const nb = { id: "", order: nextOrder, type, title: type === "CHORUS" ? "Refrain" : `Couplet ${nextOrder}`, content: "" } satisfies CpSongBlock;
     setSong({ ...song, blocks: [...song.blocks, nb] });
   }
 
@@ -221,7 +195,7 @@ export function SongsPage() {
 
   async function addBlockToPlan(i: number) {
     if (!song || !planId) return;
-    let sourceSong: SongDetail = song;
+    let sourceSong: CpSongDetail = song;
 
     // ensure block ids exist by saving if needed
     if (!song.blocks[i]?.id) {

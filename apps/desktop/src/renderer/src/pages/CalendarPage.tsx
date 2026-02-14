@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Alert, PageHeader, Panel } from "../ui/primitives";
 
-type PlanListItem = { id: string; date: string | Date; title?: string | null; updatedAt: string | Date };
-
 function ymd(d: Date) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -25,7 +23,7 @@ function isoToYmd(iso: string | Date) {
 export function CalendarPage() {
   const canUse = !!window.cp?.plans;
 
-  const [plans, setPlans] = useState<PlanListItem[]>([]);
+  const [plans, setPlans] = useState<CpPlanListItem[]>([]);
   const [cursor, setCursor] = useState<Date>(() => new Date());
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -37,7 +35,7 @@ export function CalendarPage() {
   const monthStart = useMemo(() => new Date(cursor.getFullYear(), cursor.getMonth(), 1), [cursor]);
 
   const byDate = useMemo(() => {
-    const map = new Map<string, PlanListItem[]>();
+    const map = new Map<string, CpPlanListItem[]>();
     for (const p of plans) {
       const key = isoToYmd(p.date);
       const arr = map.get(key) ?? [];

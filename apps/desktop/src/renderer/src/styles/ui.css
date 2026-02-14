@@ -574,7 +574,8 @@ textarea:focus-visible {
 }
 
 .cp-projection-click-btn:focus-visible {
-  outline: none;
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
 
 .cp-projection-click--left {

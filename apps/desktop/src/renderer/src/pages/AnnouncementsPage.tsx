@@ -7,19 +7,15 @@ import { projectMediaToScreen, projectTextToScreen } from "../projection/target"
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-type MediaItem = { name: string; path: string; mediaType: "PDF" | "IMAGE" };
-type PlanListItem = { id: string; title?: string | null; date?: string | Date };
-type ScreenKey = "A" | "B" | "C";
-
-function formatDate(p: PlanListItem) {
+function formatDate(p: CpPlanListItem) {
   if (!p.date) return "";
   const d = p.date instanceof Date ? p.date : new Date(p.date);
   return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
 
 export function AnnouncementsPage() {
-  const [files, setFiles] = useState<MediaItem[]>([]);
-  const [plans, setPlans] = useState<PlanListItem[]>([]);
+  const [files, setFiles] = useState<CpMediaFile[]>([]);
+  const [plans, setPlans] = useState<CpPlanListItem[]>([]);
   const [planId, setPlanId] = useState<string>("");
   const [pdfPage, setPdfPage] = useState("1");
   const [manualTitle, setManualTitle] = useState("Annonce");

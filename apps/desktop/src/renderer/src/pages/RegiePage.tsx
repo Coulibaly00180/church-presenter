@@ -3,14 +3,6 @@ import { Alert, Field, PageHeader, Panel, ToolbarRow } from "../ui/primitives";
 import { LiveActionsRow, LiveLockChips, LiveModeButtons } from "../ui/liveControls";
 import { projectTextToScreen } from "../projection/target";
 
-type LivePatch = {
-  planId?: string | null;
-  cursor?: number | null;
-  enabled?: boolean;
-  target?: ScreenKey;
-  black?: boolean;
-  white?: boolean;
-};
 
 function cls(...parts: Array<string | false | null | undefined>) {
   return parts.filter(Boolean).join(" ");
@@ -79,7 +71,7 @@ export function RegiePage() {
     return () => off?.();
   }, []);
 
-  async function updateLive(patch: LivePatch) {
+  async function updateLive(patch: CpLiveSetPayload) {
     if (!window.cp.live) return;
     const next = await window.cp.live.set(patch);
     setLive(next);

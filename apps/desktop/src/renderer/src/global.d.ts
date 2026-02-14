@@ -62,6 +62,8 @@ declare global {
   type CpDevtoolsTarget = Shared.CpDevtoolsTarget;
   type CpDevtoolsOpenResult = Shared.CpDevtoolsOpenResult;
 
+  type CpLiveSetPayload = Shared.CpLiveSetPayload;
+
   type CpMediaFile = Shared.CpMediaFile;
   type CpFilesPickMediaResult = Shared.CpFilesPickMediaResult;
   type CpFilesListMediaResult = Shared.CpFilesListMediaResult;

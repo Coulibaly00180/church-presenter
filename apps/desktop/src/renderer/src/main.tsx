@@ -17,28 +17,31 @@ import { HistoryPage } from "./pages/HistoryPage";
 import { BiblePage } from "./pages/BiblePage";
 import { ProjectionPage } from "./pages/ProjectionPage";
 import { AnnouncementsPage } from "./pages/AnnouncementsPage";
+import { ErrorBoundary } from "./ui/ErrorBoundary";
 
 function App() {
   return (
-    <HashRouter>
-      <Routes>
-        {/* Full-screen window, no shell */}
-        <Route path="/projection" element={<ProjectionPage />} />
+    <ErrorBoundary>
+      <HashRouter>
+        <Routes>
+          {/* Full-screen window, no shell */}
+          <Route path="/projection" element={<ProjectionPage />} />
 
-        {/* Main app */}
-        <Route element={<AppShell />}>
-          <Route path="/regie" element={<RegiePage />} />
-          <Route path="/plan" element={<PlanPage />} />
-          <Route path="/songs" element={<SongsPage />} />
-          <Route path="/calendar" element={<CalendarPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/bible" element={<BiblePage />} />
-          <Route path="/announcements" element={<AnnouncementsPage />} />
-          <Route path="/" element={<Navigate to="/regie" replace />} />
-          <Route path="*" element={<Navigate to="/regie" replace />} />
-        </Route>
-      </Routes>
-    </HashRouter>
+          {/* Main app */}
+          <Route element={<AppShell />}>
+            <Route path="/regie" element={<RegiePage />} />
+            <Route path="/plan" element={<PlanPage />} />
+            <Route path="/songs" element={<SongsPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/bible" element={<BiblePage />} />
+            <Route path="/announcements" element={<AnnouncementsPage />} />
+            <Route path="/" element={<Navigate to="/regie" replace />} />
+            <Route path="*" element={<Navigate to="/regie" replace />} />
+          </Route>
+        </Routes>
+      </HashRouter>
+    </ErrorBoundary>
   );
 }
 
