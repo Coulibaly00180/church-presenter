@@ -134,8 +134,8 @@ export function PlanComposerSection(props: PlanComposerSectionProps) {
     setBibleVerses([]);
     try {
       if (bibleTranslation === "LSG1910") {
-        const r = lookupLSG1910(bibleRef.trim());
-        if (!r) throw new Error("Reference non trouvee (offline mini)");
+        const r = await lookupLSG1910(bibleRef.trim());
+        if (!r) throw new Error("Reference non trouvee (offline)");
         setBibleReference(r.reference);
         setBibleVerses(r.verses.map((v) => ({ chapter: v.chapter, verse: v.verse, text: v.text })));
       } else {

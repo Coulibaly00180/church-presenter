@@ -55,7 +55,7 @@ type TranslationGroup = {
 };
 
 export function BiblePage() {
-  const [translationLanguage, setTranslationLanguage] = useState<string>("French FranÃ§ais"); // default language
+  const [translationLanguage, setTranslationLanguage] = useState<string>("French Français"); // default language
   const [translation, setTranslation] = useState<string>("FRLSG"); // default translation code
   const activeTranslation = translation;
   const [groups, setGroups] = useState<TranslationGroup[]>([]);
@@ -75,6 +75,7 @@ export function BiblePage() {
   const [loadingChapter, setLoadingChapter] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [offlineFallbackHint, setOfflineFallbackHint] = useState<string | null>(null);
 
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState<BollsVerse[]>([]);
@@ -83,6 +84,16 @@ export function BiblePage() {
   const skipNextBookAutoLoad = useRef(false);
 
   const currentBook = useMemo(() => books.find((b) => b.bookid === bookId), [books, bookId]);
+
+  function switchToOfflineFRLSG() {
+    const frGroup = groups.find((g) => g.translations.some((t) => t.code === "FRLSG"));
+    if (frGroup) {
+      setTranslationLanguage(frGroup.language);
+    }
+    setTranslation("FRLSG");
+    setOfflineFallbackHint(null);
+    setInfo("Mode offline FRLSG active.");
+  }
 
   // Load translations once
   useEffect(() => {
@@ -98,12 +109,11 @@ export function BiblePage() {
           g.translations.push({ code: t.short_name, label: `${t.full_name} (${t.short_name})`, dir: t.dir });
         });
         setGroups(grouped);
-        const defaultLang = "French FranÃ§ais";
         const defaultCode = "FRLSG";
-        const langExists = grouped.find((g) => g.language === defaultLang);
-        if (langExists) {
-          setTranslationLanguage(defaultLang);
-          const found = langExists.translations.find((t) => t.code === defaultCode) || langExists.translations[0];
+        const defaultGroup = grouped.find((g) => g.translations.some((t) => t.code === defaultCode));
+        if (defaultGroup) {
+          setTranslationLanguage(defaultGroup.language);
+          const found = defaultGroup.translations.find((t) => t.code === defaultCode) || defaultGroup.translations[0];
           if (found) setTranslation(found.code);
         } else if (grouped[0]?.translations[0]) {
           setTranslationLanguage(grouped[0].language);
@@ -132,6 +142,7 @@ export function BiblePage() {
     (async () => {
       setErr(null);
       setInfo(null);
+      setOfflineFallbackHint(null);
       setLoadingBooks(true);
       try {
         const list = await getBooks(activeTranslation);
@@ -142,9 +153,13 @@ export function BiblePage() {
         setSelectedVerses(new Set());
         setInfo(`Traduction ${activeTranslation} chargee (${list.length} livres).`);
       } catch (e: unknown) {
-        setErr(getErrorMessage(e));
+        const message = getErrorMessage(e);
+        setErr(message);
         setBooks([]);
         setBookId(null);
+        if (activeTranslation !== "FRLSG") {
+          setOfflineFallbackHint(`La traduction ${activeTranslation} requiert le reseau. Tu peux basculer en FRLSG offline.`);
+        }
       } finally {
         setLoadingBooks(false);
       }
@@ -291,6 +306,14 @@ export function BiblePage() {
       <PageHeader title="Bible" subtitle="Rechercher, projeter et envoyer vers le plan (bolls.life)." />
 
       {err ? <Alert tone="error">Erreur : {err}</Alert> : null}
+      {offlineFallbackHint ? (
+        <Alert>
+          <div>{offlineFallbackHint}</div>
+          <ActionRow className="cp-mt-6">
+            <button onClick={switchToOfflineFRLSG}>Basculer en FRLSG offline</button>
+          </ActionRow>
+        </Alert>
+      ) : null}
       {info ? <Alert tone="success">{info}</Alert> : null}
 
       <ToolbarPanel>

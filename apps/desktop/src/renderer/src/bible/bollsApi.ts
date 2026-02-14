@@ -1,4 +1,6 @@
-﻿export type BollsBook = { bookid: number; chronorder: number; name: string; chapters: number };
+import { getLSG1910Chapter, listLSG1910Books } from "./lookupLSG1910";
+
+export type BollsBook = { bookid: number; chronorder: number; name: string; chapters: number };
 export type BollsVerse = { pk: number; translation: string; book: number; chapter: number; verse: number; text: string; comment?: string };
 export type BollsFindResult = { total: number; exact_matches: number; results: BollsVerse[] };
 type BollsLanguageResponse = Array<{ language: string; translations?: CpBibleTranslation[] }>;
@@ -8,6 +10,7 @@ let translationsCache: Array<{ language: string; short_name: string; full_name: 
 const BOLLS_CACHE_VERSION = "2026-02-14-frlsg-v1";
 const CACHE_PREFIX = `bolls_${BOLLS_CACHE_VERSION}`;
 const FALLBACK_TRANSLATIONS = [{ language: "French Français", short_name: "FRLSG", full_name: "Bible Segond 1910", dir: "ltr" }];
+const OFFLINE_TRANSLATION = "FRLSG";
 
 function stripHtml(html: string): string {
   if (!html) return "";
@@ -77,6 +80,44 @@ function normalizeVerse(
   };
 }
 
+function isOfflineTranslation(translation: string) {
+  return translation.toUpperCase() === OFFLINE_TRANSLATION;
+}
+
+function offlineFallbackErrorMessage(translation: string) {
+  return `Connexion indisponible pour ${translation}. Bascule sur FRLSG (offline).`;
+}
+
+async function getOfflineBooksFallback(translation: string): Promise<BollsBook[] | null> {
+  if (!isOfflineTranslation(translation)) return null;
+  const books = await listLSG1910Books();
+  return books.map((book) => ({
+    bookid: book.bookid,
+    chronorder: book.chronorder,
+    name: book.name,
+    chapters: book.chapters,
+  }));
+}
+
+async function getOfflineChapterFallback(translation: string, bookId: number, chapter: number): Promise<BollsVerse[] | null> {
+  if (!isOfflineTranslation(translation)) return null;
+  const offlineVerses = await getLSG1910Chapter(bookId, chapter);
+  if (!offlineVerses || offlineVerses.length === 0) return null;
+  return offlineVerses.map((v) =>
+    normalizeVerse(
+      {
+        pk: Number(`${bookId}${String(chapter).padStart(3, "0")}${String(v.verse).padStart(3, "0")}`),
+        translation,
+        book: bookId,
+        chapter,
+        verse: v.verse,
+        text: v.text,
+      },
+      { translation, book: bookId, chapter, verse: v.verse }
+    )
+  );
+}
+
 export async function getBooks(translation: string): Promise<BollsBook[]> {
   if (booksCache[translation]) return booksCache[translation]!;
 
@@ -101,12 +142,25 @@ async function refreshBooks(translation: string, key: string) {
 }
 
 async function fetchBooks(translation: string): Promise<BollsBook[]> {
-  const r = await fetch(`https://bolls.life/get-books/${translation}/`);
-  if (!r.ok) throw new Error(`Traduction inconnue ou indispo (${translation})`);
-  const json = (await r.json()) as BollsBook[];
-  booksCache[translation] = json;
-  writeCache(cacheKey("books", translation), json);
-  return json;
+  try {
+    const r = await fetch(`https://bolls.life/get-books/${translation}/`);
+    if (!r.ok) throw new Error(`Traduction inconnue ou indispo (${translation})`);
+    const json = (await r.json()) as BollsBook[];
+    booksCache[translation] = json;
+    writeCache(cacheKey("books", translation), json);
+    return json;
+  } catch (error) {
+    const offline = await getOfflineBooksFallback(translation);
+    if (offline) {
+      booksCache[translation] = offline;
+      writeCache(cacheKey("books", translation), offline);
+      return offline;
+    }
+    if (!isOfflineTranslation(translation)) {
+      throw new Error(offlineFallbackErrorMessage(translation));
+    }
+    throw error;
+  }
 }
 
 export async function getChapter(translation: string, bookId: number, chapter: number): Promise<BollsVerse[]> {
@@ -122,6 +176,14 @@ export async function getChapter(translation: string, bookId: number, chapter: n
     return verses;
   } catch (error) {
     if (cached) return cached;
+    const offline = await getOfflineChapterFallback(translation, bookId, chapter);
+    if (offline) {
+      writeCache(key, offline);
+      return offline;
+    }
+    if (!isOfflineTranslation(translation)) {
+      throw new Error(offlineFallbackErrorMessage(translation));
+    }
     throw error;
   }
 }
