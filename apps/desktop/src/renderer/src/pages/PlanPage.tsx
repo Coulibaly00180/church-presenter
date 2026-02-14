@@ -79,12 +79,12 @@ export function PlanPage() {
     const item = plan.items[idx];
     if (!item) return;
 
-    const key = `${live.planId}:${idx}:${live.target}:${live.updatedAt}`;
+    const key = `${live.planId}:${idx}:${live.target}:${item.id}`;
     if (lastProjectionKey.current === key) return;
     lastProjectionKey.current = key;
 
     void projectPlanItemToTarget(live.target, item, live);
-  }, [live?.updatedAt, plan]);
+  }, [live?.cursor, live?.target, live?.enabled, live?.planId, plan]);
 
   const visibleItems = useMemo(() => {
     if (!plan) return [];

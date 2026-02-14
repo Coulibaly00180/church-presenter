@@ -215,7 +215,6 @@ async function importDocSong(prisma: PrismaClientType, filePath: string) {
     artist: parsed.artist,
     album: parsed.album,
     year: parsed.year,
-    tags: parsed.year,
     blocks: parsed.blocks,
   });
   return song;
@@ -475,7 +474,6 @@ export function registerSongsIpc() {
         artist: parsed.artist,
         album: parsed.album,
         year: parsed.year,
-        tags: parsed.year,
         blocks: {
           create: parsed.blocks,
         },

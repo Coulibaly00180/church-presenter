@@ -401,7 +401,7 @@ ipcMain.handle("files:pickMedia", async () => {
     return { ok: true, path: target, mediaType };
   } catch (e) {
     console.error("copy media failed", e);
-    return { ok: true, path: p, mediaType };
+    return { ok: false, error: "Échec de la copie du fichier média" };
   }
 });
 

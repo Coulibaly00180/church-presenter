@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"d:\\\\github\\\\church-presenter\" log --oneline -15)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run test:*)"
+    ]
+  }
+}
