@@ -430,6 +430,12 @@ ipcMain.handle("projection:setAppearance", (_evt, rawPatch: unknown) => {
   return _setAppearance(screenCtx, "A", patch);
 });
 
+ipcMain.handle("screens:setAppearance", (_evt, rawKey: unknown, rawPatch: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:setAppearance.key");
+  const patch = parseProjectionSetAppearancePayload(rawPatch);
+  return _setAppearance(screenCtx, key, patch);
+});
+
 ipcMain.handle("projection:setContentText", (_evt, rawPayload: unknown) => {
   const payload = parseProjectionSetTextPayload(rawPayload);
   return _setContentText(screenCtx, "A", payload);

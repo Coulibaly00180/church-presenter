@@ -102,6 +102,7 @@ export function ProjectionPage() {
   const textScale = state?.textScale ?? 1;
   const bg = mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : state?.background || "#050505";
   const fg = mode === "BLACK" ? "white" : mode === "WHITE" ? "black" : state?.foreground || "white";
+  const bgImage = mode === "NORMAL" ? state?.backgroundImage : undefined;
 
   // Reset page when media changes
   useEffect(() => {
@@ -232,6 +233,15 @@ export function ProjectionPage() {
       tabIndex={0}
       className="outline-none"
     >
+      {/* Background image */}
+      {bgImage && (
+        <img
+          src={toFileUrl(bgImage)}
+          alt=""
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0, pointerEvents: "none" }}
+        />
+      )}
+
       {/* Click areas for prev/next */}
       <button
         type="button"
@@ -256,7 +266,7 @@ export function ProjectionPage() {
         disabled={isPdf}
       />
 
-      <div style={cardStyle} key={animKey}>
+      <div style={{ ...cardStyle, position: "relative", zIndex: 1 }} key={animKey}>
         {/* Watermark screen ID */}
         <div className="fixed top-5 right-5 opacity-35 font-black tracking-widest" style={{ fontFamily: "system-ui" }}>
           SCREEN {screenKey}

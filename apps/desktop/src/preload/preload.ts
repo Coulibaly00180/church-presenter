@@ -76,6 +76,8 @@ const cpApi: CpApi = {
       ipcRenderer.invoke("screens:setContentMedia", key, payload),
     setMode: (key: ScreenKey, mode: CpProjectionMode) =>
       ipcRenderer.invoke("screens:setMode", key, mode),
+    setAppearance: (key: ScreenKey, payload: CpProjectionSetAppearancePayload) =>
+      ipcRenderer.invoke("screens:setAppearance", key, payload),
     onState: (key: ScreenKey, cb: (state: ProjectionState) => void) => {
       const handler = (_: unknown, payload: CpScreenStateEventPayload) => {
         if (payload?.key === key) cb(payload.state);

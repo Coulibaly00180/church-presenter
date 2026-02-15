@@ -21,6 +21,7 @@ export type CpProjectionState = {
   transitionEnabled: boolean;
   textScale: number;
   background: string;
+  backgroundImage?: string;
   foreground: string;
   current: CpProjectionCurrent;
   updatedAt: number;
@@ -185,7 +186,7 @@ export type CpFilesPickMediaResult =
 export type CpFilesListMediaResult = { ok: true; files: CpMediaFile[] } | { ok: false; error: string };
 export type CpFilesDeleteMediaResult = { ok: true } | { ok: false; error: string };
 
-export type CpProjectionSetAppearancePayload = { textScale?: number; background?: string; foreground?: string };
+export type CpProjectionSetAppearancePayload = { textScale?: number; background?: string; backgroundImage?: string; foreground?: string };
 export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta };
 export type CpProjectionSetMediaPayload = { title?: string; mediaPath: string; mediaType: CpMediaType };
 export type CpLiveSetPayload = {
@@ -226,6 +227,7 @@ export interface CpApi {
     setContentText: (key: ScreenKey, payload: CpProjectionSetTextPayload) => Promise<CpScreenMutationResult>;
     setContentMedia: (key: ScreenKey, payload: CpProjectionSetMediaPayload) => Promise<CpScreenMutationResult>;
     setMode: (key: ScreenKey, mode: CpProjectionMode) => Promise<CpScreenMutationResult>;
+    setAppearance: (key: ScreenKey, payload: CpProjectionSetAppearancePayload) => Promise<CpScreenMutationResult>;
     onState: (key: ScreenKey, cb: (state: CpProjectionState) => void) => () => void;
     onWindowState: (key: ScreenKey, cb: (payload: CpWindowState) => void) => () => void;
   };

@@ -55,7 +55,7 @@ export function BibleTab({ planId }: BibleTabProps) {
               onClick={() => state.jumpToResult(v)}
               className="w-full text-left px-2 py-1 text-xs rounded-sm hover:bg-accent transition-colors"
             >
-              <span className="font-medium">{v.book}:{v.chapter}:{v.verse}</span>
+              <span className="font-medium">{state.books.find(b => b.bookid === v.book)?.name ?? v.book} {v.chapter}:{v.verse}</span>
               <span className="text-muted-foreground ml-1.5 text-[10px]">{v.text.slice(0, 50)}...</span>
             </button>
           ))}

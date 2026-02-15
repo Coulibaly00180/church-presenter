@@ -199,6 +199,7 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
 
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setAppearance.textScale");
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setAppearance.background");
+  if (rec.backgroundImage !== undefined) patch.backgroundImage = expectString(rec.backgroundImage, "projection:setAppearance.backgroundImage");
   if (rec.foreground !== undefined) patch.foreground = expectString(rec.foreground, "projection:setAppearance.foreground");
 
   return patch;

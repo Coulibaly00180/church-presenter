@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { Monitor, MonitorOff, Moon, Sun, Settings } from "lucide-react";
+import { Monitor, MonitorOff, Moon, Sun, Settings, Palette } from "lucide-react";
+import { ProjectionSettings } from "@/components/dialogs/ProjectionSettings";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -44,6 +45,7 @@ function formatPlanLabel(plan: PlanListItem) {
 export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHistory }: HeaderProps) {
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [projOpen, setProjOpen] = useState(false);
+  const [appearanceOpen, setAppearanceOpen] = useState(false);
 
   useEffect(() => {
     window.cp.plans.list().then(setPlans).catch(() => null);
@@ -133,6 +135,9 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setAppearanceOpen(true)}>
+            <Palette className="h-3.5 w-3.5 mr-1.5" /> Apparence projection
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onOpenHistory}>
             Import / Export
           </DropdownMenuItem>
@@ -144,6 +149,8 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ProjectionSettings open={appearanceOpen} onOpenChange={setAppearanceOpen} />
     </header>
   );
 }
