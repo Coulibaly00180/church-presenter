@@ -8,7 +8,15 @@
       "Bash(npm run lint:*)",
       "Bash(npx vitest:*)",
       "Bash(npx eslint:*)",
-      "Bash(npx prisma generate:*)"
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx prisma migrate diff:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(TASKLIST //FI \"IMAGENAME eq electron.exe\")",
+      "Bash(TASKLIST:*)"
     ]
   }
 }
