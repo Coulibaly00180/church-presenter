@@ -14,9 +14,7 @@ function getScreenKey(): "A" | "B" | "C" {
   return "A";
 }
 
-function cls(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
+import { cls } from "../ui/cls";
 
 export function ProjectionPage() {
   const screenKey = useMemo(() => getScreenKey(), []);

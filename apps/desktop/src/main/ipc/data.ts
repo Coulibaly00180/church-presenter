@@ -1,6 +1,6 @@
 import { app, ipcMain, dialog } from "electron";
 import type { Prisma } from "@prisma/client";
-import { getPrisma } from "../db";
+import { databasePathFromUrl, getPrisma } from "../db";
 import { copyFile, mkdir, readFile, stat, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
 import type { CpDataImportError } from "../../shared/ipc";
@@ -161,16 +161,8 @@ function normalizeSongs(rawSongs: unknown, errors: CpDataImportError[]): Normali
   return songs;
 }
 
-function sqlitePathFromUrl(databaseUrl: string | undefined): string | null {
-  if (!databaseUrl) return null;
-  if (!databaseUrl.startsWith("file:")) return null;
-  const raw = databaseUrl.slice("file:".length).trim();
-  if (!raw) return null;
-  return raw;
-}
-
 async function backupDatabaseSnapshot(reason: string) {
-  const databasePath = sqlitePathFromUrl(process.env["DATABASE_URL"]);
+  const databasePath = databasePathFromUrl(process.env["DATABASE_URL"]);
   if (!databasePath) return null;
   try {
     await stat(databasePath);

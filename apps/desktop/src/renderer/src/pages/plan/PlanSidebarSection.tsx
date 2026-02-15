@@ -2,6 +2,7 @@ import React from "react";
 import { isoToYmd } from "./date";
 import { PlanListItem } from "./types";
 import { Field, Panel } from "../../ui/primitives";
+import { cls } from "../../ui/cls";
 
 type PlanSidebarSectionProps = {
   newDate: string;
@@ -14,10 +15,6 @@ type PlanSidebarSectionProps = {
   onCreatePlan: () => void | Promise<void>;
   onSelectPlan: (planId: string) => void | Promise<void>;
 };
-
-function cls(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
 
 export function PlanSidebarSection(props: PlanSidebarSectionProps) {
   const { newDate, newTitle, plans, selectedPlanId, livePlanId, onSetNewDate, onSetNewTitle, onCreatePlan, onSelectPlan } = props;

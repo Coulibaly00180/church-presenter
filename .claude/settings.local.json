@@ -5,7 +5,9 @@
       "Bash(npm run typecheck:*)",
       "Bash(npm run test:*)",
       "Bash(npx tsc:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npx eslint:*)"
     ]
   }
 }

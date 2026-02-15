@@ -1,11 +1,24 @@
 import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
-import { join, basename, extname, resolve, sep } from "path";
+import { join, basename } from "path";
 import { access, copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
 import { openDevtoolsWithGuard } from "./ipc/devtools";
+import { inferMediaType, isPathInDir, getErrorMessage } from "./ipc/fileUtils";
+import {
+  createDefaultProjectionState,
+  createDefaultLiveState,
+  setContentText as _setContentText,
+  setContentMedia as _setContentMedia,
+  setMode as _setMode,
+  setAppearance as _setAppearance,
+  setStatePatch as _setStatePatch,
+  setMirror as _setMirror,
+  mergeLive as _mergeLive,
+  type ScreenContext,
+} from "./ipc/screenState";
 import { ensureRuntimeDatabaseUrl, runSafeMigrationForPackagedRuntime } from "./db";
 import {
   parseDevtoolsTarget,
@@ -24,17 +37,13 @@ import {
 import type {
   CpLiveState,
   CpMediaType,
-  CpProjectionMode,
   CpProjectionState,
   CpScreenMeta,
   ScreenKey,
   ScreenMirrorMode,
 } from "../shared/ipc";
 
-type ProjectionMode = CpProjectionMode;
-type ProjectionState = CpProjectionState;
 type ScreenInfo = CpScreenMeta;
-type LiveState = CpLiveState;
 
 let regieWin: BrowserWindow | null = null;
 
@@ -42,60 +51,18 @@ let regieWin: BrowserWindow | null = null;
 const projWins: Partial<Record<ScreenKey, BrowserWindow>> = {};
 
 // Per-screen state (A = "main" projection)
-const screenStates: Record<ScreenKey, ProjectionState> = {
-  A: {
-    mode: "NORMAL",
-    lowerThirdEnabled: false,
-    transitionEnabled: false,
-    textScale: 1,
-    background: "#050505",
-    foreground: "#ffffff",
-    current: { kind: "EMPTY" },
-    updatedAt: Date.now(),
-  },
-  B: {
-    mode: "NORMAL",
-    lowerThirdEnabled: false,
-    transitionEnabled: false,
-    textScale: 1,
-    background: "#050505",
-    foreground: "#ffffff",
-    current: { kind: "EMPTY" },
-    updatedAt: Date.now(),
-  },
-  C: {
-    mode: "NORMAL",
-    lowerThirdEnabled: false,
-    transitionEnabled: false,
-    textScale: 1,
-    background: "#050505",
-    foreground: "#ffffff",
-    current: { kind: "EMPTY" },
-    updatedAt: Date.now(),
-  },
+const screenStates: Record<ScreenKey, CpProjectionState> = {
+  A: createDefaultProjectionState(),
+  B: createDefaultProjectionState(),
+  C: createDefaultProjectionState(),
 };
 
 // Mirror config
 const mirrors: Record<ScreenKey, ScreenMirrorMode> = {
   A: { kind: "FREE" },
-  B: { kind: "MIRROR", from: "A" }, // sensible default
-  C: { kind: "MIRROR", from: "A" }, // sensible default
+  B: { kind: "MIRROR", from: "A" },
+  C: { kind: "MIRROR", from: "A" },
 };
-
-const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
-const PDF_EXTENSIONS = new Set([".pdf"]);
-
-function inferMediaType(filePath: string): CpMediaType | null {
-  const ext = extname(filePath).toLowerCase();
-  if (PDF_EXTENSIONS.has(ext)) return "PDF";
-  if (IMAGE_EXTENSIONS.has(ext)) return "IMAGE";
-  return null;
-}
-
-function getErrorMessage(err: unknown) {
-  if (err instanceof Error) return err.message;
-  return String(err);
-}
 
 function getMediaDir() {
   return join(app.getPath("userData"), "media");
@@ -110,11 +77,6 @@ async function pathExists(pathToCheck: string) {
   }
 }
 
-function isPathInDir(baseDir: string, candidatePath: string) {
-  const base = (resolve(baseDir) + sep).toLowerCase();
-  const candidate = resolve(candidatePath).toLowerCase();
-  return candidate.startsWith(base);
-}
 
 function getPreloadPath() {
   // IMPORTANT: preload CommonJS généré par electron-vite => out/preload/index.cjs en dev
@@ -135,16 +97,25 @@ function broadcastAllScreensState() {
   (["A", "B", "C"] as ScreenKey[]).forEach((k) => sendScreenState(k));
 }
 
-function applyMirrorsFrom(source: ScreenKey) {
-  (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
-    const m = mirrors[k];
-    if (k === source) return;
-    if (m.kind === "MIRROR" && m.from === source) {
-      screenStates[k] = { ...screenStates[source], updatedAt: Date.now() };
-      sendScreenState(k);
+function broadcastLive() {
+  const payload = { ...screenCtx.liveState };
+  getAllWindowsForBroadcast().forEach((w) => {
+    try {
+      w.webContents.send("live:update", payload);
+    } catch {
+      // ignore
     }
   });
 }
+
+/** Shared context – bridges extracted pure logic to Electron windows */
+const screenCtx: ScreenContext = {
+  screenStates,
+  mirrors,
+  liveState: createDefaultLiveState(),
+  broadcast: sendScreenState,
+  broadcastLive,
+};
 
 function createRegieWindow() {
   const preloadPath = getPreloadPath();
@@ -451,63 +422,27 @@ ipcMain.handle("projection:getState", () => screenStates.A);
 
 ipcMain.handle("projection:setState", (_evt, rawPatch: unknown) => {
   const patch = parseProjectionStatePatch(rawPatch);
-  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
-  screenStates.A = { ...screenStates.A, ...patch, updatedAt: Date.now() };
-  sendScreenState("A");
-  applyMirrorsFrom("A");
-  return { ok: true, state: screenStates.A };
+  return _setStatePatch(screenCtx, "A", patch);
 });
 
 ipcMain.handle("projection:setAppearance", (_evt, rawPatch: unknown) => {
   const patch = parseProjectionSetAppearancePayload(rawPatch);
-  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
-  screenStates.A = {
-    ...screenStates.A,
-    textScale: patch.textScale ?? screenStates.A.textScale ?? 1,
-    background: patch.background ?? screenStates.A.background ?? "#050505",
-    foreground: patch.foreground ?? screenStates.A.foreground ?? "#ffffff",
-    updatedAt: Date.now(),
-  };
-  sendScreenState("A");
-  applyMirrorsFrom("A");
-  return { ok: true, state: screenStates.A };
+  return _setAppearance(screenCtx, "A", patch);
 });
 
 ipcMain.handle("projection:setContentText", (_evt, rawPayload: unknown) => {
   const payload = parseProjectionSetTextPayload(rawPayload);
-  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
-  screenStates.A = {
-    ...screenStates.A,
-    mode: "NORMAL",
-    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong },
-    updatedAt: Date.now(),
-  };
-  sendScreenState("A");
-  applyMirrorsFrom("A");
-  return { ok: true, state: screenStates.A };
+  return _setContentText(screenCtx, "A", payload);
 });
 
 ipcMain.handle("projection:setContentMedia", (_evt, rawPayload: unknown) => {
   const payload = parseProjectionSetMediaPayload(rawPayload);
-  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
-  screenStates.A = {
-    ...screenStates.A,
-    mode: "NORMAL",
-    current: { kind: "MEDIA", title: payload.title, mediaPath: payload.mediaPath, mediaType: payload.mediaType },
-    updatedAt: Date.now(),
-  };
-  sendScreenState("A");
-  applyMirrorsFrom("A");
-  return { ok: true, state: screenStates.A };
+  return _setContentMedia(screenCtx, "A", payload);
 });
 
 ipcMain.handle("projection:setMode", (_evt, rawMode: unknown) => {
   const mode = parseProjectionMode(rawMode, "projection:setMode.mode");
-  if (liveState.lockedScreens.A) return { ok: false, reason: "LOCKED", state: screenStates.A };
-  screenStates.A = { ...screenStates.A, mode, updatedAt: Date.now() };
-  sendScreenState("A");
-  applyMirrorsFrom("A");
-  return { ok: true, state: screenStates.A };
+  return _setMode(screenCtx, "A", mode);
 });
 
 // --------------------
@@ -538,15 +473,10 @@ ipcMain.handle("screens:close", (_evt, rawKey: unknown) => {
 ipcMain.handle("screens:setMirror", (_evt, rawKey: unknown, rawMirror: unknown) => {
   const key = parseScreenKey(rawKey, "screens:setMirror.key");
   const mirror = parseScreenMirrorMode(rawMirror);
-  mirrors[key] = mirror;
-  // If switching to mirror, sync immediately
-  if (mirror.kind === "MIRROR") {
-    screenStates[key] = { ...screenStates[mirror.from], updatedAt: Date.now() };
-    sendScreenState(key);
-  }
+  const result = _setMirror(screenCtx, key, mirror);
   // Notify regie
   regieWin?.webContents.send("screens:meta", { key, mirror });
-  return { ok: true, mirror };
+  return result;
 });
 
 ipcMain.handle("screens:getState", (_evt, rawKey: unknown) => {
@@ -557,67 +487,24 @@ ipcMain.handle("screens:getState", (_evt, rawKey: unknown) => {
 ipcMain.handle("screens:setContentText", (_evt, rawKey: unknown, rawPayload: unknown) => {
   const key = parseScreenKey(rawKey, "screens:setContentText.key");
   const payload = parseProjectionSetTextPayload(rawPayload);
-  // If screen is mirroring, ignore direct set (safety)
-  if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
-  if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
-
-  screenStates[key] = {
-    ...screenStates[key],
-    mode: "NORMAL",
-    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong },
-    updatedAt: Date.now(),
-  };
-  sendScreenState(key);
-  applyMirrorsFrom(key);
-  return { ok: true, state: screenStates[key] };
+  return _setContentText(screenCtx, key, payload);
 });
 
-ipcMain.handle(
-  "screens:setContentMedia",
-  (_evt, rawKey: unknown, rawPayload: unknown) => {
-    const key = parseScreenKey(rawKey, "screens:setContentMedia.key");
-    const payload = parseProjectionSetMediaPayload(rawPayload);
-    if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
-    if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
-    screenStates[key] = {
-      ...screenStates[key],
-      mode: "NORMAL",
-      current: { kind: "MEDIA", title: payload.title, mediaPath: payload.mediaPath, mediaType: payload.mediaType },
-      updatedAt: Date.now(),
-    };
-    sendScreenState(key);
-    applyMirrorsFrom(key);
-    return { ok: true, state: screenStates[key] };
-  }
-);
+ipcMain.handle("screens:setContentMedia", (_evt, rawKey: unknown, rawPayload: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:setContentMedia.key");
+  const payload = parseProjectionSetMediaPayload(rawPayload);
+  return _setContentMedia(screenCtx, key, payload);
+});
 
 ipcMain.handle("screens:setMode", (_evt, rawKey: unknown, rawMode: unknown) => {
   const key = parseScreenKey(rawKey, "screens:setMode.key");
   const mode = parseProjectionMode(rawMode, "screens:setMode.mode");
-  // If screen is mirroring, ignore
-  if (mirrors[key].kind === "MIRROR") return { ok: false, reason: "MIRROR" };
-  if (liveState.lockedScreens[key]) return { ok: false, reason: "LOCKED" };
-
-  screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
-  sendScreenState(key);
-  applyMirrorsFrom(key);
-  return { ok: true, state: screenStates[key] };
+  return _setMode(screenCtx, key, mode);
 });
 
 // --------------------
 // LiveState (central) - sync Regie / Plan / Projection targets
 // --------------------
-
-let liveState: LiveState = {
-  enabled: false,
-  planId: null,
-  cursor: 0,
-  target: "A",
-  black: false,
-  white: false,
-  lockedScreens: { A: false, B: false, C: false },
-  updatedAt: Date.now(),
-};
 
 function getAllWindowsForBroadcast(): BrowserWindow[] {
   const wins: BrowserWindow[] = [];
@@ -629,95 +516,44 @@ function getAllWindowsForBroadcast(): BrowserWindow[] {
   return wins;
 }
 
-function broadcastLive() {
-  const payload = { ...liveState };
-  getAllWindowsForBroadcast().forEach((w) => {
-    try {
-      w.webContents.send("live:update", payload);
-    } catch {
-      // ignore
-    }
-  });
-}
+ipcMain.handle("live:get", () => ({ ...screenCtx.liveState }));
 
-function applyLiveProjectionMode() {
-  const mode: ProjectionMode = liveState.black ? "BLACK" : liveState.white ? "WHITE" : "NORMAL";
-  const key = liveState.target;
+ipcMain.handle("live:set", async (_evt, rawPayload: unknown) => {
+  const payload = parseLiveSetPayload(rawPayload);
+  const patch: Partial<CpLiveState> = {};
+  if ("planId" in payload) patch.planId = payload.planId ?? null;
+  if ("cursor" in payload && typeof payload.cursor === "number") patch.cursor = payload.cursor;
+  if ("enabled" in payload && typeof payload.enabled === "boolean") patch.enabled = payload.enabled;
+  if ("target" in payload && payload.target) patch.target = payload.target;
+  if ("black" in payload && typeof payload.black === "boolean") patch.black = payload.black;
+  if ("white" in payload && typeof payload.white === "boolean") patch.white = payload.white;
+  return _mergeLive(screenCtx, patch);
+});
 
-  // If locked -> do not touch that projection mode
-  if (liveState.lockedScreens[key]) return;
+ipcMain.handle("live:toggle", () => _mergeLive(screenCtx, { enabled: !screenCtx.liveState.enabled }));
 
-  // If screen is mirroring, ignore direct set (safety)
-  if (mirrors[key]?.kind === "MIRROR") return;
+ipcMain.handle("live:next", () => _mergeLive(screenCtx, { cursor: (screenCtx.liveState.cursor ?? 0) + 1, enabled: true }));
 
-  screenStates[key] = { ...screenStates[key], mode, updatedAt: Date.now() };
-  sendScreenState(key);
-  applyMirrorsFrom(key);
-}
-
-function mergeLive(patch: Partial<LiveState>) {
-  // mutual exclusion
-  const next: LiveState = { ...liveState, ...patch, updatedAt: Date.now() };
-
-  if (patch.black === true) next.white = false;
-  if (patch.white === true) next.black = false;
-
-  if (next.cursor < 0) next.cursor = 0;
-  if (!next.target) next.target = "A";
-
-  liveState = next;
-
-  // apply to target projection mode
-  applyLiveProjectionMode();
-
-  broadcastLive();
-  return liveState;
-}
-
-ipcMain.handle("live:get", () => ({ ...liveState }));
-
-ipcMain.handle(
-  "live:set",
-  async (
-    _evt,
-    rawPayload: unknown
-  ) => {
-    const payload = parseLiveSetPayload(rawPayload);
-    const patch: Partial<LiveState> = {};
-    if ("planId" in payload) patch.planId = payload.planId ?? null;
-    if ("cursor" in payload && typeof payload.cursor === "number") patch.cursor = payload.cursor;
-    if ("enabled" in payload && typeof payload.enabled === "boolean") patch.enabled = payload.enabled;
-    if ("target" in payload && payload.target) patch.target = payload.target;
-    if ("black" in payload && typeof payload.black === "boolean") patch.black = payload.black;
-    if ("white" in payload && typeof payload.white === "boolean") patch.white = payload.white;
-    return mergeLive(patch);
-  }
-);
-
-ipcMain.handle("live:toggle", () => mergeLive({ enabled: !liveState.enabled }));
-
-ipcMain.handle("live:next", () => mergeLive({ cursor: (liveState.cursor ?? 0) + 1, enabled: true }));
-
-ipcMain.handle("live:prev", () => mergeLive({ cursor: Math.max((liveState.cursor ?? 0) - 1, 0), enabled: true }));
+ipcMain.handle("live:prev", () => _mergeLive(screenCtx, { cursor: Math.max((screenCtx.liveState.cursor ?? 0) - 1, 0), enabled: true }));
 
 ipcMain.handle("live:setCursor", (_evt, rawCursor: unknown) => {
   const cursor = parseLiveCursor(rawCursor);
-  return mergeLive({ cursor, enabled: true });
+  return _mergeLive(screenCtx, { cursor, enabled: true });
 });
 
 ipcMain.handle("live:setTarget", (_evt, rawTarget: unknown) => {
   const target = parseScreenKey(rawTarget, "live:setTarget.target");
-  return mergeLive({ target });
+  return _mergeLive(screenCtx, { target });
 });
 
-ipcMain.handle("live:toggleBlack", () => mergeLive({ black: !liveState.black, enabled: true }));
+ipcMain.handle("live:toggleBlack", () => _mergeLive(screenCtx, { black: !screenCtx.liveState.black, enabled: true }));
 
-ipcMain.handle("live:toggleWhite", () => mergeLive({ white: !liveState.white, enabled: true }));
+ipcMain.handle("live:toggleWhite", () => _mergeLive(screenCtx, { white: !screenCtx.liveState.white, enabled: true }));
 
-ipcMain.handle("live:resume", () => mergeLive({ black: false, white: false, enabled: true }));
+ipcMain.handle("live:resume", () => _mergeLive(screenCtx, { black: false, white: false, enabled: true }));
 
 ipcMain.handle("live:setLocked", (_evt, rawPayload: unknown) => {
   const payload = parseLiveSetLockedPayload(rawPayload);
-  const next = { ...liveState.lockedScreens, [payload.key]: payload.locked };
-  return mergeLive({ lockedScreens: next });
+  const next = { ...screenCtx.liveState.lockedScreens, [payload.key]: payload.locked };
+  return _mergeLive(screenCtx, { lockedScreens: next });
 });

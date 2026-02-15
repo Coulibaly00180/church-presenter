@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-
-function cls(...xs: Array<string | false | null | undefined>) {
-  return xs.filter(Boolean).join(" ");
-}
+import { cls } from "../ui/cls";
 
 function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;

@@ -1,32 +1,10 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  BollsBook,
-  BollsVerse,
-  buildReferenceLabel,
-  getBooks,
-  getChapter,
-  searchVerses,
-  versesToText,
-  listTranslations,
-} from "../bible/bollsApi";
-import { ActionRow, Alert, Field, InlineField, PageHeader, Panel, ToolbarPanel } from "../ui/primitives";
+import React from "react";
+import { ActionRow, Alert, InlineField, PageHeader, ToolbarPanel } from "../ui/primitives";
 import { PlanSelectField, ProjectionTargetField } from "../ui/headerControls";
-import { projectTextToScreen } from "../projection/target";
-
-type PlanItemPayload = Omit<CpPlanAddItemPayload, "kind"> & { kind: "BIBLE_PASSAGE" | "BIBLE_VERSE" };
-
-function stripHtml(html: string) {
-  return html.replace(/<[^>]+>/g, "").trim();
-}
-
-function verseKey(v: BollsVerse) {
-  return `${v.book}-${v.chapter}-${v.verse}`;
-}
-
-function getErrorMessage(err: unknown) {
-  if (err instanceof Error) return err.message;
-  return String(err);
-}
+import { useBibleState } from "./bible/useBibleState";
+import { BibleNav } from "./bible/BibleNav";
+import { BibleSearch } from "./bible/BibleSearch";
+import { VersePanel } from "./bible/VersePanel";
 
 function formatPlanLabel(plan: CpPlanListItem) {
   if (plan.title && plan.title.trim()) return plan.title;
@@ -35,467 +13,100 @@ function formatPlanLabel(plan: CpPlanListItem) {
   return plan.id;
 }
 
-function cls(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
-
-type TranslationGroup = {
-  language: string;
-  translations: Array<{ code: string; label: string; dir?: string }>;
-};
-
 export function BiblePage() {
-  const [translationLanguage, setTranslationLanguage] = useState<string>("French Français"); // default language
-  const [translation, setTranslation] = useState<string>("FRLSG"); // default translation code
-  const activeTranslation = translation;
-  const [groups, setGroups] = useState<TranslationGroup[]>([]);
-
-  const [books, setBooks] = useState<BollsBook[]>([]);
-  const [bookId, setBookId] = useState<number | null>(null);
-  const [chapter, setChapter] = useState<number>(1);
-  const [verses, setVerses] = useState<BollsVerse[]>([]);
-  const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
-
-  const [plans, setPlans] = useState<CpPlanListItem[]>([]);
-  const [planId, setPlanId] = useState<string>("");
-  const [addMode, setAddMode] = useState<"PASSAGE" | "VERSES">("VERSES");
-  const [target, setTarget] = useState<ScreenKey>("A");
-
-  const [loadingBooks, setLoadingBooks] = useState(false);
-  const [loadingChapter, setLoadingChapter] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const [offlineFallbackHint, setOfflineFallbackHint] = useState<string | null>(null);
-
-  const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState<BollsVerse[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const searchTimer = useRef<NodeJS.Timeout | null>(null);
-  const skipNextBookAutoLoad = useRef(false);
-
-  const currentBook = useMemo(() => books.find((b) => b.bookid === bookId), [books, bookId]);
-
-  function switchToOfflineFRLSG() {
-    const frGroup = groups.find((g) => g.translations.some((t) => t.code === "FRLSG"));
-    if (frGroup) {
-      setTranslationLanguage(frGroup.language);
-    }
-    setTranslation("FRLSG");
-    setOfflineFallbackHint(null);
-    setInfo("Mode offline FRLSG active.");
-  }
-
-  // Load translations once
-  useEffect(() => {
-    let cancelled = false;
-    listTranslations()
-      .then((ts) => {
-        if (cancelled) return;
-        const grouped: TranslationGroup[] = [];
-        ts.forEach((t) => {
-          let g = grouped.find((gg) => gg.language === t.language);
-          if (!g) {
-            g = { language: t.language, translations: [] };
-            grouped.push(g);
-          }
-          g.translations.push({ code: t.short_name, label: `${t.full_name} (${t.short_name})`, dir: t.dir });
-        });
-        setGroups(grouped);
-        const defaultCode = "FRLSG";
-        const defaultGroup = grouped.find((g) => g.translations.some((t) => t.code === defaultCode));
-        if (defaultGroup) {
-          setTranslationLanguage(defaultGroup.language);
-          const found = defaultGroup.translations.find((t) => t.code === defaultCode) || defaultGroup.translations[0];
-          if (found) setTranslation(found.code);
-        } else if (grouped[0]?.translations[0]) {
-          setTranslationLanguage(grouped[0].language);
-          setTranslation(grouped[0].translations[0].code);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setErr(e?.message || String(e));
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  // Load plans on mount
-  useEffect(() => {
-    let cancelled = false;
-    window.cp.plans
-      ?.list?.()
-      .then((ps: CpPlanListItem[]) => {
-        if (cancelled) return;
-        setPlans(ps || []);
-        if (ps?.length) setPlanId(ps[0].id);
-      })
-      .catch(() => null);
-    return () => { cancelled = true; };
-  }, []);
-
-  // Load books when translation changes
-  useEffect(() => {
-    if (!activeTranslation) return;
-    let cancelled = false;
-    (async () => {
-      setErr(null);
-      setInfo(null);
-      setOfflineFallbackHint(null);
-      setLoadingBooks(true);
-      try {
-        const list = await getBooks(activeTranslation);
-        if (cancelled) return;
-        setBooks(list);
-        setBookId(list[0]?.bookid ?? null);
-        setChapter(1);
-        setVerses([]);
-        setSelectedVerses(new Set());
-        setInfo(`Traduction ${activeTranslation} chargee (${list.length} livres).`);
-      } catch (e: unknown) {
-        if (cancelled) return;
-        const message = getErrorMessage(e);
-        setErr(message);
-        setBooks([]);
-        setBookId(null);
-        if (activeTranslation !== "FRLSG") {
-          setOfflineFallbackHint(`La traduction ${activeTranslation} requiert le reseau. Tu peux basculer en FRLSG offline.`);
-        }
-      } finally {
-        if (!cancelled) setLoadingBooks(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [activeTranslation]);
-
-  // Auto-load chapter when book changes
-  useEffect(() => {
-    if (!bookId) return;
-    // Searching a verse can set book + chapter explicitly; avoid overwriting with chapter 1.
-    if (skipNextBookAutoLoad.current) {
-      skipNextBookAutoLoad.current = false;
-      return;
-    }
-    void loadChapter(bookId, 1);
-  }, [bookId]);
-
-  async function loadChapter(bid: number, chap: number) {
-    setErr(null);
-    setLoadingChapter(true);
-    try {
-      const vs = await getChapter(activeTranslation, bid, chap);
-      setVerses(vs);
-      setChapter(chap);
-      setSelectedVerses(new Set());
-    } catch (e: unknown) {
-      setErr(getErrorMessage(e));
-    } finally {
-      setLoadingChapter(false);
-    }
-  }
-
-  function toggleVerse(n: number) {
-    const next = new Set(selectedVerses);
-    if (next.has(n)) next.delete(n);
-    else next.add(n);
-    setSelectedVerses(next);
-  }
-
-  function selectAllVerses(flag: boolean) {
-    if (!flag) {
-      setSelectedVerses(new Set());
-      return;
-    }
-    setSelectedVerses(new Set(verses.map((v) => v.verse)));
-  }
-
-  const selectedList = useMemo(() => verses.filter((v) => selectedVerses.has(v.verse)), [verses, selectedVerses]);
-  const passageText = useMemo(() => versesToText(selectedList.length ? selectedList : verses), [verses, selectedList]);
-  const referenceLabel = useMemo(
-    () => buildReferenceLabel(currentBook, chapter, selectedList.length ? selectedList.map((v) => v.verse) : undefined),
-    [currentBook, chapter, selectedList]
-  );
-
-  async function addToPlan() {
-    if (!planId) {
-      setErr("Choisis un plan avant d'ajouter.");
-      return;
-    }
-    if (!verses.length) {
-      setErr("Charge un chapitre d'abord.");
-      return;
-    }
-
-    const items: PlanItemPayload[] = [];
-    if (addMode === "PASSAGE" || selectedList.length === 0) {
-      items.push({
-        planId,
-        kind: "BIBLE_PASSAGE",
-        title: referenceLabel,
-        content: passageText,
-        refId: referenceLabel,
-        refSubId: activeTranslation,
-      });
-    } else {
-      for (const v of selectedList) {
-        items.push({
-          planId,
-          kind: "BIBLE_VERSE",
-          title: `${currentBook?.name || ""} ${v.chapter}:${v.verse} (${activeTranslation})`,
-          content: `${v.chapter}:${v.verse}  ${v.text}`,
-          refId: referenceLabel,
-          refSubId: `${v.chapter}:${v.verse}`,
-        });
-      }
-    }
-
-    for (const it of items) {
-      await window.cp.plans.addItem(it);
-    }
-    setInfo(`${items.length} element(s) ajoute(s) au plan.`);
-  }
-
-  async function projectNow() {
-    if (!verses.length) {
-      setErr("Charge un chapitre d'abord.");
-      return;
-    }
-    await projectTextToScreen({ target, title: `${referenceLabel} (${activeTranslation})`, body: passageText });
-  }
-
-  // Text search (debounced)
-  useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!searchText.trim()) {
-      setSearchResults([]);
-      return;
-    }
-    let cancelled = false;
-    searchTimer.current = setTimeout(async () => {
-      setSearchLoading(true);
-      setErr(null);
-      try {
-        const res = await searchVerses(activeTranslation, searchText.trim(), { limit: 30 });
-        if (!cancelled) setSearchResults(res.results);
-      } catch (e: unknown) {
-        if (!cancelled) {
-          setErr(getErrorMessage(e));
-          setSearchResults([]);
-        }
-      } finally {
-        if (!cancelled) setSearchLoading(false);
-      }
-    }, 350);
-    return () => {
-      cancelled = true;
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-    };
-  }, [searchText, activeTranslation]);
-
-  async function jumpToResult(v: BollsVerse) {
-    setErr(null);
-    try {
-      if (!books.length) {
-        await getBooks(activeTranslation); // ensure cache
-      }
-      skipNextBookAutoLoad.current = true;
-      setBookId(v.book);
-      await loadChapter(v.book, v.chapter);
-      setSelectedVerses(new Set([v.verse]));
-    } catch (e: unknown) {
-      setErr(getErrorMessage(e));
-    }
-  }
+  const b = useBibleState();
 
   return (
     <div className="cp-page">
       <PageHeader title="Bible" subtitle="Rechercher, projeter et envoyer vers le plan (bolls.life)." />
 
-      {err ? <Alert tone="error">Erreur : {err}</Alert> : null}
-      {offlineFallbackHint ? (
+      {b.err ? <Alert tone="error">Erreur : {b.err}</Alert> : null}
+      {b.offlineFallbackHint ? (
         <Alert>
-          <div>{offlineFallbackHint}</div>
+          <div>{b.offlineFallbackHint}</div>
           <ActionRow className="cp-mt-6">
-            <button onClick={switchToOfflineFRLSG}>Basculer en FRLSG offline</button>
+            <button onClick={b.switchToOfflineFRLSG}>Basculer en FRLSG offline</button>
           </ActionRow>
         </Alert>
       ) : null}
-      {info ? <Alert tone="success">{info}</Alert> : null}
+      {b.info ? <Alert tone="success">{b.info}</Alert> : null}
 
       <ToolbarPanel>
-          <InlineField label="Langue">
-            <select
-              value={translationLanguage}
-              onChange={(e) => {
-                const lang = e.target.value;
-                setTranslationLanguage(lang);
-                const g = groups.find((x) => x.language === lang);
-                if (g?.translations[0]) setTranslation(g.translations[0].code);
-              }}
-              className="cp-input-min-200"
-            >
-              {groups.map((g) => (
-                <option key={g.language} value={g.language}>
-                  {g.language}
-                </option>
-              ))}
-            </select>
-          </InlineField>
-          <InlineField label="Traduction">
-            <select
-              value={translation}
-              onChange={(e) => setTranslation(e.target.value)}
-              className="cp-input-min-260"
-            >
-              {(groups.find((g) => g.language === translationLanguage)?.translations || []).map((t) => (
-                <option key={t.code} value={t.code}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </InlineField>
-          <PlanSelectField
-            value={planId}
-            plans={plans}
-            getPlanId={(p) => p.id}
-            getPlanLabel={formatPlanLabel}
-            onChange={setPlanId}
-          />
-          <ProjectionTargetField value={target} onChange={setTarget} />
+        <InlineField label="Langue">
+          <select
+            value={b.translationLanguage}
+            onChange={(e) => {
+              const lang = e.target.value;
+              b.setTranslationLanguage(lang);
+              const g = b.groups.find((x) => x.language === lang);
+              if (g?.translations[0]) b.setTranslation(g.translations[0].code);
+            }}
+            className="cp-input-min-200"
+          >
+            {b.groups.map((g) => (
+              <option key={g.language} value={g.language}>{g.language}</option>
+            ))}
+          </select>
+        </InlineField>
+        <InlineField label="Traduction">
+          <select
+            value={b.translation}
+            onChange={(e) => b.setTranslation(e.target.value)}
+            className="cp-input-min-260"
+          >
+            {(b.groups.find((g) => g.language === b.translationLanguage)?.translations || []).map((t) => (
+              <option key={t.code} value={t.code}>{t.label}</option>
+            ))}
+          </select>
+        </InlineField>
+        <PlanSelectField
+          value={b.planId}
+          plans={b.plans}
+          getPlanId={(p) => p.id}
+          getPlanLabel={formatPlanLabel}
+          onChange={b.setPlanId}
+        />
+        <ProjectionTargetField value={b.target} onChange={b.setTarget} />
       </ToolbarPanel>
 
       <div className="cp-grid-main">
         <div className="cp-stack">
-          <Panel>
-            <div className="cp-section-label">Naviguer</div>
-            <div className="cp-stack-8">
-            <Field label="Livre">
-              <select
-                value={bookId ?? ""}
-                onChange={(e) => setBookId(Number(e.target.value))}
-                disabled={loadingBooks || !books.length}
-                className="cp-input-full"
-              >
-                {books.map((b) => (
-                  <option key={b.bookid} value={b.bookid}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Chapitre">
-              <input
-                type="number"
-                min={1}
-                max={currentBook?.chapters || 150}
-                value={chapter}
-                onChange={(e) => setChapter(Math.max(1, Number(e.target.value)))}
-                className="cp-input-full"
-              />
-            </Field>
-            {currentBook?.chapters ? (
-              <div className="cp-stack-6">
-                <div className="cp-help-text-flat">Chapitres de {currentBook.name}</div>
-                <div className="cp-chapter-grid">
-                  {Array.from({ length: currentBook.chapters }, (_, i) => i + 1).map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => loadChapter(currentBook.bookid, c)}
-                      className={cls("cp-chapter-btn", c === chapter && "is-active")}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            <ActionRow>
-              <button onClick={() => bookId && loadChapter(bookId, Math.max(1, chapter))} disabled={!bookId || loadingChapter}>
-                {loadingChapter ? "Chargement..." : "Charger chapitre"}
-              </button>
-              <button onClick={() => selectAllVerses(true)} disabled={!verses.length}>
-                  Tout selectionner
-                </button>
-                <button onClick={() => selectAllVerses(false)} disabled={!verses.length}>
-                  Vider
-                </button>
-              </ActionRow>
-            </div>
-          </Panel>
+          <BibleNav
+            books={b.books}
+            bookId={b.bookId}
+            onSetBookId={b.setBookId}
+            chapter={b.chapter}
+            onSetChapter={b.setChapter}
+            currentBook={b.currentBook}
+            loadingBooks={b.loadingBooks}
+            loadingChapter={b.loadingChapter}
+            onLoadChapter={b.loadChapter}
+            versesCount={b.verses.length}
+            onSelectAll={b.selectAllVerses}
+          />
 
-          <Panel>
-            <div className="cp-section-label cp-mb-6">Recherche texte (API bolls)</div>
-            <input
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="mot ou expression"
-              className="cp-input-full"
-            />
-            {searchLoading ? <div className="cp-muted">Recherche...</div> : null}
-            <div className="cp-bible-search-list">
-              {searchResults.map((r) => (
-                <button
-                  key={verseKey(r)}
-                  onClick={() => jumpToResult(r)}
-                  className="cp-search-result-btn"
-                >
-                  <b>
-                    Livre {r.book} {r.chapter}:{r.verse}
-                  </b>
-                  <div className="cp-search-result-text">{r.text}</div>
-                </button>
-              ))}
-              {searchText && !searchResults.length && !searchLoading ? (
-                <div className="cp-help-text-muted">Aucun resultat.</div>
-              ) : null}
-            </div>
-          </Panel>
+          <BibleSearch
+            searchText={b.searchText}
+            onSetSearchText={b.setSearchText}
+            searchResults={b.searchResults}
+            searchLoading={b.searchLoading}
+            onJumpToResult={b.jumpToResult}
+          />
         </div>
 
-        <Panel>
-          <div className="cp-panel-header-split">
-            <div>
-              <div className="cp-title-strong">{currentBook?.name ?? "â€”"}</div>
-              <div className="cp-muted">
-                {referenceLabel} ({activeTranslation})
-              </div>
-            </div>
-            <div className="cp-actions">
-              <InlineField label="Mode ajout">
-                <select value={addMode} onChange={(e) => setAddMode(e.target.value === "PASSAGE" ? "PASSAGE" : "VERSES")}>
-                  <option value="PASSAGE">Passage</option>
-                  <option value="VERSES">Verset par verset</option>
-                </select>
-              </InlineField>
-              <button onClick={projectNow} disabled={!verses.length}>
-                Projeter
-              </button>
-              <button onClick={addToPlan} disabled={!verses.length || !planId}>
-                Ajouter au plan
-              </button>
-            </div>
-          </div>
-
-          <div className="cp-verse-list">
-            {verses.map((v) => (
-              <label
-                key={verseKey(v)}
-                className={cls("cp-verse-card", selectedVerses.has(v.verse) && "is-selected")}
-              >
-                <div className="cp-verse-head">
-                  <input type="checkbox" checked={selectedVerses.has(v.verse)} onChange={() => toggleVerse(v.verse)} />
-                  <b>
-                    {v.chapter}:{v.verse}
-                  </b>
-                </div>
-                <div className="cp-verse-text">{stripHtml(v.text)}</div>
-              </label>
-            ))}
-            {!verses.length ? <div className="cp-muted">Charge un chapitre pour voir les versets.</div> : null}
-          </div>
-
-          <div className="cp-help-text">
-            Passage = un seul item avec tout le texte. Verset par verset = un item par verset pour faciliter la navigation live.
-          </div>
-        </Panel>
+        <VersePanel
+          currentBook={b.currentBook}
+          referenceLabel={b.referenceLabel}
+          activeTranslation={b.activeTranslation}
+          verses={b.verses}
+          selectedVerses={b.selectedVerses}
+          onToggleVerse={b.toggleVerse}
+          addMode={b.addMode}
+          onSetAddMode={b.setAddMode}
+          onProjectNow={b.projectNow}
+          onAddToPlan={b.addToPlan}
+          planId={b.planId}
+        />
       </div>
     </div>
   );

@@ -45,7 +45,7 @@ export type CpProjectionMutationResult =
 
 export type CpScreenMutationResult =
   | { ok: true; state: CpProjectionState }
-  | { ok: false; reason: "MIRROR" | "LOCKED" };
+  | { ok: false; reason: "MIRROR" | "LOCKED"; state: CpProjectionState };
 
 export type CpScreenMirrorResult = { ok: true; mirror: ScreenMirrorMode };
 

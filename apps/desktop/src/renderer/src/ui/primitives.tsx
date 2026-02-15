@@ -1,8 +1,5 @@
 import React from "react";
-
-function cls(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
+import { cls } from "./cls";
 
 type PageHeaderProps = {
   title: React.ReactNode;

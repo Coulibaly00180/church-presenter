@@ -1,12 +1,9 @@
 import React from "react";
 import { ActionRow, ToolbarRow } from "./primitives";
+import { cls } from "./cls";
 
 type LiveScreenKey = "A" | "B" | "C";
 type LiveLocks = Partial<Record<LiveScreenKey, boolean>>;
-
-function cls(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
 
 const LIVE_SCREENS: LiveScreenKey[] = ["A", "B", "C"];
 

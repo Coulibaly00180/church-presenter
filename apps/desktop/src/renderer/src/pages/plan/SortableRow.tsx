@@ -2,16 +2,13 @@ import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { PlanItem } from "./types";
+import { cls } from "../../ui/cls";
 
 type SortableRowProps = {
   item: PlanItem;
   onProject: () => void;
   onRemove: () => void;
 };
-
-function cls(...parts: Array<string | false | null | undefined>) {
-  return parts.filter(Boolean).join(" ");
-}
 
 export function SortableRow(props: SortableRowProps) {
   const { item, onProject, onRemove } = props;
