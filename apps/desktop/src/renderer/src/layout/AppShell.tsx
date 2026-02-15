@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { cls } from "../ui/cls";
+import { useTheme } from "../ui/useTheme";
 
 function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;
@@ -12,6 +13,7 @@ function isTypingTarget(el: EventTarget | null) {
 export function AppShell() {
   useLocation(); // keep for potential future route-based effects
   const [projOpen, setProjOpen] = useState(false);
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const canUse = !!window.cp?.projectionWindow;
 
@@ -65,9 +67,14 @@ export function AppShell() {
             <div className="cp-shell-title">Church Presenter</div>
             <div className="cp-shell-subtitle">Regie / Projection</div>
           </div>
-          <span className={cls("badge", "cp-shell-badge", projOpen ? "cp-badge-open" : "cp-badge-closed")}>
-            {projOpen ? "Projection ouverte" : "Projection fermee"}
-          </span>
+          <div className="cp-inline-row-tight">
+            <button onClick={toggleTheme} className="cp-btn-compact">
+              {theme === "dark" ? "Clair" : "Sombre"}
+            </button>
+            <span className={cls("badge", "cp-shell-badge", projOpen ? "cp-badge-open" : "cp-badge-closed")}>
+              {projOpen ? "Projection ouverte" : "Projection fermee"}
+            </span>
+          </div>
         </div>
 
         <div className="panel cp-panel cp-panel-soft cp-shell-projection-card">

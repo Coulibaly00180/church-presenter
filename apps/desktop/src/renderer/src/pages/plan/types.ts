@@ -13,6 +13,7 @@ export type PlanItem = {
   content?: string | null;
   refId?: string | null;
   refSubId?: string | null;
+  songId?: string | null;
   mediaPath?: string | null;
 };
 

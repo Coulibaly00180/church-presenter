@@ -15,10 +15,12 @@ model Song {
   year      String?
   language  String?
   tags      String?
+  deletedAt DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
   blocks    SongBlock[]
+  planItems ServiceItem[] @relation("ServiceItemSong")
 }
 
 model SongBlock {
@@ -41,6 +43,7 @@ model ServicePlan {
   id        String      @id @default(cuid())
   date      DateTime    @unique
   title     String?     // ex: "Culte du dimanche"
+  deletedAt DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
@@ -54,6 +57,7 @@ model ServiceItem {
   kind      String      // "SONG_BLOCK" | "ANNOUNCEMENT_TEXT" | "ANNOUNCEMENT_IMAGE" | "VERSE_MANUAL"
   refId     String?     // ex: songId pour SONG_BLOCK
   refSubId  String?     // ex: blockId pour SONG_BLOCK
+  songId    String?     // FK vers Song pour SONG_BLOCK (ON DELETE SET NULL)
   title     String?
   content   String?     // texte annonce / verset / etc
   mediaPath String?     // chemin local image (MVP)
@@ -61,7 +65,9 @@ model ServiceItem {
   updatedAt DateTime    @updatedAt
 
   plan      ServicePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  song      Song?       @relation("ServiceItemSong", fields: [songId], references: [id], onDelete: SetNull)
 
   @@index([planId, order])
   @@unique([planId, order])
+  @@index([songId])
 }

@@ -327,6 +327,7 @@ export function registerSongsIpc() {
     if (query.length > 0) {
       return prisma.song.findMany({
         where: {
+          deletedAt: null,
           OR: [
             { title: { contains: query } },
             { artist: { contains: query } },
@@ -342,6 +343,7 @@ export function registerSongsIpc() {
     }
 
     return prisma.song.findMany({
+      where: { deletedAt: null },
       orderBy: { updatedAt: "desc" },
       select: { id: true, title: true, artist: true, album: true, year: true, updatedAt: true },
       take: 200,
@@ -412,7 +414,7 @@ export function registerSongsIpc() {
   ipcMain.handle("songs:delete", async (_evt, rawId: unknown) => {
     const prisma = getPrisma();
     const id = parseNonEmptyString(rawId, "songs:delete.id");
-    await prisma.song.delete({ where: { id } });
+    await prisma.song.update({ where: { id }, data: { deletedAt: new Date() } });
     return { ok: true };
   });
 

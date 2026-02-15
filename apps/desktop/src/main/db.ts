@@ -140,7 +140,7 @@ async function getAppliedMigrationNames(prisma: PrismaClient) {
   return names;
 }
 
-async function applySingleMigration(prisma: PrismaClient, migrationName: string, sql: string) {
+export async function applySingleMigration(prisma: PrismaClient, migrationName: string, sql: string) {
   const statements = splitSqlStatements(sql);
   const id = randomUUID();
   const checksum = createHash("sha256").update(sql).digest("hex");
@@ -160,15 +160,22 @@ async function applySingleMigration(prisma: PrismaClient, migrationName: string,
 
   let appliedSteps = 0;
   try {
-    for (const statement of statements) {
-      try {
-        await prisma.$executeRawUnsafe(statement);
-      } catch (err) {
-        if (!isBenignMigrationError(err)) {
-          throw err;
+    await prisma.$executeRawUnsafe("BEGIN");
+    try {
+      for (const statement of statements) {
+        try {
+          await prisma.$executeRawUnsafe(statement);
+        } catch (err) {
+          if (!isBenignMigrationError(err)) {
+            throw err;
+          }
         }
+        appliedSteps += 1;
       }
-      appliedSteps += 1;
+      await prisma.$executeRawUnsafe("COMMIT");
+    } catch (err) {
+      await prisma.$executeRawUnsafe("ROLLBACK");
+      throw err;
     }
 
     await prisma.$executeRawUnsafe(
@@ -181,7 +188,10 @@ async function applySingleMigration(prisma: PrismaClient, migrationName: string,
     );
   } catch (err) {
     await prisma.$executeRawUnsafe(
-      `UPDATE "_prisma_migrations" SET "logs" = ? WHERE "id" = ?`,
+      `UPDATE "_prisma_migrations"
+       SET "rolled_back_at" = ?, "logs" = ?
+       WHERE "id" = ?`,
+      new Date().toISOString(),
       getErrorMessage(err),
       id
     );

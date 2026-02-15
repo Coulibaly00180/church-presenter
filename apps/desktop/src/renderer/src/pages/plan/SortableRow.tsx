@@ -27,6 +27,8 @@ export function SortableRow(props: SortableRowProps) {
     return null;
   })();
 
+  const songOrphaned = item.kind === "SONG_BLOCK" && !item.songId && !item.refId;
+
   const titleAttr =
     item.kind === "SONG_BLOCK" && item.refId
       ? `Chant source: ${item.title || ""} (id: ${item.refId}${item.refSubId ? " / bloc " + item.refSubId : ""})`
@@ -45,7 +47,7 @@ export function SortableRow(props: SortableRowProps) {
 
       <div className="cp-flex-1">
         <div className="cp-field-label">
-          #{item.order} - {item.title || item.kind}{" "}
+          #{item.order} - {songOrphaned ? "[Chant supprime]" : (item.title || item.kind)}{" "}
           {badge ? <span className={cls("cp-kind-badge", badge.className)}>{badge.label}</span> : null}
         </div>
         <div className="cp-date-muted">

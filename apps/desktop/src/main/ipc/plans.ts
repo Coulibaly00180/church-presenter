@@ -60,6 +60,7 @@ export async function createPlanItemWithRetry(
             content: payload.content,
             refId: payload.refId,
             refSubId: payload.refSubId,
+            songId: payload.kind === "SONG_BLOCK" ? payload.refId : undefined,
             mediaPath: payload.mediaPath,
           },
         });
@@ -77,6 +78,7 @@ export function registerPlansIpc() {
   ipcMain.handle("plans:list", async () => {
     const prisma = getPrisma();
     return prisma.servicePlan.findMany({
+      where: { deletedAt: null },
       orderBy: { date: "desc" },
       select: { id: true, date: true, title: true, updatedAt: true },
       take: 200,
@@ -121,6 +123,7 @@ export function registerPlansIpc() {
                 content: it.content,
                 refId: it.refId,
                 refSubId: it.refSubId,
+                songId: it.songId,
                 mediaPath: it.mediaPath,
               },
             });
@@ -164,7 +167,7 @@ export function registerPlansIpc() {
   ipcMain.handle("plans:delete", async (_evt, rawPlanId: unknown) => {
     const prisma = getPrisma();
     const planId = parseNonEmptyString(rawPlanId, "plans:delete.planId");
-    await prisma.servicePlan.delete({ where: { id: planId } });
+    await prisma.servicePlan.update({ where: { id: planId }, data: { deletedAt: new Date() } });
     return { ok: true };
   });
 

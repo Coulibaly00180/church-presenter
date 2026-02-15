@@ -372,8 +372,8 @@ export function registerDataIpc() {
   ipcMain.handle("data:exportAll", async () => {
     const prisma = getPrisma();
     const payload = {
-      songs: await prisma.song.findMany({ include: { blocks: { orderBy: { order: "asc" } } } }),
-      plans: await prisma.servicePlan.findMany({ include: { items: { orderBy: { order: "asc" } } } }),
+      songs: await prisma.song.findMany({ where: { deletedAt: null }, include: { blocks: { orderBy: { order: "asc" } } } }),
+      plans: await prisma.servicePlan.findMany({ where: { deletedAt: null }, include: { items: { orderBy: { order: "asc" } } } }),
       exportedAt: new Date().toISOString(),
     };
 
