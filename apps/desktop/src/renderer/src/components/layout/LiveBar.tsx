@@ -89,7 +89,7 @@ export function LiveBar() {
   };
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 border-t bg-card shrink-0 flex-wrap">
+    <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border/60 bg-muted/50 dark:bg-secondary/30 shrink-0 flex-wrap">
       {/* Transport */}
       <Tooltip>
         <TooltipTrigger asChild>

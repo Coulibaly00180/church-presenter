@@ -80,7 +80,7 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
   });
 
   return (
-    <header className="flex items-center gap-2 px-3 py-1.5 border-b bg-card shrink-0">
+    <header className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/50 dark:bg-secondary/30 shrink-0">
       <h1 className="text-sm font-semibold whitespace-nowrap">Church Presenter</h1>
 
       <Select value={planId ?? ""} onValueChange={onSelectPlan}>
