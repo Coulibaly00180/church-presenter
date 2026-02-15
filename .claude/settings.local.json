@@ -17,7 +17,13 @@
       "Bash(findstr:*)",
       "Bash(TASKLIST //FI \"IMAGENAME eq electron.exe\")",
       "Bash(TASKLIST:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(wc -l:*)",
+      "Bash(grep:*)",
+      "Bash(xargs:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(ls:*)"
     ]
   }
 }

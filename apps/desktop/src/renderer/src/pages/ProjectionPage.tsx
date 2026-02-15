@@ -1,11 +1,11 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { cn } from "@/lib/utils";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 function getScreenKey(): "A" | "B" | "C" {
-  // HashRouter: "#/projection?screen=B"
   const hash = window.location.hash || "";
   const q = hash.includes("?") ? hash.split("?")[1] : "";
   const params = new URLSearchParams(q);
@@ -14,7 +14,21 @@ function getScreenKey(): "A" | "B" | "C" {
   return "A";
 }
 
-import { cls } from "../ui/cls";
+function getErrorMessage(err: unknown) {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function toFileUrl(p?: string) {
+  if (!p) return "";
+  if (p.startsWith("file://") || p.startsWith("http://") || p.startsWith("https://") || p.startsWith("data:")) return p;
+  const [pathOnly, frag] = p.split("#");
+  const base =
+    pathOnly.startsWith("\\\\")
+      ? `file:${pathOnly.replace(/\\/g, "/")}`
+      : `file:///${pathOnly.replace(/\\/g, "/")}`;
+  return frag ? `${base}#${frag}` : base;
+}
 
 export function ProjectionPage() {
   const screenKey = useMemo(() => getScreenKey(), []);
@@ -29,24 +43,7 @@ export function ProjectionPage() {
   const pdfDocRef = useRef<{ path: string; doc: pdfjsLib.PDFDocumentProxy } | null>(null);
   const [blockCursor, setBlockCursor] = useState<number>(0);
 
-  function getErrorMessage(err: unknown) {
-    if (err instanceof Error) return err.message;
-    return String(err);
-  }
-
-  function toFileUrl(p?: string) {
-    if (!p) return "";
-    if (p.startsWith("file://") || p.startsWith("http://") || p.startsWith("https://") || p.startsWith("data:")) return p;
-    // preserve #fragment (used for page selection)
-    const [pathOnly, frag] = p.split("#");
-    const base =
-      pathOnly.startsWith("\\\\") // UNC
-        ? `file:${pathOnly.replace(/\\/g, "/")}`
-        : `file:///${pathOnly.replace(/\\/g, "/")}`;
-    return frag ? `${base}#${frag}` : base;
-  }
-
-  // Live controls from projection window: arrows/Q/D + click left/right (skip when PDF to avoid conflict with PDF paging)
+  // Live controls: arrows/Q/D + click left/right (skip when PDF to avoid conflict with PDF paging)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const isPdf = state?.current?.mediaType === "PDF";
@@ -62,47 +59,30 @@ export function ProjectionPage() {
           .map((part: string) => part.trim())
           .filter(Boolean);
         const max = Math.max(parts.length - 1, 0);
-        setBlockCursor((idx) => {
-          const next = Math.min(Math.max(idx + (isNext ? 1 : -1), 0), max);
-          return next;
-        });
+        setBlockCursor((idx) => Math.min(Math.max(idx + (isNext ? 1 : -1), 0), max));
         return;
       }
 
-      if (isNext) {
-        e.preventDefault();
-        window.cp.live?.next?.();
-      }
-      if (isPrev) {
-        e.preventDefault();
-        window.cp.live?.prev?.();
-      }
+      if (isNext) { e.preventDefault(); window.cp.live?.next?.(); }
+      if (isPrev) { e.preventDefault(); window.cp.live?.prev?.(); }
     };
-
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [state?.current?.kind, state?.current?.mediaType, state?.current?.body]);
 
   useEffect(() => {
     const hasScreens = !!window.cp?.screens?.getState && !!window.cp?.screens?.onState;
-
     if (hasScreens) {
       window.cp.screens.getState(screenKey).then(setState);
       const off = window.cp.screens.onState(screenKey, setState);
       return () => off();
     }
-
-    // fallback legacy
-    if (!window.cp?.projection) {
-      console.error("window.cp.projection not available (preload not loaded?)");
-      return;
-    }
+    if (!window.cp?.projection) return;
     window.cp.projection.getState().then(setState);
     const off = window.cp.projection.onState(setState);
     return () => off();
   }, [screenKey]);
 
-  // Declenche une transition douce a chaque changement de "current"
   useEffect(() => {
     setAnimKey((k) => k + 1);
     setBlockCursor(0);
@@ -113,11 +93,7 @@ export function ProjectionPage() {
   const isPdf = current.kind === "MEDIA" && current.mediaType === "PDF";
   const lowerThird = !!state?.lowerThirdEnabled;
   const textBlocks = useMemo(
-    () =>
-      String(current.body || "")
-        .split(/\n\s*\n/g)
-        .map((part) => part.trim())
-        .filter(Boolean),
+    () => String(current.body || "").split(/\n\s*\n/g).map((part) => part.trim()).filter(Boolean),
     [current.body]
   );
   const projectedBody =
@@ -140,15 +116,13 @@ export function ProjectionPage() {
     }
   }, [current.kind, current.mediaType, current.mediaPath]);
 
-  // Render PDF page to image for clean display (no viewer UI)
+  // Render PDF page to image
   useEffect(() => {
     let cancelled = false;
     async function renderPdf() {
       setPdfImage(null);
       setPdfError(null);
-      if (!isPdf || !current.mediaPath) {
-        return;
-      }
+      if (!isPdf || !current.mediaPath) return;
       setPdfLoading(true);
       try {
         const [pathOnly, frag] = current.mediaPath.split("#");
@@ -182,12 +156,10 @@ export function ProjectionPage() {
       }
     }
     renderPdf();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [isPdf, current.mediaPath, pdfPage]);
 
-  // Global key navigation for PDF (single handler to avoid duplicate page jumps)
+  // PDF key navigation
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!isPdf) return;
@@ -258,59 +230,66 @@ export function ProjectionPage() {
         }
       }}
       tabIndex={0}
+      className="outline-none"
     >
-      {/* click areas */}
+      {/* Click areas for prev/next */}
       <button
         type="button"
         aria-label="Precedent"
-        onClick={() => {
-          if (!isPdf) window.cp.live?.prev?.();
-        }}
-        className={cls("cp-projection-click", "cp-projection-click-btn", "cp-projection-click--left", isPdf && "is-disabled")}
+        onClick={() => { if (!isPdf) window.cp.live?.prev?.(); }}
+        className={cn(
+          "absolute top-0 left-0 w-1/2 h-full bg-transparent border-none p-0 m-0 appearance-none cursor-pointer",
+          "focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2",
+          isPdf && "pointer-events-none cursor-default",
+        )}
         disabled={isPdf}
       />
       <button
         type="button"
         aria-label="Suivant"
-        onClick={() => {
-          if (!isPdf) window.cp.live?.next?.();
-        }}
-        className={cls("cp-projection-click", "cp-projection-click-btn", "cp-projection-click--right", isPdf && "is-disabled")}
+        onClick={() => { if (!isPdf) window.cp.live?.next?.(); }}
+        className={cn(
+          "absolute top-0 right-0 w-1/2 h-full bg-transparent border-none p-0 m-0 appearance-none cursor-pointer",
+          "focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2",
+          isPdf && "pointer-events-none cursor-default",
+        )}
         disabled={isPdf}
       />
+
       <div style={cardStyle} key={animKey}>
-        {/* watermark screen id */}
-        <div className="cp-projection-watermark">
+        {/* Watermark screen ID */}
+        <div className="fixed top-5 right-5 opacity-35 font-black tracking-widest" style={{ fontFamily: "system-ui" }}>
           SCREEN {screenKey}
         </div>
 
         {current.kind === "EMPTY" ? (
-          <div className="cp-projection-empty">Pret.</div>
+          <div className="opacity-70 text-4xl">Pret.</div>
         ) : current.kind === "MEDIA" && current.mediaPath ? (
           <>
-            {/* Pas de titre pour les PDF, seulement l'image rendue */}
             {current.mediaType === "PDF" ? (
               pdfImage ? (
                 <>
                   <img
                     src={pdfImage}
-                    className="cp-projection-pdf-image"
+                    className="w-full max-h-[92vh] object-contain rounded-lg"
+                    alt="PDF"
                   />
-                  <div className="cp-projection-page-indicator">
+                  <div className="absolute bottom-6 right-7 bg-black/60 text-white px-4 py-2 rounded-md font-extrabold text-base">
                     {pdfPage} / {pdfPageCount || "?"}
                   </div>
                 </>
               ) : pdfLoading ? (
-                <div className="cp-muted-80">Chargement du PDF...</div>
+                <div className="opacity-80">Chargement du PDF...</div>
               ) : pdfError ? (
-                <div className="cp-error-pdf">PDF: {pdfError}</div>
+                <div className="text-red-400">PDF: {pdfError}</div>
               ) : null
             ) : (
               <>
                 {current.title ? <div style={titleStyle}>{current.title}</div> : null}
                 <img
                   src={toFileUrl(current.mediaPath)}
-                  className="cp-projection-media-image"
+                  className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                  alt={current.title || "Media"}
                 />
               </>
             )}
@@ -319,7 +298,7 @@ export function ProjectionPage() {
           <>
             <div style={bodyStyle}>{projectedBody}</div>
             {(current.metaSong || current.title) ? (
-              <div className="cp-projection-meta-badge">
+              <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-black/60 text-white px-6 py-3 rounded-full flex items-center gap-3 text-sm font-semibold max-w-[95%] flex-wrap justify-center text-center">
                 <span>{current.metaSong?.title || current.title || "Chant"}</span>
                 {current.metaSong?.artist ? <span>• {current.metaSong.artist}</span> : null}
                 {current.metaSong?.album ? <span>• {current.metaSong.album}</span> : null}
@@ -332,7 +311,3 @@ export function ProjectionPage() {
     </div>
   );
 }
-
-
-
-
