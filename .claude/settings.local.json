@@ -16,7 +16,8 @@
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
       "Bash(TASKLIST //FI \"IMAGENAME eq electron.exe\")",
-      "Bash(TASKLIST:*)"
+      "Bash(TASKLIST:*)",
+      "Bash(taskkill:*)"
     ]
   }
 }
