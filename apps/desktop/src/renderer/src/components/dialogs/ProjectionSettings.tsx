@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ImagePlus, Trash2 } from "lucide-react";
@@ -58,6 +58,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Apparence projection</DialogTitle>
+          <DialogDescription>Modifier les couleurs, la taille du texte et l'image de fond.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           {/* Background color */}

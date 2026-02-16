@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { PlanEditor } from "@/components/plan/PlanEditor";
 import { PlanToolbar } from "@/components/plan/PlanToolbar";
+import { NextPreview } from "@/components/plan/NextPreview";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import { isoToYmd } from "@/lib/date";
 import type { Plan, PlanItem } from "@/lib/types";
@@ -117,6 +118,12 @@ export function MainPage() {
         onProject={handleProject}
         onRemove={handleRemove}
         onReorder={handleReorder}
+      />
+
+      <NextPreview
+        prevItem={plan.items.find((i) => i.order === (live?.cursor ?? 0) - 1) ?? null}
+        currentItem={plan.items.find((i) => i.order === (live?.cursor ?? 0)) ?? null}
+        nextItem={plan.items.find((i) => i.order === (live?.cursor ?? 0) + 1) ?? null}
       />
     </div>
   );

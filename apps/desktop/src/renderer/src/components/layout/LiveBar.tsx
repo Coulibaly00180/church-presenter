@@ -5,16 +5,24 @@ import {
   MonitorSmartphone,
   Lock,
   Unlock,
+  MessageSquarePlus,
+  Palette,
+  ImagePlus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { QuickProjectDialog } from "@/components/dialogs/QuickProjectDialog";
+import { matchAction } from "@/lib/shortcuts";
 
 function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;
@@ -26,6 +34,11 @@ function isTypingTarget(el: EventTarget | null) {
 export function LiveBar() {
   const [live, setLive] = useState<CpLiveState | null>(null);
   const [screens, setScreens] = useState<CpScreenMeta[]>([]);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [bg, setBg] = useState("#050505");
+  const [fg, setFg] = useState("#ffffff");
+  const [scale, setScale] = useState(1);
+  const [bgImage, setBgImage] = useState("");
 
   useEffect(() => {
     if (!window.cp.live) return;
@@ -51,22 +64,58 @@ export function LiveBar() {
       if (isTypingTarget(e.target)) return;
       if (!window.cp.live) return;
 
-      switch (e.key) {
-        case "1": e.preventDefault(); window.cp.live.setTarget("A"); break;
-        case "2": e.preventDefault(); window.cp.live.setTarget("B"); break;
-        case "3": e.preventDefault(); window.cp.live.setTarget("C"); break;
-        case "b": case "B": e.preventDefault(); window.cp.live.toggleBlack(); break;
-        case "w": case "W": e.preventDefault(); window.cp.live.toggleWhite(); break;
-        case "r": case "R": e.preventDefault(); window.cp.live.resume(); break;
-        case "ArrowLeft": case "q": case "Q":
-          e.preventDefault(); window.cp.live.prev(); break;
-        case "ArrowRight": case " ": case "d": case "D":
-          e.preventDefault(); window.cp.live.next(); break;
+      const action = matchAction(e);
+      if (!action || action === "toggleProjection") return;
+      e.preventDefault();
+
+      switch (action) {
+        case "targetA": window.cp.live.setTarget("A"); break;
+        case "targetB": window.cp.live.setTarget("B"); break;
+        case "targetC": window.cp.live.setTarget("C"); break;
+        case "toggleBlack": window.cp.live.toggleBlack(); break;
+        case "toggleWhite": window.cp.live.toggleWhite(); break;
+        case "resume": window.cp.live.resume(); break;
+        case "prev": window.cp.live.prev(); break;
+        case "next": window.cp.live.next(); break;
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  // Load projection appearance
+  useEffect(() => {
+    window.cp.projection.getState().then((s) => {
+      setBg(s.background || "#050505");
+      setFg(s.foreground || "#ffffff");
+      setScale(s.textScale || 1);
+      setBgImage(s.backgroundImage || "");
+    });
+    const off = window.cp.projection.onState((s) => {
+      setBg(s.background || "#050505");
+      setFg(s.foreground || "#ffffff");
+      setScale(s.textScale || 1);
+      setBgImage(s.backgroundImage || "");
+    });
+    return () => off?.();
+  }, []);
+
+  const applyAppearance = (patch: { background?: string; foreground?: string; textScale?: number; backgroundImage?: string }) => {
+    window.cp.projection.setAppearance(patch);
+  };
+
+  const pickBgImage = async () => {
+    const result = await window.cp.files.pickMedia();
+    if (result.ok && "path" in result) {
+      setBgImage(result.path);
+      applyAppearance({ backgroundImage: result.path });
+    }
+  };
+
+  const clearBgImage = () => {
+    setBgImage("");
+    applyAppearance({ backgroundImage: "" });
+  };
 
   const target = live?.target ?? "A";
   const locked = live?.lockedScreens ?? { A: false, B: false, C: false };
@@ -180,6 +229,72 @@ export function LiveBar() {
 
       <Separator orientation="vertical" className="h-5 mx-0.5" />
 
+      {/* Appearance popover */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="xs">
+            <Palette className="h-3 w-3" />
+            Style
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="start" className="w-64 p-3">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Fond</Label>
+              <input
+                type="color"
+                title="Couleur de fond"
+                value={bg}
+                onChange={(e) => { setBg(e.target.value); applyAppearance({ background: e.target.value }); }}
+                className="h-7 w-10 rounded border cursor-pointer"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Texte</Label>
+              <input
+                type="color"
+                title="Couleur du texte"
+                value={fg}
+                onChange={(e) => { setFg(e.target.value); applyAppearance({ foreground: e.target.value }); }}
+                className="h-7 w-10 rounded border cursor-pointer"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Taille</Label>
+                <span className="text-[10px] text-muted-foreground font-mono">{scale.toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                title="Taille du texte"
+                min={0.5}
+                max={3}
+                step={0.1}
+                value={scale}
+                onChange={(e) => { const v = parseFloat(e.target.value); setScale(v); applyAppearance({ textScale: v }); }}
+                className="w-full accent-primary"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Image de fond</Label>
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={pickBgImage}>
+                  <ImagePlus className="h-2.5 w-2.5 mr-0.5" /> Choisir
+                </Button>
+                {bgImage && (
+                  <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive" onClick={clearBgImage}>
+                    <Trash2 className="h-2.5 w-2.5" />
+                  </Button>
+                )}
+                {bgImage && <span className="text-[9px] text-muted-foreground truncate flex-1">{bgImage.split(/[\\/]/).pop()}</span>}
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Separator orientation="vertical" className="h-5 mx-0.5" />
+
       {/* Lock buttons */}
       {(["A", "B", "C"] as ScreenKey[]).map((k) => (
         <Tooltip key={`lock-${k}`}>
@@ -198,11 +313,25 @@ export function LiveBar() {
         </Tooltip>
       ))}
 
+      <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="xs" onClick={() => setQuickOpen(true)}>
+            <MessageSquarePlus className="h-3 w-3" />
+            Rapide
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Projeter un texte ou image libre</TooltipContent>
+      </Tooltip>
+
       <div className="flex-1" />
 
       <span className="text-[10px] text-muted-foreground hidden sm:inline">
         1/2/3=ecran B/W/R=modes ←/→=nav
       </span>
+
+      <QuickProjectDialog open={quickOpen} onOpenChange={setQuickOpen} />
     </div>
   );
 }

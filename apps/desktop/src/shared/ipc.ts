@@ -67,6 +67,7 @@ export type CpSongListItem = {
   album?: string | null;
   year?: string | null;
   updatedAt: string | Date;
+  matchSnippet?: string | null;
 };
 
 export type CpSongDetail = {

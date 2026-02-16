@@ -1,10 +1,11 @@
 import React from "react";
-import { Copy, Download, Trash2 } from "lucide-react";
+import { BookmarkPlus, Copy, Download, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import type { Plan } from "@/lib/types";
 import { isoToYmd } from "@/lib/date";
+import { saveAsTemplate } from "@/lib/templates";
 
 type PlanToolbarProps = {
   plan: Plan;
@@ -28,6 +29,16 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated }: PlanToolbarProps)
     }
   };
 
+  const handleSaveTemplate = () => {
+    const name = prompt("Nom du template :");
+    if (!name?.trim()) return;
+    const items = plan.items.map(({ kind, title, content, refId, refSubId, mediaPath }) => ({
+      kind, title, content, refId, refSubId, mediaPath,
+    }));
+    saveAsTemplate(name.trim(), items);
+    toast.success("Template sauvegarde");
+  };
+
   const handleDelete = async () => {
     await window.cp.plans.delete(plan.id);
     toast.success("Plan supprime");
@@ -36,6 +47,15 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated }: PlanToolbarProps)
 
   return (
     <div className="flex items-center gap-1">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSaveTemplate}>
+            <BookmarkPlus className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Sauvegarder comme template</TooltipContent>
+      </Tooltip>
+
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleExport}>

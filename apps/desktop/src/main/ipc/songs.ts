@@ -325,7 +325,7 @@ export function registerSongsIpc() {
     const query = (parseOptionalQuery(rawQ, "songs:list.query") ?? "").trim();
 
     if (query.length > 0) {
-      return prisma.song.findMany({
+      const songs = await prisma.song.findMany({
         where: {
           deletedAt: null,
           OR: [
@@ -337,8 +337,26 @@ export function registerSongsIpc() {
           ],
         },
         orderBy: { updatedAt: "desc" },
-        select: { id: true, title: true, artist: true, album: true, year: true, updatedAt: true },
+        select: {
+          id: true, title: true, artist: true, album: true, year: true, updatedAt: true,
+          blocks: { where: { content: { contains: query } }, select: { content: true }, take: 1 },
+        },
         take: 200,
+      });
+
+      return songs.map((s) => {
+        const { blocks, ...rest } = s;
+        let matchSnippet: string | null = null;
+        if (blocks && blocks.length > 0) {
+          const content = blocks[0].content;
+          const idx = content.toLowerCase().indexOf(query.toLowerCase());
+          if (idx >= 0) {
+            const start = Math.max(0, idx - 30);
+            const end = Math.min(content.length, idx + query.length + 50);
+            matchSnippet = (start > 0 ? "..." : "") + content.slice(start, end).trim() + (end < content.length ? "..." : "");
+          }
+        }
+        return { ...rest, matchSnippet };
       });
     }
 

@@ -5,6 +5,8 @@ import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isoToYmd, localNowYmd } from "@/lib/date";
 import { toast } from "sonner";
+import { getTemplates, type PlanTemplate } from "@/lib/templates";
+import { TemplatePickerDialog } from "@/components/dialogs/TemplatePickerDialog";
 
 type PlanEntry = { id: string; date: string | Date; title?: string | null };
 
@@ -17,6 +19,8 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [plans, setPlans] = useState<PlanEntry[]>([]);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
 
   useEffect(() => {
     window.cp.plans.list().then(setPlans).catch(() => null);
@@ -41,14 +45,7 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
   const prev = () => { if (month === 0) { setMonth(11); setYear(year - 1); } else setMonth(month - 1); };
   const next = () => { if (month === 11) { setMonth(0); setYear(year + 1); } else setMonth(month + 1); };
 
-  const handleDayClick = async (day: number) => {
-    const ymd = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const existing = planByDate.get(ymd);
-    if (existing) {
-      onSelectPlan(existing.id);
-      return;
-    }
-    // Create new plan
+  const createPlanDirect = async (ymd: string) => {
     const created = await window.cp.plans.create({ dateIso: ymd, title: "Culte" });
     if (created?.id) {
       toast.success("Plan cree");
@@ -56,6 +53,45 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
       setPlans(refreshed);
       onSelectPlan(created.id);
     }
+  };
+
+  const handleDayClick = async (day: number) => {
+    const ymd = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const existing = planByDate.get(ymd);
+    if (existing) {
+      onSelectPlan(existing.id);
+      return;
+    }
+    const templates = getTemplates();
+    if (templates.length > 0) {
+      setPendingDate(ymd);
+      setTemplateOpen(true);
+    } else {
+      await createPlanDirect(ymd);
+    }
+  };
+
+  const handleTemplateSelect = async (template: PlanTemplate) => {
+    if (!pendingDate) return;
+    const created = await window.cp.plans.create({ dateIso: pendingDate, title: "Culte" });
+    if (created?.id) {
+      for (const item of template.items) {
+        await window.cp.plans.addItem({
+          planId: created.id,
+          kind: item.kind,
+          title: item.title ?? undefined,
+          content: item.content ?? undefined,
+          refId: item.refId ?? undefined,
+          refSubId: item.refSubId ?? undefined,
+          mediaPath: item.mediaPath ?? undefined,
+        });
+      }
+      toast.success("Plan cree depuis template");
+      const refreshed = await window.cp.plans.list();
+      setPlans(refreshed);
+      onSelectPlan(created.id);
+    }
+    setPendingDate(null);
   };
 
   return (
@@ -105,6 +141,13 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
           );
         })}
       </div>
+
+      <TemplatePickerDialog
+        open={templateOpen}
+        onOpenChange={(v) => { setTemplateOpen(v); if (!v) setPendingDate(null); }}
+        onSelect={handleTemplateSelect}
+        onSkip={() => { if (pendingDate) createPlanDirect(pendingDate); setPendingDate(null); }}
+      />
     </div>
   );
 }

@@ -29,7 +29,7 @@ export function SongsTab({ planId }: SongsTabProps) {
         <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
           className="h-8 text-xs pl-7"
-          placeholder="Rechercher un chant..."
+          placeholder="Rechercher par titre, artiste ou paroles..."
           value={state.q}
           onChange={(e) => state.setQ(e.target.value)}
         />
@@ -67,6 +67,7 @@ export function SongsTab({ planId }: SongsTabProps) {
             <div className="flex-1 min-w-0">
               <div className="font-medium truncate">{s.title}</div>
               {s.artist && <div className="text-[10px] text-muted-foreground truncate">{s.artist}</div>}
+              {s.matchSnippet && <div className="text-[10px] text-muted-foreground/70 truncate italic">&#9835; {s.matchSnippet}</div>}
             </div>
             <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
           </button>

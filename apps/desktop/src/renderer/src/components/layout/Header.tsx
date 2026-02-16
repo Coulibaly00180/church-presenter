@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Monitor, MonitorOff, Moon, Sun, Settings, Palette } from "lucide-react";
+import { Monitor, MonitorOff, Moon, Sun, Settings, Palette, Keyboard } from "lucide-react";
 import { ProjectionSettings } from "@/components/dialogs/ProjectionSettings";
+import { ShortcutsDialog } from "@/components/dialogs/ShortcutsDialog";
+import { matchAction } from "@/lib/shortcuts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -46,6 +48,7 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
   const [plans, setPlans] = useState<PlanListItem[]>([]);
   const [projOpen, setProjOpen] = useState(false);
   const [appearanceOpen, setAppearanceOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   useEffect(() => {
     window.cp.plans.list().then(setPlans).catch(() => null);
@@ -69,10 +72,10 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
     }
   };
 
-  // Ctrl+P shortcut
+  // Projection shortcut (configurable)
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") {
+      if (matchAction(e) === "toggleProjection") {
         e.preventDefault();
         toggleProjection();
       }
@@ -138,6 +141,9 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
           <DropdownMenuItem onClick={() => setAppearanceOpen(true)}>
             <Palette className="h-3.5 w-3.5 mr-1.5" /> Apparence projection
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>
+            <Keyboard className="h-3.5 w-3.5 mr-1.5" /> Raccourcis clavier
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onOpenHistory}>
             Import / Export
           </DropdownMenuItem>
@@ -151,6 +157,7 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
       </DropdownMenu>
 
       <ProjectionSettings open={appearanceOpen} onOpenChange={setAppearanceOpen} />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </header>
   );
 }
