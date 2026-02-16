@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, BookOpen, Music, ImagePlus, ChevronLeft } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Plus, FileText, BookOpen, Music, ImagePlus, ChevronLeft, Type } from "lucide-react";
 import { toast } from "sonner";
 import { lookupLSG1910 } from "@/bible/lookupLSG1910";
 
@@ -39,22 +40,26 @@ type SongDetail = {
   blocks: SongBlock[];
 };
 
-/* ─────────── Text tab ─────────── */
+/* ─────────── Text / Announcement tab ─────────── */
 function TextTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
   const [title, setTitle] = useState("Annonce");
   const [content, setContent] = useState("");
 
   const add = async () => {
     if (!content.trim()) { toast.error("Ecrivez du contenu."); return; }
-    await window.cp.plans.addItem({
-      planId,
-      kind: "ANNOUNCEMENT_TEXT",
-      title: title.trim() || "Annonce",
-      content: content.trim(),
-    });
-    toast.success("Annonce ajoutee au plan.");
-    setContent("");
-    onAdded();
+    try {
+      await window.cp.plans.addItem({
+        planId,
+        kind: "ANNOUNCEMENT_TEXT",
+        title: title.trim() || "Annonce",
+        content: content.trim(),
+      });
+      toast.success("Annonce ajoutee au plan.");
+      setContent("");
+      onAdded();
+    } catch (e) {
+      toast.error("Erreur lors de l'ajout.");
+    }
   };
 
   return (
@@ -85,56 +90,85 @@ function BibleTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
   const [preview, setPreview] = useState<string | null>(null);
   const [resolvedRef, setResolvedRef] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualContent, setManualContent] = useState("");
 
   const lookup = async () => {
-    if (!reference.trim()) return;
+    if (!reference.trim()) { toast.error("Entrez une reference. Ex: Jean 3:16"); return; }
     setLoading(true);
     setPreview(null);
+    setResolvedRef(null);
     try {
       const result = await lookupLSG1910(reference.trim());
       if (!result || !result.verses.length) {
-        toast.error("Reference introuvable. Ex: Jean 3:16 ou Genese 1:1-3");
+        toast.error("Reference introuvable. Essayez: Jean 3:16, Genese 1:1-3, Psaumes 23:1-6");
         return;
       }
       setResolvedRef(result.reference);
       const text = result.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text}`).join("\n");
       setPreview(text);
+    } catch (e) {
+      toast.error("Erreur lors de la recherche du verset.");
     } finally {
       setLoading(false);
     }
   };
 
-  const add = async () => {
+  const addLookedUp = async () => {
     if (!preview || !resolvedRef) return;
-    await window.cp.plans.addItem({
-      planId,
-      kind: "BIBLE_PASSAGE",
-      title: `${resolvedRef} (FRLSG)`,
-      content: preview,
-      refId: resolvedRef,
-      refSubId: "FRLSG",
-    });
-    toast.success("Verset ajoute au plan.");
-    setReference("");
-    setPreview(null);
-    setResolvedRef(null);
-    onAdded();
+    try {
+      await window.cp.plans.addItem({
+        planId,
+        kind: "BIBLE_PASSAGE",
+        title: `${resolvedRef} (FRLSG)`,
+        content: preview,
+        refId: resolvedRef,
+        refSubId: "FRLSG",
+      });
+      toast.success("Verset ajoute au plan.");
+      setReference("");
+      setPreview(null);
+      setResolvedRef(null);
+      onAdded();
+    } catch (e) {
+      toast.error("Erreur lors de l'ajout.");
+    }
+  };
+
+  const addManual = async () => {
+    if (!manualContent.trim()) { toast.error("Ecrivez le texte du verset."); return; }
+    try {
+      await window.cp.plans.addItem({
+        planId,
+        kind: "BIBLE_PASSAGE",
+        title: manualTitle.trim() || "Verset",
+        content: manualContent.trim(),
+        refId: manualTitle.trim() || undefined,
+      });
+      toast.success("Verset ajoute au plan.");
+      setManualTitle("");
+      setManualContent("");
+      onAdded();
+    } catch (e) {
+      toast.error("Erreur lors de l'ajout.");
+    }
   };
 
   return (
-    <div className="space-y-2">
-      <div className="space-y-1">
-        <Label className="text-xs">Reference (FRLSG)</Label>
+    <div className="space-y-3">
+      {/* Recherche automatique */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Recherche Bible (FRLSG)</Label>
         <div className="flex gap-1.5">
           <Input
             className="h-7 text-xs flex-1"
-            placeholder="Ex: Jean 3:16 ou Genese 1:1-3"
+            placeholder="Ex: Jean 3:16 ou Psaumes 23:1-6"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") lookup(); }}
           />
           <Button size="sm" className="h-7 text-xs" onClick={lookup} disabled={loading}>
-            Chercher
+            {loading ? "..." : "Chercher"}
           </Button>
         </div>
       </div>
@@ -143,14 +177,36 @@ function BibleTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
           <div className="flex items-center gap-1.5">
             <Badge variant="secondary" className="text-[10px]">{resolvedRef}</Badge>
           </div>
-          <div className="text-xs bg-muted/50 rounded-md p-2 max-h-[120px] overflow-y-auto whitespace-pre-wrap">
+          <div className="text-xs bg-muted/50 rounded-md p-2 max-h-[100px] overflow-y-auto whitespace-pre-wrap">
             {preview}
           </div>
-          <Button size="sm" className="w-full h-7 text-xs" onClick={add}>
+          <Button size="sm" className="w-full h-7 text-xs" onClick={addLookedUp}>
             <Plus className="h-3 w-3 mr-1" /> Ajouter au plan
           </Button>
         </div>
       )}
+
+      <Separator />
+
+      {/* Saisie manuelle */}
+      <div className="space-y-1.5">
+        <Label className="text-xs font-medium">Saisie manuelle</Label>
+        <Input
+          className="h-7 text-xs"
+          placeholder="Reference (ex: Romains 8:28)"
+          value={manualTitle}
+          onChange={(e) => setManualTitle(e.target.value)}
+        />
+        <textarea
+          className="w-full rounded-md border bg-background px-3 py-2 text-xs min-h-[60px] resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+          placeholder="Collez ou tapez le texte du verset..."
+          value={manualContent}
+          onChange={(e) => setManualContent(e.target.value)}
+        />
+        <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={addManual}>
+          <Plus className="h-3 w-3 mr-1" /> Ajouter manuellement
+        </Button>
+      </div>
     </div>
   );
 }
@@ -169,6 +225,9 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
     try {
       const items = await window.cp.songs.list(query.trim());
       setResults(items as SongListItem[]);
+      if (!items.length) toast.info("Aucun chant trouve.");
+    } catch {
+      toast.error("Erreur lors de la recherche.");
     } finally {
       setSearching(false);
     }
@@ -179,27 +238,17 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
   }, [query]);
 
   const selectSong = async (id: string) => {
-    const detail = await window.cp.songs.get(id);
-    if (detail) setSong(detail as SongDetail);
+    try {
+      const detail = await window.cp.songs.get(id);
+      if (detail) setSong(detail as SongDetail);
+    } catch {
+      toast.error("Erreur lors du chargement du chant.");
+    }
   };
 
   const addBlock = async (block: SongBlock) => {
     if (!song) return;
-    await window.cp.plans.addItem({
-      planId,
-      kind: "SONG_BLOCK",
-      title: `${song.title} - ${block.title || block.type}`,
-      content: block.content || "",
-      refId: song.id,
-      refSubId: block.id,
-    });
-    toast.success("Bloc ajoute au plan.");
-    onAdded();
-  };
-
-  const addAll = async () => {
-    if (!song) return;
-    for (const block of song.blocks) {
+    try {
       await window.cp.plans.addItem({
         planId,
         kind: "SONG_BLOCK",
@@ -208,9 +257,31 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
         refId: song.id,
         refSubId: block.id,
       });
+      toast.success("Bloc ajoute au plan.");
+      onAdded();
+    } catch {
+      toast.error("Erreur lors de l'ajout.");
     }
-    toast.success(`${song.blocks.length} bloc(s) ajoute(s) au plan.`);
-    onAdded();
+  };
+
+  const addAll = async () => {
+    if (!song) return;
+    try {
+      for (const block of song.blocks) {
+        await window.cp.plans.addItem({
+          planId,
+          kind: "SONG_BLOCK",
+          title: `${song.title} - ${block.title || block.type}`,
+          content: block.content || "",
+          refId: song.id,
+          refSubId: block.id,
+        });
+      }
+      toast.success(`${song.blocks.length} bloc(s) ajoute(s) au plan.`);
+      onAdded();
+    } catch {
+      toast.error("Erreur lors de l'ajout.");
+    }
   };
 
   if (song) {
@@ -221,6 +292,7 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
             <ChevronLeft className="h-3 w-3" />
           </Button>
           <span className="text-xs font-medium truncate">{song.title}</span>
+          {song.artist && <span className="text-[10px] text-muted-foreground truncate">— {song.artist}</span>}
         </div>
         <ScrollArea className="max-h-[200px]">
           <div className="space-y-1">
@@ -255,7 +327,7 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
           onKeyDown={(e) => { if (e.key === "Enter") search(); }}
         />
         <Button size="sm" className="h-7 text-xs" onClick={search} disabled={searching}>
-          Chercher
+          {searching ? "..." : "Chercher"}
         </Button>
       </div>
       {results.length > 0 && (
@@ -282,20 +354,75 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
   );
 }
 
+/* ─────────── Free text / Title card tab ─────────── */
+function FreeTextTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+
+  const add = async () => {
+    if (!title.trim() && !content.trim()) { toast.error("Ecrivez un titre ou du contenu."); return; }
+    try {
+      await window.cp.plans.addItem({
+        planId,
+        kind: "ANNOUNCEMENT_TEXT",
+        title: title.trim() || "Texte",
+        content: content.trim(),
+      });
+      toast.success("Texte ajoute au plan.");
+      setTitle("");
+      setContent("");
+      onAdded();
+    } catch {
+      toast.error("Erreur lors de l'ajout.");
+    }
+  };
+
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] text-muted-foreground">Titre seul (ex: "Accueil", "Offrande") ou texte complet a projeter.</p>
+      <div className="space-y-1">
+        <Label className="text-xs">Titre</Label>
+        <Input
+          className="h-7 text-xs"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Ex: Accueil, Offrande, Priere..."
+        />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Contenu (optionnel)</Label>
+        <textarea
+          className="w-full rounded-md border bg-background px-3 py-2 text-xs min-h-[60px] resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+          placeholder="Texte a projeter (optionnel)..."
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+        />
+      </div>
+      <Button size="sm" className="w-full h-7 text-xs" onClick={add}>
+        <Plus className="h-3 w-3 mr-1" /> Ajouter au plan
+      </Button>
+    </div>
+  );
+}
+
 /* ─────────── Media tab ─────────── */
 function MediaTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
   const pick = async () => {
-    const result = await window.cp.files.pickMedia();
-    if (!result?.ok || !("path" in result)) return;
-    const isPdf = result.path.toLowerCase().endsWith(".pdf");
-    await window.cp.plans.addItem({
-      planId,
-      kind: isPdf ? "ANNOUNCEMENT_PDF" : "ANNOUNCEMENT_IMAGE",
-      title: result.path.split(/[\\/]/).pop() || "Media",
-      mediaPath: result.path,
-    });
-    toast.success("Media ajoute au plan.");
-    onAdded();
+    try {
+      const result = await window.cp.files.pickMedia();
+      if (!result?.ok || !("path" in result)) return;
+      const isPdf = result.path.toLowerCase().endsWith(".pdf");
+      await window.cp.plans.addItem({
+        planId,
+        kind: isPdf ? "ANNOUNCEMENT_PDF" : "ANNOUNCEMENT_IMAGE",
+        title: result.path.split(/[\\/]/).pop() || "Media",
+        mediaPath: result.path,
+      });
+      toast.success("Media ajoute au plan.");
+      onAdded();
+    } catch {
+      toast.error("Erreur lors de l'ajout du media.");
+    }
   };
 
   return (
@@ -312,14 +439,17 @@ function MediaTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
 export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajouter un element</DialogTitle>
         </DialogHeader>
         <Tabs defaultValue="text">
           <TabsList className="w-full">
             <TabsTrigger value="text" className="text-xs gap-1">
-              <FileText className="h-3 w-3" /> Texte
+              <Type className="h-3 w-3" /> Titre
+            </TabsTrigger>
+            <TabsTrigger value="announce" className="text-xs gap-1">
+              <FileText className="h-3 w-3" /> Annonce
             </TabsTrigger>
             <TabsTrigger value="bible" className="text-xs gap-1">
               <BookOpen className="h-3 w-3" /> Verset
@@ -332,6 +462,9 @@ export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="text">
+            <FreeTextTab planId={planId} onAdded={onAdded} />
+          </TabsContent>
+          <TabsContent value="announce">
             <TextTab planId={planId} onAdded={onAdded} />
           </TabsContent>
           <TabsContent value="bible">
