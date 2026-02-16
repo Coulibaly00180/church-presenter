@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { PlanEditor } from "@/components/plan/PlanEditor";
 import { PlanToolbar } from "@/components/plan/PlanToolbar";
 import { NextPreview } from "@/components/plan/NextPreview";
+import { AddItemDialog } from "@/components/dialogs/AddItemDialog";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import { isoToYmd } from "@/lib/date";
 import type { Plan, PlanItem } from "@/lib/types";
@@ -23,6 +24,7 @@ export function MainPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
+  const [addItemOpen, setAddItemOpen] = useState(false);
 
   // Load plan
   useEffect(() => {
@@ -156,12 +158,20 @@ export function MainPage() {
         onProject={handleProject}
         onRemove={handleRemove}
         onReorder={handleReorder}
+        onAddItem={() => setAddItemOpen(true)}
       />
 
       <NextPreview
         prevItem={plan.items.find((i) => i.order === (live?.cursor ?? 0) - 1) ?? null}
         currentItem={plan.items.find((i) => i.order === (live?.cursor ?? 0)) ?? null}
         nextItem={plan.items.find((i) => i.order === (live?.cursor ?? 0) + 1) ?? null}
+      />
+
+      <AddItemDialog
+        open={addItemOpen}
+        onOpenChange={setAddItemOpen}
+        planId={planId}
+        onAdded={reload}
       />
     </div>
   );
