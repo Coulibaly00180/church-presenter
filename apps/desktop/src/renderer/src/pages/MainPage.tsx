@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { Pencil } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { PlanEditor } from "@/components/plan/PlanEditor";
@@ -19,6 +20,9 @@ export function MainPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [live, setLive] = useState<CpLiveState | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
 
   // Load plan
   useEffect(() => {
@@ -75,6 +79,21 @@ export function MainPage() {
     await window.cp.plans.reorder({ planId, orderedItemIds });
   }, [planId, plan]);
 
+  const startEditTitle = () => {
+    setTitleDraft(plan?.title || "Culte");
+    setEditingTitle(true);
+    setTimeout(() => titleRef.current?.select(), 0);
+  };
+
+  const commitTitle = async () => {
+    setEditingTitle(false);
+    const trimmed = titleDraft.trim();
+    if (!planId || !plan || trimmed === (plan.title || "Culte")) return;
+    await window.cp.plans.update({ planId, title: trimmed || "Culte" });
+    setPlan({ ...plan, title: trimmed || "Culte" });
+    toast.success("Plan renomme");
+  };
+
   if (!planId || !plan) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -99,7 +118,26 @@ export function MainPage() {
     <div className="flex flex-col h-full gap-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">{plan.title || "Culte"}</h2>
+          {editingTitle ? (
+            <input
+              ref={titleRef}
+              type="text"
+              title="Nom du plan"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => { if (e.key === "Enter") commitTitle(); if (e.key === "Escape") setEditingTitle(false); }}
+              className="text-lg font-semibold bg-transparent border-b border-primary outline-none px-0"
+            />
+          ) : (
+            <h2
+              className="text-lg font-semibold cursor-pointer hover:text-primary/80 group flex items-center gap-1.5"
+              onClick={startEditTitle}
+            >
+              {plan.title || "Culte"}
+              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+            </h2>
+          )}
           <p className="text-sm text-muted-foreground">{dateStr} — {plan.items.length} element{plan.items.length !== 1 ? "s" : ""}</p>
         </div>
         <PlanToolbar

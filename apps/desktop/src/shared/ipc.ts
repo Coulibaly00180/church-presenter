@@ -153,6 +153,8 @@ export type CpPlanAddItemPayload = {
 
 export type CpPlanDuplicatePayload = { planId: string; dateIso?: string; title?: string };
 export type CpPlanCreatePayload = { dateIso: string; title?: string };
+export type CpPlanUpdatePayload = { planId: string; title?: string };
+export type CpPlanUpdateResult = { ok: true };
 export type CpPlanRemoveItemPayload = { planId: string; itemId: string };
 export type CpPlanReorderPayload = { planId: string; orderedItemIds: string[] };
 export type CpPlanExportPayload = { planId: string };
@@ -250,6 +252,7 @@ export interface CpApi {
     get: (id: string) => Promise<CpPlan | null>;
     duplicate: (payload: CpPlanDuplicatePayload) => Promise<CpPlan | null>;
     create: (payload: CpPlanCreatePayload) => Promise<CpPlan>;
+    update: (payload: CpPlanUpdatePayload) => Promise<CpPlanUpdateResult>;
     delete: (planId: string) => Promise<CpPlanDeleteResult>;
     addItem: (payload: CpPlanAddItemPayload) => Promise<CpPlanItem>;
     removeItem: (payload: CpPlanRemoveItemPayload) => Promise<CpPlanRemoveItemResult>;

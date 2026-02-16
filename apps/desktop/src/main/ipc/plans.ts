@@ -11,6 +11,7 @@ import {
   parsePlanExportPayload,
   parsePlanRemoveItemPayload,
   parsePlanReorderPayload,
+  parsePlanUpdatePayload,
 } from "./runtimeValidation";
 
 function normalizeDateToMidnight(dateIso: string) {
@@ -162,6 +163,16 @@ export function registerPlansIpc() {
     }
 
     throw new Error("Unable to find an available plan date");
+  });
+
+  ipcMain.handle("plans:update", async (_evt, rawPayload: unknown) => {
+    const prisma = getPrisma();
+    const payload = parsePlanUpdatePayload(rawPayload);
+    await prisma.servicePlan.update({
+      where: { id: payload.planId },
+      data: { title: payload.title },
+    });
+    return { ok: true };
   });
 
   ipcMain.handle("plans:delete", async (_evt, rawPlanId: unknown) => {

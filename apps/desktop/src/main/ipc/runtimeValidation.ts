@@ -8,6 +8,7 @@ import type {
   CpPlanCreatePayload,
   CpPlanDuplicatePayload,
   CpPlanExportPayload,
+  CpPlanUpdatePayload,
   CpPlanRemoveItemPayload,
   CpPlanReorderPayload,
   CpProjectionCurrent,
@@ -320,6 +321,14 @@ export function parsePlanCreatePayload(value: unknown): CpPlanCreatePayload {
   return {
     dateIso: expectString(rec.dateIso, "plans:create.dateIso"),
     title: expectOptionalString(rec.title, "plans:create.title"),
+  };
+}
+
+export function parsePlanUpdatePayload(value: unknown): CpPlanUpdatePayload {
+  const rec = expectRecord(value, "plans:update payload");
+  return {
+    planId: expectString(rec.planId, "plans:update.planId"),
+    title: expectOptionalString(rec.title, "plans:update.title"),
   };
 }
 
