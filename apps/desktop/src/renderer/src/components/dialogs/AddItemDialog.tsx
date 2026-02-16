@@ -57,7 +57,7 @@ function TextTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
       toast.success("Annonce ajoutee au plan.");
       setContent("");
       onAdded();
-    } catch (e) {
+    } catch {
       toast.error("Erreur lors de l'ajout.");
     }
   };
@@ -107,7 +107,7 @@ function BibleTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
       setResolvedRef(result.reference);
       const text = result.verses.map((v) => `${v.chapter}:${v.verse}  ${v.text}`).join("\n");
       setPreview(text);
-    } catch (e) {
+    } catch {
       toast.error("Erreur lors de la recherche du verset.");
     } finally {
       setLoading(false);
@@ -130,7 +130,7 @@ function BibleTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
       setPreview(null);
       setResolvedRef(null);
       onAdded();
-    } catch (e) {
+    } catch {
       toast.error("Erreur lors de l'ajout.");
     }
   };
@@ -149,7 +149,7 @@ function BibleTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
       setManualTitle("");
       setManualContent("");
       onAdded();
-    } catch (e) {
+    } catch {
       toast.error("Erreur lors de l'ajout.");
     }
   };

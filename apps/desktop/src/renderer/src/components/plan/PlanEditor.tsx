@@ -38,7 +38,6 @@ type PlanEditorProps = {
 };
 
 export function PlanEditor({
-  planId,
   items,
   liveCursor,
   selectedIndex,
