@@ -1,9 +1,10 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Play, Trash2 } from "lucide-react";
+import { Copy, GripVertical, MonitorSmartphone, Pencil, Play, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { PlanItem as PlanItemType } from "@/lib/types";
@@ -16,6 +17,7 @@ const KIND_CONFIG: Record<string, { label: string; variant: "default" | "seconda
   ANNOUNCEMENT_IMAGE: { label: "Image", variant: "outline" },
   ANNOUNCEMENT_PDF: { label: "PDF", variant: "outline" },
   VERSE_MANUAL: { label: "Verset", variant: "secondary" },
+  TIMER: { label: "Timer", variant: "outline" },
 };
 
 type PlanItemProps = {
@@ -24,10 +26,13 @@ type PlanItemProps = {
   isSelected: boolean;
   onSelect: () => void;
   onProject: () => void;
+  onProjectToScreen?: (screen: "A" | "B" | "C") => void;
+  onDuplicate: () => void;
+  onEdit: () => void;
   onRemove: () => void;
 };
 
-export function PlanItem({ item, isLiveCursor, isSelected, onSelect, onProject, onRemove }: PlanItemProps) {
+export function PlanItem({ item, isLiveCursor, isSelected, onSelect, onProject, onProjectToScreen, onDuplicate, onEdit, onRemove }: PlanItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
 
   const style: React.CSSProperties = {
@@ -88,7 +93,46 @@ export function PlanItem({ item, isLiveCursor, isSelected, onSelect, onProject, 
               <Play className="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Projeter</TooltipContent>
+          <TooltipContent>Projeter (clic droit = choisir ecran)</TooltipContent>
+        </Tooltip>
+
+        {onProjectToScreen && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-5" onClick={(e) => e.stopPropagation()}>
+                <MonitorSmartphone className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onProjectToScreen("A"); }}>
+                Ecran A
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onProjectToScreen("B"); }}>
+                Ecran B
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onProjectToScreen("C"); }}>
+                Ecran C
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onDuplicate(); }}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Dupliquer</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Modifier</TooltipContent>
         </Tooltip>
 
         <Tooltip>

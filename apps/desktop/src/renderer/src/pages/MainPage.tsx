@@ -7,6 +7,8 @@ import { PlanEditor } from "@/components/plan/PlanEditor";
 import { PlanToolbar } from "@/components/plan/PlanToolbar";
 import { NextPreview } from "@/components/plan/NextPreview";
 import { AddItemDialog } from "@/components/dialogs/AddItemDialog";
+import { EditItemDialog } from "@/components/dialogs/EditItemDialog";
+import { ProjectionHistoryDialog, type ProjectionLogEntry } from "@/components/dialogs/ProjectionHistoryDialog";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import { isoToYmd } from "@/lib/date";
 import type { Plan, PlanItem } from "@/lib/types";
@@ -25,6 +27,12 @@ export function MainPage() {
   const [titleDraft, setTitleDraft] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const [editItem, setEditItem] = useState<PlanItem | null>(null);
+  const [projectionLog, setProjectionLog] = useState<ProjectionLogEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [loopActive, setLoopActive] = useState(false);
+  const [loopInterval, setLoopInterval] = useState(10);
+  const loopRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load plan
   useEffect(() => {
@@ -53,6 +61,33 @@ export function MainPage() {
     }
   }, [planId]);
 
+  // Loop mode: auto-advance through plan items
+  useEffect(() => {
+    if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
+    if (!loopActive || !plan || plan.items.length === 0) return;
+
+    const items = plan.items;
+    loopRef.current = setInterval(() => {
+      const cursor = live?.cursor ?? 0;
+      const currentIdx = items.findIndex((i) => i.order === cursor);
+      const nextIdx = currentIdx >= items.length - 1 ? 0 : currentIdx + 1;
+      const nextItem = items[nextIdx];
+      if (nextItem) {
+        const target = live?.target ?? "A";
+        projectPlanItemToTarget(target, nextItem, live);
+        window.cp.live?.setCursor(nextItem.order);
+        setProjectionLog((prev) => [...prev, {
+          timestamp: Date.now(),
+          title: nextItem.title || nextItem.kind,
+          kind: nextItem.kind,
+          content: nextItem.content ?? undefined,
+        }]);
+      }
+    }, loopInterval * 1000);
+
+    return () => { if (loopRef.current) clearInterval(loopRef.current); };
+  }, [loopActive, loopInterval, plan, live]);
+
   const reload = useCallback(() => {
     if (!planId) return;
     window.cp.plans.get(planId).then((p) => {
@@ -66,6 +101,12 @@ export function MainPage() {
     if (window.cp.live) {
       await window.cp.live.setCursor(item.order);
     }
+    setProjectionLog((prev) => [...prev, {
+      timestamp: Date.now(),
+      title: item.title || item.kind,
+      kind: item.kind,
+      content: item.content ?? undefined,
+    }]);
   }, [live]);
 
   const handleRemove = useCallback(async (item: PlanItem) => {
@@ -73,6 +114,25 @@ export function MainPage() {
     await window.cp.plans.removeItem({ planId, itemId: item.id });
     toast.success("Element supprime");
     reload();
+  }, [planId, reload]);
+
+  const handleDuplicate = useCallback(async (item: PlanItem) => {
+    if (!planId) return;
+    try {
+      await window.cp.plans.addItem({
+        planId,
+        kind: item.kind,
+        title: item.title ?? undefined,
+        content: item.content ?? undefined,
+        refId: item.refId ?? undefined,
+        refSubId: item.refSubId ?? undefined,
+        mediaPath: item.mediaPath ?? undefined,
+      });
+      toast.success("Element duplique");
+      reload();
+    } catch {
+      toast.error("Erreur lors de la duplication");
+    }
   }, [planId, reload]);
 
   const handleReorder = useCallback(async (orderedItemIds: string[], newItems: PlanItem[]) => {
@@ -146,6 +206,26 @@ export function MainPage() {
           plan={plan}
           onDeleted={() => setPlanId(null)}
           onDuplicated={(newId) => setPlanId(newId)}
+          onShowHistory={() => setHistoryOpen(true)}
+          loopActive={loopActive}
+          loopInterval={loopInterval}
+          onToggleLoop={() => setLoopActive((v) => !v)}
+          onSetLoopInterval={setLoopInterval}
+          onImportFromFile={async () => {
+            if (!planId) return;
+            try {
+              const result = await window.cp.plans.importFromFile(planId);
+              if ("canceled" in result && result.canceled) return;
+              if (result.ok) {
+                toast.success(`${result.added} element(s) importe(s)`);
+                reload();
+              } else if ("error" in result) {
+                toast.error(result.error);
+              }
+            } catch {
+              toast.error("Erreur lors de l'import");
+            }
+          }}
         />
       </div>
 
@@ -156,9 +236,30 @@ export function MainPage() {
         selectedIndex={selectedIndex}
         onSelect={setSelectedIndex}
         onProject={handleProject}
+        onProjectToScreen={async (item, screen) => {
+          await projectPlanItemToTarget(screen, item, live);
+          setProjectionLog((prev) => [...prev, {
+            timestamp: Date.now(),
+            title: `[${screen}] ${item.title || item.kind}`,
+            kind: item.kind,
+            content: item.content ?? undefined,
+          }]);
+        }}
+        onDuplicate={handleDuplicate}
+        onEdit={(item) => setEditItem(item)}
         onRemove={handleRemove}
         onReorder={handleReorder}
         onAddItem={() => setAddItemOpen(true)}
+        onDropItem={async (data) => {
+          if (!planId) return;
+          try {
+            await window.cp.plans.addItem({ planId, ...data });
+            toast.success("Element ajoute au plan");
+            reload();
+          } catch {
+            toast.error("Erreur lors de l'ajout");
+          }
+        }}
       />
 
       <NextPreview
@@ -172,6 +273,21 @@ export function MainPage() {
         onOpenChange={setAddItemOpen}
         planId={planId}
         onAdded={reload}
+      />
+
+      <EditItemDialog
+        open={editItem !== null}
+        onOpenChange={(open) => { if (!open) setEditItem(null); }}
+        planId={planId}
+        item={editItem}
+        onSaved={reload}
+      />
+
+      <ProjectionHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        entries={projectionLog}
+        onClear={() => setProjectionLog([])}
       />
     </div>
   );

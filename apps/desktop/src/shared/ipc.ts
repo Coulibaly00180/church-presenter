@@ -155,6 +155,8 @@ export type CpPlanDuplicatePayload = { planId: string; dateIso?: string; title?:
 export type CpPlanCreatePayload = { dateIso: string; title?: string };
 export type CpPlanUpdatePayload = { planId: string; title?: string };
 export type CpPlanUpdateResult = { ok: true };
+export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string };
+export type CpPlanUpdateItemResult = { ok: true };
 export type CpPlanRemoveItemPayload = { planId: string; itemId: string };
 export type CpPlanReorderPayload = { planId: string; orderedItemIds: string[] };
 export type CpPlanExportPayload = { planId: string };
@@ -200,6 +202,16 @@ export type CpLiveSetPayload = {
   black?: boolean;
   white?: boolean;
 };
+
+export type CpSyncStatus = {
+  running: boolean;
+  port: number;
+  clients: number;
+  addresses: string[];
+};
+
+export type CpSyncStartResult = { ok: true; port: number; addresses: string[] } | { ok: false; error: string };
+export type CpSyncStopResult = { ok: true };
 
 export type CpScreenStateEventPayload = { key: ScreenKey; state: CpProjectionState };
 export type CpScreenWindowEventPayload = { key: ScreenKey; isOpen: boolean };
@@ -255,9 +267,11 @@ export interface CpApi {
     update: (payload: CpPlanUpdatePayload) => Promise<CpPlanUpdateResult>;
     delete: (planId: string) => Promise<CpPlanDeleteResult>;
     addItem: (payload: CpPlanAddItemPayload) => Promise<CpPlanItem>;
+    updateItem: (payload: CpPlanUpdateItemPayload) => Promise<CpPlanUpdateItemResult>;
     removeItem: (payload: CpPlanRemoveItemPayload) => Promise<CpPlanRemoveItemResult>;
     reorder: (payload: CpPlanReorderPayload) => Promise<CpPlanReorderResult>;
     export: (payload: CpPlanExportPayload) => Promise<CpPlanExportResult>;
+    importFromFile: (planId: string) => Promise<{ ok: true; added: number } | { ok: false; canceled: true } | { ok: false; error: string }>;
   };
   data: {
     exportAll: () => Promise<CpDataExportResult>;
@@ -279,6 +293,12 @@ export interface CpApi {
     resume: () => Promise<CpLiveState>;
     setLocked: (key: ScreenKey, locked: boolean) => Promise<CpLiveState>;
     onUpdate: (cb: (state: CpLiveState) => void) => () => void;
+  };
+  sync: {
+    start: (port?: number) => Promise<CpSyncStartResult>;
+    stop: () => Promise<CpSyncStopResult>;
+    status: () => Promise<CpSyncStatus>;
+    onStatusChange: (cb: (status: CpSyncStatus) => void) => () => void;
   };
   devtools: {
     open: (target: CpDevtoolsTarget) => Promise<CpDevtoolsOpenResult>;

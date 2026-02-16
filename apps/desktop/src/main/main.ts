@@ -6,6 +6,7 @@ import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
 import { openDevtoolsWithGuard } from "./ipc/devtools";
+import { registerSyncIpc, syncBroadcastLive, syncBroadcastScreenState } from "./ipc/syncServer";
 import { inferMediaType, isPathInDir, getErrorMessage } from "./ipc/fileUtils";
 import {
   createDefaultProjectionState,
@@ -91,6 +92,7 @@ function sendScreenState(key: ScreenKey) {
   const payload = { key, state: screenStates[key] };
   regieWin?.webContents.send("screens:state", payload);
   projWins[key]?.webContents.send("screens:state", payload);
+  syncBroadcastScreenState(key, screenStates[key]);
 }
 
 function broadcastAllScreensState() {
@@ -106,6 +108,7 @@ function broadcastLive() {
       // ignore
     }
   });
+  syncBroadcastLive(payload);
 }
 
 /** Shared context – bridges extracted pure logic to Electron windows */
@@ -299,6 +302,31 @@ void app.whenReady().then(async () => {
     registerBibleIpc();
   } catch (e) {
     console.error("registerBibleIpc failed", e);
+  }
+
+  try {
+    registerSyncIpc({
+      onLiveCommand: async (cmd, data) => {
+        switch (cmd) {
+          case "live:next": return _mergeLive(screenCtx, { cursor: (screenCtx.liveState.cursor ?? 0) + 1, enabled: true });
+          case "live:prev": return _mergeLive(screenCtx, { cursor: Math.max((screenCtx.liveState.cursor ?? 0) - 1, 0), enabled: true });
+          case "live:toggle": return _mergeLive(screenCtx, { enabled: !screenCtx.liveState.enabled });
+          case "live:toggleBlack": return _mergeLive(screenCtx, { black: !screenCtx.liveState.black, enabled: true });
+          case "live:toggleWhite": return _mergeLive(screenCtx, { white: !screenCtx.liveState.white, enabled: true });
+          case "live:resume": return _mergeLive(screenCtx, { black: false, white: false, enabled: true });
+          case "live:setCursor": {
+            const cursor = typeof data === "number" ? data : 0;
+            return _mergeLive(screenCtx, { cursor, enabled: true });
+          }
+          default: return { ...screenCtx.liveState };
+        }
+      },
+      onStatusChanged: (status) => {
+        regieWin?.webContents.send("sync:status", status);
+      },
+    });
+  } catch (e) {
+    console.error("registerSyncIpc failed", e);
   }
 
   try {

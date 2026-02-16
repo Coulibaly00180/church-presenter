@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, BookOpen, Music, ImagePlus, ChevronLeft, Type } from "lucide-react";
+import { Plus, FileText, BookOpen, Music, ImagePlus, ChevronLeft, Type, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { lookupLSG1910 } from "@/bible/lookupLSG1910";
 
@@ -435,6 +435,74 @@ function MediaTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
   );
 }
 
+/* ─────────── Timer tab ─────────── */
+function TimerTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
+  const [title, setTitle] = useState("Compte a rebours");
+  const [minutes, setMinutes] = useState(5);
+  const [seconds, setSeconds] = useState(0);
+
+  const add = async () => {
+    const totalSeconds = minutes * 60 + seconds;
+    if (totalSeconds <= 0) { toast.error("La duree doit etre superieure a 0."); return; }
+    try {
+      await window.cp.plans.addItem({
+        planId,
+        kind: "TIMER",
+        title: title.trim() || "Compte a rebours",
+        content: String(totalSeconds),
+      });
+      toast.success("Minuterie ajoutee au plan.");
+      onAdded();
+    } catch {
+      toast.error("Erreur lors de l'ajout.");
+    }
+  };
+
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] text-muted-foreground">Ajoutez un compte a rebours a projeter (ex: pause, attente).</p>
+      <div className="space-y-1">
+        <Label className="text-xs">Titre</Label>
+        <Input className="h-7 text-xs" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Compte a rebours" />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Duree</Label>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              min={0}
+              max={120}
+              className="h-7 text-xs w-16 text-center"
+              value={minutes}
+              onChange={(e) => setMinutes(Math.max(0, Math.min(120, Number(e.target.value) || 0)))}
+            />
+            <span className="text-xs text-muted-foreground">min</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Input
+              type="number"
+              min={0}
+              max={59}
+              className="h-7 text-xs w-16 text-center"
+              value={seconds}
+              onChange={(e) => setSeconds(Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
+            />
+            <span className="text-xs text-muted-foreground">sec</span>
+          </div>
+          <span className="text-sm font-mono text-muted-foreground ml-auto">{mm}:{ss}</span>
+        </div>
+      </div>
+      <Button size="sm" className="w-full h-7 text-xs" onClick={add}>
+        <Plus className="h-3 w-3 mr-1" /> Ajouter au plan
+      </Button>
+    </div>
+  );
+}
+
 /* ─────────── Main dialog ─────────── */
 export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
   return (
@@ -460,6 +528,9 @@ export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
             <TabsTrigger value="media" className="text-xs gap-1">
               <ImagePlus className="h-3 w-3" /> Media
             </TabsTrigger>
+            <TabsTrigger value="timer" className="text-xs gap-1">
+              <Timer className="h-3 w-3" /> Timer
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="text">
             <FreeTextTab planId={planId} onAdded={onAdded} />
@@ -475,6 +546,9 @@ export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
           </TabsContent>
           <TabsContent value="media">
             <MediaTab planId={planId} onAdded={onAdded} />
+          </TabsContent>
+          <TabsContent value="timer">
+            <TimerTab planId={planId} onAdded={onAdded} />
           </TabsContent>
         </Tabs>
       </DialogContent>

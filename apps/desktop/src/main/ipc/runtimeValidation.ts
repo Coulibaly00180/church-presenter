@@ -9,6 +9,7 @@ import type {
   CpPlanDuplicatePayload,
   CpPlanExportPayload,
   CpPlanUpdatePayload,
+  CpPlanUpdateItemPayload,
   CpPlanRemoveItemPayload,
   CpPlanReorderPayload,
   CpProjectionCurrent,
@@ -329,6 +330,16 @@ export function parsePlanUpdatePayload(value: unknown): CpPlanUpdatePayload {
   return {
     planId: expectString(rec.planId, "plans:update.planId"),
     title: expectOptionalString(rec.title, "plans:update.title"),
+  };
+}
+
+export function parsePlanUpdateItemPayload(value: unknown): CpPlanUpdateItemPayload {
+  const rec = expectRecord(value, "plans:updateItem payload");
+  return {
+    planId: expectString(rec.planId, "plans:updateItem.planId"),
+    itemId: expectString(rec.itemId, "plans:updateItem.itemId"),
+    title: expectOptionalString(rec.title, "plans:updateItem.title", { trim: false, allowEmpty: true }),
+    content: expectOptionalString(rec.content, "plans:updateItem.content", { trim: false, allowEmpty: true }),
   };
 }
 

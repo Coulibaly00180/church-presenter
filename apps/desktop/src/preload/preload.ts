@@ -13,6 +13,7 @@ import type {
   CpPlanRemoveItemPayload,
   CpPlanReorderPayload,
   CpPlanUpdatePayload,
+  CpPlanUpdateItemPayload,
   CpProjectionMode,
   CpProjectionSetAppearancePayload,
   CpProjectionSetMediaPayload,
@@ -20,6 +21,7 @@ import type {
   CpProjectionState,
   CpScreenStateEventPayload,
   CpScreenWindowEventPayload,
+  CpSyncStatus,
   ScreenKey,
   ScreenMirrorMode,
 } from "../shared/ipc";
@@ -121,9 +123,11 @@ const cpApi: CpApi = {
     update: (payload: CpPlanUpdatePayload) => ipcRenderer.invoke("plans:update", payload),
     delete: (planId: string) => ipcRenderer.invoke("plans:delete", planId),
     addItem: (payload: CpPlanAddItemPayload) => ipcRenderer.invoke("plans:addItem", payload),
+    updateItem: (payload: CpPlanUpdateItemPayload) => ipcRenderer.invoke("plans:updateItem", payload),
     removeItem: (payload: CpPlanRemoveItemPayload) => ipcRenderer.invoke("plans:removeItem", payload),
     reorder: (payload: CpPlanReorderPayload) => ipcRenderer.invoke("plans:reorder", payload),
     export: (payload: CpPlanExportPayload) => ipcRenderer.invoke("plans:export", payload),
+    importFromFile: (planId: string) => ipcRenderer.invoke("plans:importFromFile", planId),
   },
 
   data: {
@@ -156,6 +160,17 @@ const cpApi: CpApi = {
       const handler = (_: unknown, payload: CpLiveState) => cb(payload);
       ipcRenderer.on("live:update", handler);
       return () => ipcRenderer.removeListener("live:update", handler);
+    },
+  },
+
+  sync: {
+    start: (port?: number) => ipcRenderer.invoke("sync:start", port),
+    stop: () => ipcRenderer.invoke("sync:stop"),
+    status: () => ipcRenderer.invoke("sync:status"),
+    onStatusChange: (cb: (status: CpSyncStatus) => void) => {
+      const handler = (_: unknown, payload: CpSyncStatus) => cb(payload);
+      ipcRenderer.on("sync:status", handler);
+      return () => ipcRenderer.removeListener("sync:status", handler);
     },
   },
 

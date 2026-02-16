@@ -1,6 +1,7 @@
 import { dialog, ipcMain } from "electron";
 import type { Prisma } from "@prisma/client";
-import { writeFile } from "fs/promises";
+import { readFile, writeFile } from "fs/promises";
+import mammoth from "mammoth";
 import { getPrisma } from "../db";
 import { validatePlanReorderPayload } from "./reorderValidation";
 import {
@@ -12,6 +13,7 @@ import {
   parsePlanRemoveItemPayload,
   parsePlanReorderPayload,
   parsePlanUpdatePayload,
+  parsePlanUpdateItemPayload,
 } from "./runtimeValidation";
 
 function normalizeDateToMidnight(dateIso: string) {
@@ -194,6 +196,26 @@ export function registerPlansIpc() {
     }
   );
 
+  ipcMain.handle("plans:updateItem", async (_evt, rawPayload: unknown) => {
+    const prisma = getPrisma();
+    const payload = parsePlanUpdateItemPayload(rawPayload);
+    const item = await prisma.serviceItem.findUnique({
+      where: { id: payload.itemId },
+      select: { id: true, planId: true },
+    });
+    if (!item) throw new Error("Plan item not found");
+    if (item.planId !== payload.planId) throw new Error("Item does not belong to this plan");
+
+    await prisma.serviceItem.update({
+      where: { id: payload.itemId },
+      data: {
+        ...(payload.title !== undefined ? { title: payload.title } : {}),
+        ...(payload.content !== undefined ? { content: payload.content } : {}),
+      },
+    });
+    return { ok: true };
+  });
+
   ipcMain.handle("plans:removeItem", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
     const payload = parsePlanRemoveItemPayload(rawPayload);
@@ -261,5 +283,50 @@ export function registerPlansIpc() {
     await writeFile(res.filePath, data, "utf-8");
 
     return { ok: true, path: res.filePath };
+  });
+
+  ipcMain.handle("plans:importFromFile", async (_evt, rawPlanId: unknown) => {
+    const prisma = getPrisma();
+    const planId = parseNonEmptyString(rawPlanId, "plans:importFromFile.planId");
+
+    const plan = await prisma.servicePlan.findUnique({ where: { id: planId } });
+    if (!plan) throw new Error("Plan not found");
+
+    const res = await dialog.showOpenDialog({
+      title: "Importer un programme",
+      filters: [
+        { name: "Documents", extensions: ["docx", "txt"] },
+      ],
+      properties: ["openFile"],
+    });
+    if (res.canceled || !res.filePaths.length) return { ok: false, canceled: true };
+
+    const filePath = res.filePaths[0];
+    const ext = filePath.toLowerCase().split(".").pop();
+    let lines: string[] = [];
+
+    if (ext === "docx") {
+      const buffer = await readFile(filePath);
+      const result = await mammoth.extractRawText({ buffer });
+      lines = result.value.split(/\n/).map((l: string) => l.trim()).filter(Boolean);
+    } else {
+      const text = await readFile(filePath, "utf-8");
+      lines = text.split(/\n/).map((l) => l.trim()).filter(Boolean);
+    }
+
+    if (lines.length === 0) return { ok: false, error: "Fichier vide" };
+
+    let added = 0;
+    for (const line of lines) {
+      await createPlanItemWithRetry(prisma, {
+        planId,
+        kind: "ANNOUNCEMENT_TEXT",
+        title: line.slice(0, 100),
+        content: line,
+      });
+      added++;
+    }
+
+    return { ok: true, added };
   });
 }

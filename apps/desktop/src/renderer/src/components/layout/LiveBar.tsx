@@ -9,6 +9,8 @@ import {
   Palette,
   ImagePlus,
   Trash2,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +41,7 @@ export function LiveBar() {
   const [fg, setFg] = useState("#ffffff");
   const [scale, setScale] = useState(1);
   const [bgImage, setBgImage] = useState("");
+  const [syncStatus, setSyncStatus] = useState<CpSyncStatus | null>(null);
 
   useEffect(() => {
     if (!window.cp.live) return;
@@ -81,6 +84,14 @@ export function LiveBar() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  // Sync status
+  useEffect(() => {
+    if (!window.cp.sync) return;
+    window.cp.sync.status().then(setSyncStatus).catch(() => null);
+    const off = window.cp.sync.onStatusChange(setSyncStatus);
+    return () => off?.();
   }, []);
 
   // Load projection appearance
@@ -324,6 +335,80 @@ export function LiveBar() {
         </TooltipTrigger>
         <TooltipContent>Projeter un texte ou image libre</TooltipContent>
       </Tooltip>
+
+      <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+      {/* Sync */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant={syncStatus?.running ? "default" : "outline"}
+            size="xs"
+          >
+            {syncStatus?.running
+              ? <><Wifi className="h-3 w-3" /> Sync ({syncStatus.clients})</>
+              : <><WifiOff className="h-3 w-3" /> Sync</>}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent side="top" align="end" className="w-64 p-3">
+          <div className="space-y-2">
+            <p className="text-xs font-medium">Synchronisation reseau</p>
+            <p className="text-[10px] text-muted-foreground">
+              Permet a d'autres postes de suivre et controler la projection via le reseau local.
+            </p>
+            {syncStatus?.running ? (
+              <>
+                <div className="text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Port</span>
+                    <span className="font-mono">{syncStatus.port}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Clients</span>
+                    <span className="font-mono">{syncStatus.clients}</span>
+                  </div>
+                  {syncStatus.addresses.length > 0 && (
+                    <div>
+                      <span className="text-muted-foreground">Adresses :</span>
+                      {syncStatus.addresses.map((addr) => (
+                        <div key={addr} className="font-mono text-[10px] ml-2">
+                          ws://{addr}:{syncStatus.port}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  className="w-full h-7 text-xs"
+                  onClick={async () => {
+                    await window.cp.sync.stop();
+                    const s = await window.cp.sync.status();
+                    setSyncStatus(s);
+                  }}
+                >
+                  Arreter le serveur
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                className="w-full h-7 text-xs"
+                onClick={async () => {
+                  const result = await window.cp.sync.start();
+                  if (result.ok) {
+                    const s = await window.cp.sync.status();
+                    setSyncStatus(s);
+                  }
+                }}
+              >
+                Demarrer le serveur
+              </Button>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
 
       <div className="flex-1" />
 

@@ -5,6 +5,47 @@ import { cn } from "@/lib/utils";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
+function TimerDisplay({ durationSeconds, textScale, fg }: { durationSeconds: number; textScale: number; fg: string }) {
+  const [remaining, setRemaining] = useState(durationSeconds);
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    setRemaining(durationSeconds);
+    startRef.current = Date.now();
+  }, [durationSeconds]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startRef.current) / 1000);
+      const left = Math.max(0, durationSeconds - elapsed);
+      setRemaining(left);
+      if (left <= 0) clearInterval(interval);
+    }, 200);
+    return () => clearInterval(interval);
+  }, [durationSeconds]);
+
+  const mm = String(Math.floor(remaining / 60)).padStart(2, "0");
+  const ss = String(remaining % 60).padStart(2, "0");
+  const isUrgent = remaining <= 10 && remaining > 0;
+  const isDone = remaining <= 0;
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div
+        className={cn("font-mono font-black tabular-nums transition-colors", isDone && "opacity-50")}
+        style={{ fontSize: 180 * textScale, color: isUrgent ? "#ef4444" : fg, lineHeight: 1 }}
+      >
+        {mm}:{ss}
+      </div>
+      {isDone && (
+        <div style={{ fontSize: 36 * textScale, color: fg, opacity: 0.7, fontWeight: 700 }}>
+          Temps ecoule
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getScreenKey(): "A" | "B" | "C" {
   const hash = window.location.hash || "";
   const q = hash.includes("?") ? hash.split("?")[1] : "";
@@ -91,6 +132,9 @@ export function ProjectionPage() {
   const mode = state?.mode ?? "NORMAL";
   const current: CpProjectionCurrent = state?.current ?? { kind: "EMPTY" };
   const isPdf = current.kind === "MEDIA" && current.mediaType === "PDF";
+  const isTimer = current.kind === "TEXT" && (current.title || "").startsWith("TIMER:");
+  const timerTitle = isTimer ? (current.title || "").replace(/^TIMER:/, "") : "";
+  const timerDuration = isTimer ? parseInt(current.body || "0", 10) : 0;
   const lowerThird = !!state?.lowerThirdEnabled;
   const textBlocks = useMemo(
     () => String(current.body || "").split(/\n\s*\n/g).map((part) => part.trim()).filter(Boolean),
@@ -274,6 +318,11 @@ export function ProjectionPage() {
 
         {current.kind === "EMPTY" ? (
           <div className="opacity-70 text-4xl">Pret.</div>
+        ) : isTimer && timerDuration > 0 ? (
+          <>
+            <div style={{ ...titleStyle, marginBottom: 24 }}>{timerTitle}</div>
+            <TimerDisplay durationSeconds={timerDuration} textScale={textScale} fg={fg} />
+          </>
         ) : current.kind === "MEDIA" && current.mediaPath ? (
           <>
             {current.mediaType === "PDF" ? (

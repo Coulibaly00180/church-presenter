@@ -101,7 +101,18 @@ export function SongsTab({ planId }: SongsTabProps) {
               {state.song.blocks.map((block, i) => (
                 <div
                   key={block.id || i}
-                  className="flex items-start gap-2 px-2 py-1.5 rounded-md border text-xs bg-card hover:bg-accent/50 transition-colors"
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/cp-item", JSON.stringify({
+                      kind: "SONG_BLOCK",
+                      title: `${state.song!.title} - ${block.title || block.type}`,
+                      content: block.content,
+                      refId: state.song!.id,
+                      refSubId: block.id,
+                    }));
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
+                  className="flex items-start gap-2 px-2 py-1.5 rounded-md border text-xs bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
