@@ -66,9 +66,14 @@ declare global {
   type CpSyncStatus = Shared.CpSyncStatus;
 
   type CpMediaFile = Shared.CpMediaFile;
+  type CpLibraryFileKind = Shared.CpLibraryFileKind;
+  type CpLibraryFileFolder = Shared.CpLibraryFileFolder;
   type CpFilesPickMediaResult = Shared.CpFilesPickMediaResult;
   type CpFilesListMediaResult = Shared.CpFilesListMediaResult;
   type CpFilesDeleteMediaResult = Shared.CpFilesDeleteMediaResult;
+  type CpFilesChooseLibraryDirResult = Shared.CpFilesChooseLibraryDirResult;
+  type CpFilesGetLibraryDirResult = Shared.CpFilesGetLibraryDirResult;
+  type CpFilesReadMediaResult = Shared.CpFilesReadMediaResult;
 
   interface Window {
     cp: Shared.CpApi;

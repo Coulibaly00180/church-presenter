@@ -1,13 +1,13 @@
 import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
 import { join, basename } from "path";
-import { access, copyFile, mkdir, readdir, stat, unlink } from "fs/promises";
+import { access, copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from "fs/promises";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
 import { openDevtoolsWithGuard } from "./ipc/devtools";
 import { registerSyncIpc, syncBroadcastLive, syncBroadcastScreenState } from "./ipc/syncServer";
-import { inferMediaType, isPathInDir, getErrorMessage } from "./ipc/fileUtils";
+import { inferLibraryFileKind, inferMediaType, inferMimeType, isPathInDir, getErrorMessage } from "./ipc/fileUtils";
 import {
   createDefaultProjectionState,
   createDefaultLiveState,
@@ -36,8 +36,8 @@ import {
   parseScreenMirrorMode,
 } from "./ipc/runtimeValidation";
 import type {
+  CpMediaFile,
   CpLiveState,
-  CpMediaType,
   CpProjectionState,
   CpScreenMeta,
   ScreenKey,
@@ -76,6 +76,79 @@ async function pathExists(pathToCheck: string) {
   } catch {
     return false;
   }
+}
+
+type FilesConfig = {
+  libraryDir?: string;
+};
+
+function getFilesConfigPath() {
+  return join(app.getPath("userData"), "files.config.json");
+}
+
+async function readFilesConfig(): Promise<FilesConfig> {
+  const cfgPath = getFilesConfigPath();
+  if (!(await pathExists(cfgPath))) return {};
+  try {
+    const raw = await readFile(cfgPath, "utf-8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    const cfg = parsed as FilesConfig;
+    if (cfg.libraryDir && typeof cfg.libraryDir !== "string") return {};
+    return cfg;
+  } catch {
+    return {};
+  }
+}
+
+async function writeFilesConfig(cfg: FilesConfig) {
+  const cfgPath = getFilesConfigPath();
+  await mkdir(join(app.getPath("userData")), { recursive: true });
+  await writeFile(cfgPath, JSON.stringify(cfg, null, 2), "utf-8");
+}
+
+type LibraryDirs = {
+  rootDir: string;
+  imagesDir: string;
+  documentsDir: string;
+};
+
+function buildLibraryDirs(rootDir: string): LibraryDirs {
+  return {
+    rootDir,
+    imagesDir: join(rootDir, "images"),
+    documentsDir: join(rootDir, "documents"),
+  };
+}
+
+async function ensureLibraryDirs(rootDir: string): Promise<LibraryDirs> {
+  const dirs = buildLibraryDirs(rootDir);
+  await mkdir(dirs.rootDir, { recursive: true });
+  await mkdir(dirs.imagesDir, { recursive: true });
+  await mkdir(dirs.documentsDir, { recursive: true });
+  return dirs;
+}
+
+async function getActiveLibraryDirs(): Promise<LibraryDirs> {
+  const cfg = await readFilesConfig();
+  const rootDir = cfg.libraryDir?.trim() || getMediaDir();
+  return ensureLibraryDirs(rootDir);
+}
+
+async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "root"): Promise<CpMediaFile[]> {
+  if (!(await pathExists(dirPath))) return [];
+  const entries = await readdir(dirPath);
+  const filesRaw = await Promise.all(
+    entries.map(async (name): Promise<CpMediaFile | null> => {
+      const full = join(dirPath, name);
+      const st = await stat(full);
+      if (!st.isFile()) return null;
+      const kind = inferLibraryFileKind(name);
+      if (!kind) return null;
+      return { name, path: full, kind, folder };
+    })
+  );
+  return filesRaw.filter((x): x is CpMediaFile => !!x);
 }
 
 
@@ -392,9 +465,9 @@ ipcMain.handle("files:pickMedia", async () => {
   const mediaType = inferMediaType(p);
   if (!mediaType) return { ok: false, error: "Unsupported media extension" };
 
-  const mediaDir = getMediaDir();
-  await mkdir(mediaDir, { recursive: true });
-  const target = join(mediaDir, basename(p));
+  const dirs = await getActiveLibraryDirs();
+  const targetDir = mediaType === "IMAGE" ? dirs.imagesDir : dirs.documentsDir;
+  const target = join(targetDir, basename(p));
   try {
     await copyFile(p, target);
     return { ok: true, path: target, mediaType };
@@ -406,23 +479,63 @@ ipcMain.handle("files:pickMedia", async () => {
 
 ipcMain.handle("files:listMedia", async () => {
   try {
-    const mediaDir = getMediaDir();
-    if (!(await pathExists(mediaDir))) return { ok: true, files: [] };
-    const entries = await readdir(mediaDir);
-    const filesRaw = await Promise.all(
-      entries.map(async (name): Promise<{ name: string; path: string; mediaType: CpMediaType } | null> => {
-        const full = join(mediaDir, name);
-        const st = await stat(full);
-        if (!st.isFile()) return null;
-        const mediaType = inferMediaType(name);
-        if (!mediaType) return null;
-        return { name, path: full, mediaType };
-      })
-    );
-    const files = filesRaw.filter((x): x is { name: string; path: string; mediaType: CpMediaType } => !!x);
-    return { ok: true, files };
+    const dirs = await getActiveLibraryDirs();
+    const [imagesFiles, documentFiles, legacyRootFiles] = await Promise.all([
+      listLibraryFilesInDir(dirs.imagesDir, "images"),
+      listLibraryFilesInDir(dirs.documentsDir, "documents"),
+      listLibraryFilesInDir(dirs.rootDir, "root"),
+    ]);
+    const filesByPath = new Map<string, CpMediaFile>();
+    [...imagesFiles, ...documentFiles, ...legacyRootFiles].forEach((file) => {
+      filesByPath.set(file.path, file);
+    });
+    const files = Array.from(filesByPath.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    return { ok: true, rootDir: dirs.rootDir, files };
   } catch (e: unknown) {
     console.error("listMedia failed", e);
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("files:getLibraryDir", async () => {
+  try {
+    const dirs = await getActiveLibraryDirs();
+    return { ok: true, path: dirs.rootDir };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("files:chooseLibraryDir", async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: "Choisir le dossier par defaut",
+      properties: ["openDirectory", "createDirectory"],
+    });
+    if (result.canceled || !result.filePaths?.[0]) return { ok: false, canceled: true };
+    const path = result.filePaths[0];
+    await ensureLibraryDirs(path);
+    await writeFilesConfig({ libraryDir: path });
+    return { ok: true, path };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("files:readMedia", async (_evt, rawPayload: unknown) => {
+  try {
+    const payload = parseFilesDeleteMediaPayload(rawPayload);
+    if (!payload?.path) return { ok: false, error: "Missing media path" };
+    const dirs = await getActiveLibraryDirs();
+    if (!isPathInDir(dirs.rootDir, payload.path)) {
+      return { ok: false, error: "Path outside media directory" };
+    }
+    if (!(await pathExists(payload.path))) {
+      return { ok: false, error: "Media file not found" };
+    }
+    const data = await readFile(payload.path);
+    return { ok: true, base64: data.toString("base64"), mimeType: inferMimeType(payload.path) };
+  } catch (e: unknown) {
     return { ok: false, error: getErrorMessage(e) };
   }
 });
@@ -431,8 +544,8 @@ ipcMain.handle("files:deleteMedia", async (_evt, rawPayload: unknown) => {
   try {
     const payload = parseFilesDeleteMediaPayload(rawPayload);
     if (!payload?.path) return { ok: false, error: "Missing media path" };
-    const mediaDir = getMediaDir();
-    if (!isPathInDir(mediaDir, payload.path)) {
+    const dirs = await getActiveLibraryDirs();
+    if (!isPathInDir(dirs.rootDir, payload.path)) {
       return { ok: false, error: "Path outside media directory" };
     }
     if (await pathExists(payload.path)) {

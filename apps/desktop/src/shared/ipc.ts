@@ -183,13 +183,28 @@ export type CpBibleListTranslationsResult = { ok: true; data: CpBibleLanguageGro
 export type CpDevtoolsTarget = "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C";
 export type CpDevtoolsOpenResult = { ok: true } | { ok: false; reason: "DISABLED_IN_PROD" };
 
-export type CpMediaFile = { name: string; path: string; mediaType: CpMediaType };
+export type CpLibraryFileKind = CpMediaType | "DOCUMENT";
+export type CpLibraryFileFolder = "images" | "documents" | "root";
+export type CpMediaFile = {
+  name: string;
+  path: string;
+  kind: CpLibraryFileKind;
+  folder: CpLibraryFileFolder;
+};
 export type CpFilesPickMediaResult =
   | { ok: true; path: string; mediaType: CpMediaType }
   | { ok: false; canceled: true }
   | { ok: false; error: string };
-export type CpFilesListMediaResult = { ok: true; files: CpMediaFile[] } | { ok: false; error: string };
+export type CpFilesListMediaResult = { ok: true; rootDir: string; files: CpMediaFile[] } | { ok: false; error: string };
 export type CpFilesDeleteMediaResult = { ok: true } | { ok: false; error: string };
+export type CpFilesChooseLibraryDirResult =
+  | { ok: true; path: string }
+  | { ok: false; canceled: true }
+  | { ok: false; error: string };
+export type CpFilesGetLibraryDirResult = { ok: true; path: string } | { ok: false; error: string };
+export type CpFilesReadMediaResult =
+  | { ok: true; base64: string; mimeType: string }
+  | { ok: false; error: string };
 
 export type CpProjectionSetAppearancePayload = { textScale?: number; background?: string; backgroundImage?: string; foreground?: string };
 export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta };
@@ -307,5 +322,8 @@ export interface CpApi {
     pickMedia: () => Promise<CpFilesPickMediaResult>;
     deleteMedia: (payload: { path: string }) => Promise<CpFilesDeleteMediaResult>;
     listMedia: () => Promise<CpFilesListMediaResult>;
+    chooseLibraryDir: () => Promise<CpFilesChooseLibraryDirResult>;
+    getLibraryDir: () => Promise<CpFilesGetLibraryDirResult>;
+    readMedia: (payload: { path: string }) => Promise<CpFilesReadMediaResult>;
   };
 }
