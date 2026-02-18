@@ -190,6 +190,7 @@ export function parseProjectionStatePatch(value: unknown): Partial<CpProjectionS
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setState.textScale");
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setState.background");
   if (rec.foreground !== undefined) patch.foreground = expectString(rec.foreground, "projection:setState.foreground");
+  if (rec.logoPath !== undefined) patch.logoPath = expectString(rec.logoPath, "projection:setState.logoPath", { allowEmpty: true });
   if (rec.current !== undefined) patch.current = parseProjectionCurrent(rec.current, "projection:setState.current");
 
   return patch;
@@ -202,6 +203,7 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setAppearance.textScale");
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setAppearance.background");
   if (rec.backgroundImage !== undefined) patch.backgroundImage = expectString(rec.backgroundImage, "projection:setAppearance.backgroundImage");
+  if (rec.logoPath !== undefined) patch.logoPath = expectString(rec.logoPath, "projection:setAppearance.logoPath", { allowEmpty: true });
   if (rec.foreground !== undefined) patch.foreground = expectString(rec.foreground, "projection:setAppearance.foreground");
 
   return patch;

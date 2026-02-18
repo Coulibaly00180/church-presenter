@@ -83,6 +83,7 @@ export function ProjectionPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<{ path: string; doc: pdfjsLib.PDFDocumentProxy } | null>(null);
   const [blockCursor, setBlockCursor] = useState<number>(0);
+  const [logoFailed, setLogoFailed] = useState(false);
 
   // Live controls: arrows/Q/D + click left/right (skip when PDF to avoid conflict with PDF paging)
   useEffect(() => {
@@ -147,6 +148,23 @@ export function ProjectionPage() {
   const bg = mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : state?.background || "#050505";
   const fg = mode === "BLACK" ? "white" : mode === "WHITE" ? "black" : state?.foreground || "white";
   const bgImage = mode === "NORMAL" ? state?.backgroundImage : undefined;
+  const logoPath = mode === "NORMAL" ? state?.logoPath : undefined;
+  const meta = current.metaSong;
+  const metaLine = [meta?.artist, meta?.album, meta?.year].filter(Boolean).join(" - ");
+  const overlayTitle = useMemo(() => {
+    if (current.kind === "EMPTY") return "";
+    if (isTimer) return timerTitle || "Timer";
+    const songTitle = (current.metaSong?.title || "").trim();
+    const itemTitle = (current.title || "").trim();
+    if (songTitle && itemTitle && itemTitle.toLowerCase() !== songTitle.toLowerCase()) {
+      return `${songTitle} - ${itemTitle}`;
+    }
+    return songTitle || itemTitle;
+  }, [current.kind, current.metaSong?.title, current.title, isTimer, timerTitle]);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [logoPath]);
 
   // Reset page when media changes
   useEffect(() => {
@@ -249,13 +267,6 @@ export function ProjectionPage() {
     borderRadius: lowerThird ? 16 : 0,
   };
 
-  const titleStyle: React.CSSProperties = {
-    fontSize: (lowerThird ? 32 : 46) * textScale,
-    fontWeight: 900,
-    marginBottom: lowerThird ? 8 : 18,
-    letterSpacing: -0.5,
-  };
-
   const bodyStyle: React.CSSProperties = {
     fontSize: (lowerThird ? 40 : 56) * textScale,
     fontWeight: 800,
@@ -286,6 +297,27 @@ export function ProjectionPage() {
         />
       )}
 
+      {/* Top overlays: title (left) + logo (right) */}
+      {(overlayTitle || logoPath) && (
+        <div className="absolute top-4 left-5 right-5 z-[3] pointer-events-none flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            {overlayTitle && (
+              <div className="inline-block max-w-[70vw] truncate bg-black/55 text-white px-4 py-2 rounded-md font-semibold text-[clamp(14px,2.2vw,28px)]">
+                {overlayTitle}
+              </div>
+            )}
+          </div>
+          {logoPath && !logoFailed && (
+            <img
+              src={toFileUrl(logoPath)}
+              alt="Logo"
+              className="max-h-[11vh] max-w-[18vw] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.55)]"
+              onError={() => setLogoFailed(true)}
+            />
+          )}
+        </div>
+      )}
+
       {/* Click areas for prev/next */}
       <button
         type="button"
@@ -312,7 +344,7 @@ export function ProjectionPage() {
 
       <div style={{ ...cardStyle, position: "relative", zIndex: 1 }} key={animKey}>
         {/* Watermark screen ID */}
-        <div className="fixed top-5 right-5 opacity-35 font-black tracking-widest" style={{ fontFamily: "system-ui" }}>
+        <div className="fixed bottom-4 right-5 opacity-35 font-black tracking-widest" style={{ fontFamily: "system-ui" }}>
           SCREEN {screenKey}
         </div>
 
@@ -320,7 +352,6 @@ export function ProjectionPage() {
           <div className="opacity-70 text-4xl">Pret.</div>
         ) : isTimer && timerDuration > 0 ? (
           <>
-            <div style={{ ...titleStyle, marginBottom: 24 }}>{timerTitle}</div>
             <TimerDisplay durationSeconds={timerDuration} textScale={textScale} fg={fg} />
           </>
         ) : current.kind === "MEDIA" && current.mediaPath ? (
@@ -344,7 +375,6 @@ export function ProjectionPage() {
               ) : null
             ) : (
               <>
-                {current.title ? <div style={titleStyle}>{current.title}</div> : null}
                 <img
                   src={toFileUrl(current.mediaPath)}
                   className="max-w-full max-h-[80vh] object-contain rounded-lg"
@@ -356,12 +386,9 @@ export function ProjectionPage() {
         ) : (
           <>
             <div style={bodyStyle}>{projectedBody}</div>
-            {(current.metaSong || current.title) ? (
+            {metaLine ? (
               <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-black/60 text-white px-6 py-3 rounded-full flex items-center gap-3 text-sm font-semibold max-w-[95%] flex-wrap justify-center text-center">
-                <span>{current.metaSong?.title || current.title || "Chant"}</span>
-                {current.metaSong?.artist ? <span>• {current.metaSong.artist}</span> : null}
-                {current.metaSong?.album ? <span>• {current.metaSong.album}</span> : null}
-                {current.metaSong?.year ? <span>• {current.metaSong.year}</span> : null}
+                <span>{metaLine}</span>
               </div>
             ) : null}
           </>

@@ -22,6 +22,7 @@ export type CpProjectionState = {
   textScale: number;
   background: string;
   backgroundImage?: string;
+  logoPath?: string;
   foreground: string;
   current: CpProjectionCurrent;
   updatedAt: number;
@@ -206,7 +207,13 @@ export type CpFilesReadMediaResult =
   | { ok: true; base64: string; mimeType: string }
   | { ok: false; error: string };
 
-export type CpProjectionSetAppearancePayload = { textScale?: number; background?: string; backgroundImage?: string; foreground?: string };
+export type CpProjectionSetAppearancePayload = {
+  textScale?: number;
+  background?: string;
+  backgroundImage?: string;
+  logoPath?: string;
+  foreground?: string;
+};
 export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta };
 export type CpProjectionSetMediaPayload = { title?: string; mediaPath: string; mediaType: CpMediaType };
 export type CpLiveSetPayload = {

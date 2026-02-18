@@ -35,6 +35,7 @@ export function createDefaultProjectionState(): CpProjectionState {
     textScale: 1,
     background: "#050505",
     backgroundImage: "",
+    logoPath: "",
     foreground: "#ffffff",
     current: { kind: "EMPTY" },
     updatedAt: Date.now(),
@@ -148,6 +149,7 @@ export function setAppearance(
     textScale: patch.textScale ?? ctx.screenStates[key].textScale ?? 1,
     background: patch.background ?? ctx.screenStates[key].background ?? "#050505",
     backgroundImage: patch.backgroundImage ?? ctx.screenStates[key].backgroundImage ?? "",
+    logoPath: patch.logoPath ?? ctx.screenStates[key].logoPath ?? "",
     foreground: patch.foreground ?? ctx.screenStates[key].foreground ?? "#ffffff",
     updatedAt: Date.now(),
   };
