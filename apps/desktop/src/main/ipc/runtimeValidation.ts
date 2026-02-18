@@ -1,7 +1,9 @@
 import type {
   CpDataImportAtomicity,
+  CpBackgroundFillMode,
   CpDataImportMode,
   CpDevtoolsTarget,
+  CpForegroundFillMode,
   CpLiveSetPayload,
   CpMediaType,
   CpPlanAddItemPayload,
@@ -27,6 +29,8 @@ type UnknownRecord = Record<string, unknown>;
 
 const SCREEN_KEYS = ["A", "B", "C"] as const;
 const PROJECTION_MODES = ["NORMAL", "BLACK", "WHITE"] as const;
+const BACKGROUND_FILL_MODES = ["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL"] as const;
+const FOREGROUND_FILL_MODES = ["SOLID", "GRADIENT"] as const;
 const MEDIA_TYPES = ["IMAGE", "PDF"] as const;
 const DEVTOOLS_TARGETS = ["REGIE", "PROJECTION", "SCREEN_A", "SCREEN_B", "SCREEN_C"] as const;
 const DATA_IMPORT_MODES = ["MERGE", "REPLACE"] as const;
@@ -163,6 +167,14 @@ export function parseProjectionMode(value: unknown, label = "mode"): CpProjectio
   return expectEnum(value, label, PROJECTION_MODES);
 }
 
+export function parseBackgroundFillMode(value: unknown, label = "backgroundMode"): CpBackgroundFillMode {
+  return expectEnum(value, label, BACKGROUND_FILL_MODES);
+}
+
+export function parseForegroundFillMode(value: unknown, label = "foregroundMode"): CpForegroundFillMode {
+  return expectEnum(value, label, FOREGROUND_FILL_MODES);
+}
+
 export function parseMediaType(value: unknown, label = "mediaType"): CpMediaType {
   return expectEnum(value, label, MEDIA_TYPES);
 }
@@ -189,6 +201,13 @@ export function parseProjectionStatePatch(value: unknown): Partial<CpProjectionS
   }
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setState.textScale");
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setState.background");
+  if (rec.backgroundMode !== undefined) patch.backgroundMode = parseBackgroundFillMode(rec.backgroundMode, "projection:setState.backgroundMode");
+  if (rec.backgroundGradientFrom !== undefined) patch.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "projection:setState.backgroundGradientFrom");
+  if (rec.backgroundGradientTo !== undefined) patch.backgroundGradientTo = expectString(rec.backgroundGradientTo, "projection:setState.backgroundGradientTo");
+  if (rec.backgroundGradientAngle !== undefined) patch.backgroundGradientAngle = expectNumber(rec.backgroundGradientAngle, "projection:setState.backgroundGradientAngle");
+  if (rec.foregroundMode !== undefined) patch.foregroundMode = parseForegroundFillMode(rec.foregroundMode, "projection:setState.foregroundMode");
+  if (rec.foregroundGradientFrom !== undefined) patch.foregroundGradientFrom = expectString(rec.foregroundGradientFrom, "projection:setState.foregroundGradientFrom");
+  if (rec.foregroundGradientTo !== undefined) patch.foregroundGradientTo = expectString(rec.foregroundGradientTo, "projection:setState.foregroundGradientTo");
   if (rec.foreground !== undefined) patch.foreground = expectString(rec.foreground, "projection:setState.foreground");
   if (rec.logoPath !== undefined) patch.logoPath = expectString(rec.logoPath, "projection:setState.logoPath", { allowEmpty: true });
   if (rec.current !== undefined) patch.current = parseProjectionCurrent(rec.current, "projection:setState.current");
@@ -202,8 +221,15 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
 
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setAppearance.textScale");
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setAppearance.background");
+  if (rec.backgroundMode !== undefined) patch.backgroundMode = parseBackgroundFillMode(rec.backgroundMode, "projection:setAppearance.backgroundMode");
+  if (rec.backgroundGradientFrom !== undefined) patch.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "projection:setAppearance.backgroundGradientFrom");
+  if (rec.backgroundGradientTo !== undefined) patch.backgroundGradientTo = expectString(rec.backgroundGradientTo, "projection:setAppearance.backgroundGradientTo");
+  if (rec.backgroundGradientAngle !== undefined) patch.backgroundGradientAngle = expectNumber(rec.backgroundGradientAngle, "projection:setAppearance.backgroundGradientAngle");
   if (rec.backgroundImage !== undefined) patch.backgroundImage = expectString(rec.backgroundImage, "projection:setAppearance.backgroundImage");
   if (rec.logoPath !== undefined) patch.logoPath = expectString(rec.logoPath, "projection:setAppearance.logoPath", { allowEmpty: true });
+  if (rec.foregroundMode !== undefined) patch.foregroundMode = parseForegroundFillMode(rec.foregroundMode, "projection:setAppearance.foregroundMode");
+  if (rec.foregroundGradientFrom !== undefined) patch.foregroundGradientFrom = expectString(rec.foregroundGradientFrom, "projection:setAppearance.foregroundGradientFrom");
+  if (rec.foregroundGradientTo !== undefined) patch.foregroundGradientTo = expectString(rec.foregroundGradientTo, "projection:setAppearance.foregroundGradientTo");
   if (rec.foreground !== undefined) patch.foreground = expectString(rec.foreground, "projection:setAppearance.foreground");
 
   return patch;

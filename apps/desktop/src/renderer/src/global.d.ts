@@ -8,6 +8,8 @@ declare global {
 
   type CpProjectionMode = Shared.CpProjectionMode;
   type CpMediaType = Shared.CpMediaType;
+  type CpBackgroundFillMode = Shared.CpBackgroundFillMode;
+  type CpForegroundFillMode = Shared.CpForegroundFillMode;
   type CpSongMeta = Shared.CpSongMeta;
   type CpWindowState = Shared.CpWindowState;
 

@@ -82,8 +82,31 @@ type FilesConfig = {
   libraryDir?: string;
 };
 
+type ProjectionAppearancePrefs = {
+  textScale?: number;
+  background?: string;
+  backgroundMode?: CpProjectionState["backgroundMode"];
+  backgroundGradientFrom?: string;
+  backgroundGradientTo?: string;
+  backgroundGradientAngle?: number;
+  backgroundImage?: string;
+  logoPath?: string;
+  foreground?: string;
+  foregroundMode?: CpProjectionState["foregroundMode"];
+  foregroundGradientFrom?: string;
+  foregroundGradientTo?: string;
+};
+
+type ProjectionConfig = {
+  screens?: Partial<Record<ScreenKey, ProjectionAppearancePrefs>>;
+};
+
 function getFilesConfigPath() {
   return join(app.getPath("userData"), "files.config.json");
+}
+
+function getProjectionConfigPath() {
+  return join(app.getPath("userData"), "projection.config.json");
 }
 
 async function readFilesConfig(): Promise<FilesConfig> {
@@ -105,6 +128,97 @@ async function writeFilesConfig(cfg: FilesConfig) {
   const cfgPath = getFilesConfigPath();
   await mkdir(join(app.getPath("userData")), { recursive: true });
   await writeFile(cfgPath, JSON.stringify(cfg, null, 2), "utf-8");
+}
+
+function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearancePrefs | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  const out: ProjectionAppearancePrefs = {};
+
+  if (typeof rec.textScale === "number" && Number.isFinite(rec.textScale)) out.textScale = rec.textScale;
+  if (typeof rec.background === "string") out.background = rec.background;
+  if (rec.backgroundMode === "SOLID" || rec.backgroundMode === "GRADIENT_LINEAR" || rec.backgroundMode === "GRADIENT_RADIAL") {
+    out.backgroundMode = rec.backgroundMode;
+  }
+  if (typeof rec.backgroundGradientFrom === "string") out.backgroundGradientFrom = rec.backgroundGradientFrom;
+  if (typeof rec.backgroundGradientTo === "string") out.backgroundGradientTo = rec.backgroundGradientTo;
+  if (typeof rec.backgroundGradientAngle === "number" && Number.isFinite(rec.backgroundGradientAngle)) {
+    out.backgroundGradientAngle = rec.backgroundGradientAngle;
+  }
+  if (typeof rec.backgroundImage === "string") out.backgroundImage = rec.backgroundImage;
+  if (typeof rec.logoPath === "string") out.logoPath = rec.logoPath;
+  if (typeof rec.foreground === "string") out.foreground = rec.foreground;
+  if (rec.foregroundMode === "SOLID" || rec.foregroundMode === "GRADIENT") out.foregroundMode = rec.foregroundMode;
+  if (typeof rec.foregroundGradientFrom === "string") out.foregroundGradientFrom = rec.foregroundGradientFrom;
+  if (typeof rec.foregroundGradientTo === "string") out.foregroundGradientTo = rec.foregroundGradientTo;
+
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+function pickProjectionAppearancePrefs(state: CpProjectionState): ProjectionAppearancePrefs {
+  return {
+    textScale: state.textScale,
+    background: state.background,
+    backgroundMode: state.backgroundMode,
+    backgroundGradientFrom: state.backgroundGradientFrom,
+    backgroundGradientTo: state.backgroundGradientTo,
+    backgroundGradientAngle: state.backgroundGradientAngle,
+    backgroundImage: state.backgroundImage,
+    logoPath: state.logoPath,
+    foreground: state.foreground,
+    foregroundMode: state.foregroundMode,
+    foregroundGradientFrom: state.foregroundGradientFrom,
+    foregroundGradientTo: state.foregroundGradientTo,
+  };
+}
+
+async function readProjectionConfig(): Promise<ProjectionConfig> {
+  const cfgPath = getProjectionConfigPath();
+  if (!(await pathExists(cfgPath))) return {};
+  try {
+    const raw = await readFile(cfgPath, "utf-8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const rec = parsed as Record<string, unknown>;
+    const screensRaw = rec.screens;
+    if (!screensRaw || typeof screensRaw !== "object" || Array.isArray(screensRaw)) return {};
+    const screensRec = screensRaw as Record<string, unknown>;
+    const screens: Partial<Record<ScreenKey, ProjectionAppearancePrefs>> = {};
+    (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+      const sanitized = sanitizeProjectionAppearancePrefs(screensRec[key]);
+      if (sanitized) screens[key] = sanitized;
+    });
+    return { screens };
+  } catch {
+    return {};
+  }
+}
+
+async function writeProjectionConfig(cfg: ProjectionConfig) {
+  const cfgPath = getProjectionConfigPath();
+  await mkdir(join(app.getPath("userData")), { recursive: true });
+  await writeFile(cfgPath, JSON.stringify(cfg, null, 2), "utf-8");
+}
+
+async function applyProjectionConfigOnStartup() {
+  const cfg = await readProjectionConfig();
+  if (!cfg.screens) return;
+  (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+    const prefs = cfg.screens?.[key];
+    if (!prefs) return;
+    screenStates[key] = {
+      ...screenStates[key],
+      ...prefs,
+      updatedAt: Date.now(),
+    };
+  });
+}
+
+async function persistProjectionAppearanceForScreen(key: ScreenKey) {
+  const cfg = await readProjectionConfig();
+  const screens = { ...(cfg.screens ?? {}) };
+  screens[key] = pickProjectionAppearancePrefs(screenStates[key]);
+  await writeProjectionConfig({ screens });
 }
 
 type LibraryDirs = {
@@ -322,6 +436,7 @@ function closeScreenWindow(key: ScreenKey) {
 
 void app.whenReady().then(async () => {
   await ensureRuntimeDatabaseUrl();
+  await applyProjectionConfigOnStartup();
 
   if (app.isPackaged) {
     try {
@@ -566,15 +681,23 @@ ipcMain.handle("projection:setState", (_evt, rawPatch: unknown) => {
   return _setStatePatch(screenCtx, "A", patch);
 });
 
-ipcMain.handle("projection:setAppearance", (_evt, rawPatch: unknown) => {
+ipcMain.handle("projection:setAppearance", async (_evt, rawPatch: unknown) => {
   const patch = parseProjectionSetAppearancePayload(rawPatch);
-  return _setAppearance(screenCtx, "A", patch);
+  const result = _setAppearance(screenCtx, "A", patch);
+  if (result.ok) {
+    await persistProjectionAppearanceForScreen("A");
+  }
+  return result;
 });
 
-ipcMain.handle("screens:setAppearance", (_evt, rawKey: unknown, rawPatch: unknown) => {
+ipcMain.handle("screens:setAppearance", async (_evt, rawKey: unknown, rawPatch: unknown) => {
   const key = parseScreenKey(rawKey, "screens:setAppearance.key");
   const patch = parseProjectionSetAppearancePayload(rawPatch);
-  return _setAppearance(screenCtx, key, patch);
+  const result = _setAppearance(screenCtx, key, patch);
+  if (result.ok) {
+    await persistProjectionAppearanceForScreen(key);
+  }
+  return result;
 });
 
 ipcMain.handle("projection:setContentText", (_evt, rawPayload: unknown) => {

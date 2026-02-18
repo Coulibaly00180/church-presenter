@@ -5,7 +5,17 @@ import { cn } from "@/lib/utils";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-function TimerDisplay({ durationSeconds, textScale, fg }: { durationSeconds: number; textScale: number; fg: string }) {
+function TimerDisplay({
+  durationSeconds,
+  textScale,
+  solidColor,
+  textFillStyle,
+}: {
+  durationSeconds: number;
+  textScale: number;
+  solidColor: string;
+  textFillStyle: React.CSSProperties;
+}) {
   const [remaining, setRemaining] = useState(durationSeconds);
   const startRef = useRef(Date.now());
 
@@ -33,12 +43,16 @@ function TimerDisplay({ durationSeconds, textScale, fg }: { durationSeconds: num
     <div className="flex flex-col items-center gap-4">
       <div
         className={cn("font-mono font-black tabular-nums transition-colors", isDone && "opacity-50")}
-        style={{ fontSize: 180 * textScale, color: isUrgent ? "#ef4444" : fg, lineHeight: 1 }}
+        style={{
+          fontSize: 180 * textScale,
+          lineHeight: 1,
+          ...(isUrgent ? { color: "#ef4444" } : textFillStyle),
+        }}
       >
         {mm}:{ss}
       </div>
       {isDone && (
-        <div style={{ fontSize: 36 * textScale, color: fg, opacity: 0.7, fontWeight: 700 }}>
+        <div style={{ fontSize: 36 * textScale, color: solidColor, opacity: 0.7, fontWeight: 700 }}>
           Temps ecoule
         </div>
       )}
@@ -145,8 +159,35 @@ export function ProjectionPage() {
     textBlocks.length > 0 ? textBlocks[Math.max(0, Math.min(blockCursor, textBlocks.length - 1))] : String(current.body ?? "");
 
   const textScale = state?.textScale ?? 1;
-  const bg = mode === "BLACK" ? "black" : mode === "WHITE" ? "white" : state?.background || "#050505";
-  const fg = mode === "BLACK" ? "white" : mode === "WHITE" ? "black" : state?.foreground || "white";
+  const bgMode = state?.backgroundMode ?? "SOLID";
+  const bgSolid = state?.background || "#050505";
+  const bgGradientFrom = state?.backgroundGradientFrom || "#2563eb";
+  const bgGradientTo = state?.backgroundGradientTo || "#7c3aed";
+  const bgGradientAngle = state?.backgroundGradientAngle ?? 135;
+  const fgMode = state?.foregroundMode ?? "SOLID";
+  const fgSolid = mode === "BLACK" ? "white" : mode === "WHITE" ? "black" : state?.foreground || "white";
+  const fgGradientFrom = state?.foregroundGradientFrom || fgSolid;
+  const fgGradientTo = state?.foregroundGradientTo || "#93c5fd";
+  const bg =
+    mode === "BLACK"
+      ? "black"
+      : mode === "WHITE"
+        ? "white"
+        : bgMode === "GRADIENT_LINEAR"
+          ? `linear-gradient(${bgGradientAngle}deg, ${bgGradientFrom} 0%, ${bgGradientTo} 100%)`
+          : bgMode === "GRADIENT_RADIAL"
+            ? `radial-gradient(circle at center, ${bgGradientFrom} 0%, ${bgGradientTo} 100%)`
+            : bgSolid;
+  const textFillStyle: React.CSSProperties =
+    mode === "NORMAL" && fgMode === "GRADIENT"
+      ? {
+          backgroundImage: `linear-gradient(120deg, ${fgGradientFrom} 0%, ${fgGradientTo} 100%)`,
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          WebkitTextFillColor: "transparent",
+          color: "transparent",
+        }
+      : { color: fgSolid };
   const bgImage = mode === "NORMAL" ? state?.backgroundImage : undefined;
   const logoPath = mode === "NORMAL" ? state?.logoPath : undefined;
   const meta = current.metaSong;
@@ -249,7 +290,7 @@ export function ProjectionPage() {
     width: "100vw",
     height: "100vh",
     background: bg,
-    color: fg,
+    color: fgSolid,
     display: "flex",
     alignItems: lowerThird ? "flex-end" : "center",
     justifyContent: "center",
@@ -302,7 +343,10 @@ export function ProjectionPage() {
         <div className="absolute top-4 left-5 right-5 z-[3] pointer-events-none flex items-start justify-between gap-4">
           <div className="min-w-0">
             {overlayTitle && (
-              <div className="inline-block max-w-[70vw] truncate bg-black/55 text-white px-4 py-2 rounded-md font-semibold text-[clamp(14px,2.2vw,28px)]">
+              <div
+                className="inline-block max-w-[70vw] truncate bg-black/55 px-4 py-2 rounded-md font-semibold text-[clamp(14px,2.2vw,28px)]"
+                style={textFillStyle}
+              >
                 {overlayTitle}
               </div>
             )}
@@ -352,7 +396,7 @@ export function ProjectionPage() {
           <div className="opacity-70 text-4xl">Pret.</div>
         ) : isTimer && timerDuration > 0 ? (
           <>
-            <TimerDisplay durationSeconds={timerDuration} textScale={textScale} fg={fg} />
+            <TimerDisplay durationSeconds={timerDuration} textScale={textScale} solidColor={fgSolid} textFillStyle={textFillStyle} />
           </>
         ) : current.kind === "MEDIA" && current.mediaPath ? (
           <>
@@ -385,7 +429,7 @@ export function ProjectionPage() {
           </>
         ) : (
           <>
-            <div style={bodyStyle}>{projectedBody}</div>
+            <div style={{ ...bodyStyle, ...textFillStyle }}>{projectedBody}</div>
             {metaLine ? (
               <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-black/60 text-white px-6 py-3 rounded-full flex items-center gap-3 text-sm font-semibold max-w-[95%] flex-wrap justify-center text-center">
                 <span>{metaLine}</span>

@@ -22,7 +22,14 @@ type Props = {
 
 export function ProjectionSettings({ open, onOpenChange }: Props) {
   const [bg, setBg] = useState("#050505");
+  const [bgMode, setBgMode] = useState<CpBackgroundFillMode>("SOLID");
+  const [bgGradientFrom, setBgGradientFrom] = useState("#2563eb");
+  const [bgGradientTo, setBgGradientTo] = useState("#7c3aed");
+  const [bgGradientAngle, setBgGradientAngle] = useState(135);
   const [fg, setFg] = useState("#ffffff");
+  const [fgMode, setFgMode] = useState<CpForegroundFillMode>("SOLID");
+  const [fgGradientFrom, setFgGradientFrom] = useState("#ffffff");
+  const [fgGradientTo, setFgGradientTo] = useState("#93c5fd");
   const [scale, setScale] = useState(1);
   const [bgImage, setBgImage] = useState("");
   const [logoPath, setLogoPath] = useState("");
@@ -38,7 +45,14 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     if (!open) return;
     window.cp.projection.getState().then((s) => {
       setBg(s.background || "#050505");
+      setBgMode(s.backgroundMode || "SOLID");
+      setBgGradientFrom(s.backgroundGradientFrom || "#2563eb");
+      setBgGradientTo(s.backgroundGradientTo || "#7c3aed");
+      setBgGradientAngle(s.backgroundGradientAngle ?? 135);
       setFg(s.foreground || "#ffffff");
+      setFgMode(s.foregroundMode || "SOLID");
+      setFgGradientFrom(s.foregroundGradientFrom || "#ffffff");
+      setFgGradientTo(s.foregroundGradientTo || "#93c5fd");
       setScale(s.textScale || 1);
       setBgImage(s.backgroundImage || "");
       setLogoPath(s.logoPath || "");
@@ -46,7 +60,20 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     void loadImages();
   }, [open]);
 
-  const apply = (patch: { background?: string; backgroundImage?: string; logoPath?: string; foreground?: string; textScale?: number }) => {
+  const apply = (patch: {
+    background?: string;
+    backgroundMode?: CpBackgroundFillMode;
+    backgroundGradientFrom?: string;
+    backgroundGradientTo?: string;
+    backgroundGradientAngle?: number;
+    backgroundImage?: string;
+    logoPath?: string;
+    foreground?: string;
+    foregroundMode?: CpForegroundFillMode;
+    foregroundGradientFrom?: string;
+    foregroundGradientTo?: string;
+    textScale?: number;
+  }) => {
     window.cp.projection.setAppearance(patch);
   };
 
@@ -87,25 +114,139 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
         </DialogHeader>
         <div className="space-y-4">
           {/* Background color */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">Couleur de fond</Label>
-            <input
-              type="color"
-              value={bg}
-              onChange={(e) => { setBg(e.target.value); apply({ background: e.target.value }); }}
-              className="h-8 w-12 rounded border cursor-pointer"
-            />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Mode fond</Label>
+              <select
+                className="h-8 rounded border bg-background px-2 text-xs"
+                value={bgMode}
+                onChange={(e) => {
+                  const next = e.target.value as CpBackgroundFillMode;
+                  setBgMode(next);
+                  apply({ backgroundMode: next });
+                }}
+              >
+                <option value="SOLID">Couleur unie</option>
+                <option value="GRADIENT_LINEAR">Degrade lineaire</option>
+                <option value="GRADIENT_RADIAL">Degrade radial</option>
+              </select>
+            </div>
+            {bgMode === "SOLID" ? (
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Couleur de fond</Label>
+                <input
+                  type="color"
+                  value={bg}
+                  onChange={(e) => { setBg(e.target.value); apply({ background: e.target.value }); }}
+                  className="h-8 w-12 rounded border cursor-pointer"
+                />
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-md border p-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Couleur A</Label>
+                  <input
+                    type="color"
+                    value={bgGradientFrom}
+                    onChange={(e) => {
+                      setBgGradientFrom(e.target.value);
+                      apply({ backgroundGradientFrom: e.target.value });
+                    }}
+                    className="h-8 w-12 rounded border cursor-pointer"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Couleur B</Label>
+                  <input
+                    type="color"
+                    value={bgGradientTo}
+                    onChange={(e) => {
+                      setBgGradientTo(e.target.value);
+                      apply({ backgroundGradientTo: e.target.value });
+                    }}
+                    className="h-8 w-12 rounded border cursor-pointer"
+                  />
+                </div>
+                {bgMode === "GRADIENT_LINEAR" && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">Angle</Label>
+                      <span className="text-xs text-muted-foreground font-mono">{bgGradientAngle}deg</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={360}
+                      step={1}
+                      value={bgGradientAngle}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        setBgGradientAngle(v);
+                        apply({ backgroundGradientAngle: v });
+                      }}
+                      className="w-full accent-primary"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Foreground color */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">Couleur du texte</Label>
-            <input
-              type="color"
-              value={fg}
-              onChange={(e) => { setFg(e.target.value); apply({ foreground: e.target.value }); }}
-              className="h-8 w-12 rounded border cursor-pointer"
-            />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Mode texte</Label>
+              <select
+                className="h-8 rounded border bg-background px-2 text-xs"
+                value={fgMode}
+                onChange={(e) => {
+                  const next = e.target.value as CpForegroundFillMode;
+                  setFgMode(next);
+                  apply({ foregroundMode: next });
+                }}
+              >
+                <option value="SOLID">Couleur unie</option>
+                <option value="GRADIENT">Degrade</option>
+              </select>
+            </div>
+            {fgMode === "SOLID" ? (
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Couleur du texte</Label>
+                <input
+                  type="color"
+                  value={fg}
+                  onChange={(e) => { setFg(e.target.value); apply({ foreground: e.target.value }); }}
+                  className="h-8 w-12 rounded border cursor-pointer"
+                />
+              </div>
+            ) : (
+              <div className="space-y-2 rounded-md border p-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Couleur A</Label>
+                  <input
+                    type="color"
+                    value={fgGradientFrom}
+                    onChange={(e) => {
+                      setFgGradientFrom(e.target.value);
+                      apply({ foregroundGradientFrom: e.target.value });
+                    }}
+                    className="h-8 w-12 rounded border cursor-pointer"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Couleur B</Label>
+                  <input
+                    type="color"
+                    value={fgGradientTo}
+                    onChange={(e) => {
+                      setFgGradientTo(e.target.value);
+                      apply({ foregroundGradientTo: e.target.value });
+                    }}
+                    className="h-8 w-12 rounded border cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Text scale */}

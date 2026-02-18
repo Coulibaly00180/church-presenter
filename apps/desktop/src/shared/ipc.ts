@@ -3,6 +3,8 @@ export type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: Screen
 
 export type CpProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 export type CpMediaType = "IMAGE" | "PDF";
+export type CpBackgroundFillMode = "SOLID" | "GRADIENT_LINEAR" | "GRADIENT_RADIAL";
+export type CpForegroundFillMode = "SOLID" | "GRADIENT";
 export type CpSongMeta = { title?: string; artist?: string; album?: string; year?: string };
 export type CpWindowState = { isOpen: boolean };
 
@@ -21,8 +23,15 @@ export type CpProjectionState = {
   transitionEnabled: boolean;
   textScale: number;
   background: string;
+  backgroundMode?: CpBackgroundFillMode;
+  backgroundGradientFrom?: string;
+  backgroundGradientTo?: string;
+  backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  foregroundMode?: CpForegroundFillMode;
+  foregroundGradientFrom?: string;
+  foregroundGradientTo?: string;
   foreground: string;
   current: CpProjectionCurrent;
   updatedAt: number;
@@ -210,8 +219,15 @@ export type CpFilesReadMediaResult =
 export type CpProjectionSetAppearancePayload = {
   textScale?: number;
   background?: string;
+  backgroundMode?: CpBackgroundFillMode;
+  backgroundGradientFrom?: string;
+  backgroundGradientTo?: string;
+  backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  foregroundMode?: CpForegroundFillMode;
+  foregroundGradientFrom?: string;
+  foregroundGradientTo?: string;
   foreground?: string;
 };
 export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta };
