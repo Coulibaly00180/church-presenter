@@ -33,6 +33,8 @@ export function createDefaultProjectionState(): CpProjectionState {
     lowerThirdEnabled: false,
     transitionEnabled: false,
     textScale: 1,
+    textFont: "system-ui",
+    textFontPath: "",
     background: "#050505",
     backgroundMode: "SOLID",
     backgroundGradientFrom: "#2563eb",
@@ -154,6 +156,8 @@ export function setAppearance(
   ctx.screenStates[key] = {
     ...ctx.screenStates[key],
     textScale: patch.textScale ?? ctx.screenStates[key].textScale ?? 1,
+    textFont: patch.textFont ?? ctx.screenStates[key].textFont ?? "system-ui",
+    textFontPath: patch.textFontPath ?? ctx.screenStates[key].textFontPath ?? "",
     background: patch.background ?? ctx.screenStates[key].background ?? "#050505",
     backgroundMode: patch.backgroundMode ?? ctx.screenStates[key].backgroundMode ?? "SOLID",
     backgroundGradientFrom: patch.backgroundGradientFrom ?? ctx.screenStates[key].backgroundGradientFrom ?? "#2563eb",

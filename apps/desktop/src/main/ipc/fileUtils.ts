@@ -4,6 +4,7 @@ import type { CpLibraryFileKind, CpMediaType } from "../../shared/ipc";
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
 const PDF_EXTENSIONS = new Set([".pdf"]);
 const DOCUMENT_EXTENSIONS = new Set([".doc", ".docx", ".odt", ".rtf", ".txt"]);
+const FONT_EXTENSIONS = new Set([".ttf", ".otf"]);
 
 const MIME_BY_EXT: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -17,6 +18,8 @@ const MIME_BY_EXT: Record<string, string> = {
   ".odt": "application/vnd.oasis.opendocument.text",
   ".rtf": "application/rtf",
   ".txt": "text/plain",
+  ".ttf": "font/ttf",
+  ".otf": "font/otf",
 };
 
 export function inferMediaType(filePath: string): CpMediaType | null {
@@ -31,6 +34,7 @@ export function inferLibraryFileKind(filePath: string): CpLibraryFileKind | null
   if (PDF_EXTENSIONS.has(ext)) return "PDF";
   if (IMAGE_EXTENSIONS.has(ext)) return "IMAGE";
   if (DOCUMENT_EXTENSIONS.has(ext)) return "DOCUMENT";
+  if (FONT_EXTENSIONS.has(ext)) return "FONT";
   return null;
 }
 

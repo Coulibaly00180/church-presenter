@@ -23,6 +23,8 @@ export type CpProjectionState = {
   lowerThirdEnabled: boolean;
   transitionEnabled: boolean;
   textScale: number;
+  textFont: string;
+  textFontPath?: string;
   background: string;
   backgroundMode?: CpBackgroundFillMode;
   backgroundGradientFrom?: string;
@@ -194,8 +196,8 @@ export type CpBibleListTranslationsResult = { ok: true; data: CpBibleLanguageGro
 export type CpDevtoolsTarget = "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" | "SCREEN_C";
 export type CpDevtoolsOpenResult = { ok: true } | { ok: false; reason: "DISABLED_IN_PROD" };
 
-export type CpLibraryFileKind = CpMediaType | "DOCUMENT";
-export type CpLibraryFileFolder = "images" | "documents" | "root";
+export type CpLibraryFileKind = CpMediaType | "DOCUMENT" | "FONT";
+export type CpLibraryFileFolder = "images" | "documents" | "fonts" | "root";
 export type CpMediaFile = {
   name: string;
   path: string;
@@ -226,6 +228,10 @@ export type CpFilesPickMediaResult =
   | { ok: true; path: string; mediaType: CpMediaType }
   | { ok: false; canceled: true }
   | { ok: false; error: string };
+export type CpFilesPickFontResult =
+  | { ok: true; path: string }
+  | { ok: false; canceled: true }
+  | { ok: false; error: string };
 export type CpFilesListMediaResult = { ok: true; rootDir: string; files: CpMediaFile[] } | { ok: false; error: string };
 export type CpFilesDeleteMediaResult = { ok: true } | { ok: false; error: string };
 export type CpFilesChooseLibraryDirResult =
@@ -245,6 +251,8 @@ export type CpSettingsSetTemplatesResult = { ok: true; templates: CpPlanTemplate
 
 export type CpProjectionSetAppearancePayload = {
   textScale?: number;
+  textFont?: string;
+  textFontPath?: string;
   background?: string;
   backgroundMode?: CpBackgroundFillMode;
   backgroundGradientFrom?: string;
@@ -370,6 +378,7 @@ export interface CpApi {
   };
   files: {
     pickMedia: () => Promise<CpFilesPickMediaResult>;
+    pickFont: () => Promise<CpFilesPickFontResult>;
     deleteMedia: (payload: { path: string }) => Promise<CpFilesDeleteMediaResult>;
     listMedia: () => Promise<CpFilesListMediaResult>;
     chooseLibraryDir: () => Promise<CpFilesChooseLibraryDirResult>;

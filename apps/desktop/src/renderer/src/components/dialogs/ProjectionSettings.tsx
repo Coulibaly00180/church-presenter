@@ -4,6 +4,20 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ImagePlus, RefreshCw, Trash2 } from "lucide-react";
 
+const PROJECTION_FONT_OPTIONS = [
+  { label: "System UI", value: "system-ui" },
+  { label: "Space Grotesk", value: "\"Space Grotesk\", system-ui, sans-serif" },
+  { label: "Arial", value: "Arial, Helvetica, sans-serif" },
+  { label: "Verdana", value: "Verdana, Geneva, sans-serif" },
+  { label: "Trebuchet MS", value: "\"Trebuchet MS\", sans-serif" },
+  { label: "Georgia", value: "Georgia, serif" },
+  { label: "Times New Roman", value: "\"Times New Roman\", Times, serif" },
+] as const;
+
+function fontFamilyFromFileName(fileName: string) {
+  return fileName.replace(/\.(ttf|otf)$/i, "").trim() || "CustomFont";
+}
+
 function toFileUrl(p?: string) {
   if (!p) return "";
   if (p.startsWith("file://") || p.startsWith("http://") || p.startsWith("https://") || p.startsWith("data:")) return p;
@@ -31,14 +45,18 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
   const [fgGradientFrom, setFgGradientFrom] = useState("#ffffff");
   const [fgGradientTo, setFgGradientTo] = useState("#93c5fd");
   const [scale, setScale] = useState(1);
+  const [textFont, setTextFont] = useState("system-ui");
+  const [textFontPath, setTextFontPath] = useState("");
   const [bgImage, setBgImage] = useState("");
   const [logoPath, setLogoPath] = useState("");
   const [imageFiles, setImageFiles] = useState<CpMediaFile[]>([]);
+  const [fontFiles, setFontFiles] = useState<CpMediaFile[]>([]);
 
   const loadImages = async () => {
     const media = await window.cp.files.listMedia();
     if (!media.ok) return;
     setImageFiles(media.files.filter((f) => f.kind === "IMAGE"));
+    setFontFiles(media.files.filter((f) => f.kind === "FONT"));
   };
 
   useEffect(() => {
@@ -54,6 +72,8 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
       setFgGradientFrom(s.foregroundGradientFrom || "#ffffff");
       setFgGradientTo(s.foregroundGradientTo || "#93c5fd");
       setScale(s.textScale || 1);
+      setTextFont(s.textFont || "system-ui");
+      setTextFontPath(s.textFontPath || "");
       setBgImage(s.backgroundImage || "");
       setLogoPath(s.logoPath || "");
     });
@@ -73,6 +93,8 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     foregroundGradientFrom?: string;
     foregroundGradientTo?: string;
     textScale?: number;
+    textFont?: string;
+    textFontPath?: string;
   }) => {
     window.cp.projection.setAppearance(patch);
   };
@@ -105,9 +127,20 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     apply({ logoPath: "" });
   };
 
+  const pickFont = async () => {
+    const result = await window.cp.files.pickFont();
+    if (result.ok && "path" in result) {
+      const guessedFamily = fontFamilyFromFileName(result.path.split(/[\\/]/).pop() || "");
+      setTextFont(guessedFamily);
+      setTextFontPath(result.path);
+      apply({ textFont: guessedFamily, textFontPath: result.path });
+      await loadImages();
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="w-[min(94vw,760px)] max-w-[760px]">
         <DialogHeader>
           <DialogTitle>Apparence projection</DialogTitle>
           <DialogDescription>Modifier les couleurs, la taille du texte et l'image de fond.</DialogDescription>
@@ -270,6 +303,72 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
             />
           </div>
 
+          {/* Font */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Police du texte</Label>
+            <select
+              className="h-8 w-full rounded border bg-background px-2 text-xs"
+              value={textFont}
+              onChange={(e) => {
+                const next = e.target.value;
+                setTextFont(next);
+                setTextFontPath("");
+                apply({ textFont: next, textFontPath: "" });
+              }}
+            >
+              {PROJECTION_FONT_OPTIONS.map((font) => (
+                <option key={font.value} value={font.value}>
+                  {font.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs">Police personnalisée (.ttf/.otf)</Label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                className="h-8 min-w-[220px] flex-1 rounded border bg-background px-2 text-xs"
+                value={textFontPath}
+                onChange={(e) => {
+                  const path = e.target.value;
+                  if (!path) {
+                    setTextFontPath("");
+                    return;
+                  }
+                  const file = fontFiles.find((f) => f.path === path);
+                  const family = fontFamilyFromFileName(file?.name || path.split(/[\\/]/).pop() || "");
+                  setTextFont(family);
+                  setTextFontPath(path);
+                  apply({ textFont: family, textFontPath: path });
+                }}
+              >
+                <option value="">Aucune</option>
+                {fontFiles.map((file) => (
+                  <option key={file.path} value={file.path}>
+                    {file.name}
+                  </option>
+                ))}
+              </select>
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={pickFont}>
+                <ImagePlus className="h-3 w-3 mr-1" /> Importer
+              </Button>
+              {textFontPath && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-destructive"
+                  onClick={() => {
+                    setTextFontPath("");
+                    apply({ textFontPath: "" });
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+          </div>
+
           {/* Background image */}
           <div className="space-y-1.5">
             <Label className="text-xs">Image de fond</Label>
@@ -298,9 +397,9 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
           {/* Logo image */}
           <div className="space-y-1.5">
             <Label className="text-xs">Logo (haut droite)</Label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <select
-                className="h-7 flex-1 rounded-md border bg-background px-2 text-xs"
+                className="h-7 min-w-[220px] flex-1 rounded-md border bg-background px-2 text-xs"
                 value={logoPath}
                 onChange={(e) => {
                   const value = e.target.value;

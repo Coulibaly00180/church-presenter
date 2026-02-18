@@ -200,6 +200,8 @@ export function parseProjectionStatePatch(value: unknown): Partial<CpProjectionS
     patch.transitionEnabled = expectBoolean(rec.transitionEnabled, "projection:setState.transitionEnabled");
   }
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setState.textScale");
+  if (rec.textFont !== undefined) patch.textFont = expectString(rec.textFont, "projection:setState.textFont");
+  if (rec.textFontPath !== undefined) patch.textFontPath = expectString(rec.textFontPath, "projection:setState.textFontPath", { allowEmpty: true });
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setState.background");
   if (rec.backgroundMode !== undefined) patch.backgroundMode = parseBackgroundFillMode(rec.backgroundMode, "projection:setState.backgroundMode");
   if (rec.backgroundGradientFrom !== undefined) patch.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "projection:setState.backgroundGradientFrom");
@@ -220,6 +222,8 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
   const patch: CpProjectionSetAppearancePayload = {};
 
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setAppearance.textScale");
+  if (rec.textFont !== undefined) patch.textFont = expectString(rec.textFont, "projection:setAppearance.textFont");
+  if (rec.textFontPath !== undefined) patch.textFontPath = expectString(rec.textFontPath, "projection:setAppearance.textFontPath", { allowEmpty: true });
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setAppearance.background");
   if (rec.backgroundMode !== undefined) patch.backgroundMode = parseBackgroundFillMode(rec.backgroundMode, "projection:setAppearance.backgroundMode");
   if (rec.backgroundGradientFrom !== undefined) patch.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "projection:setAppearance.backgroundGradientFrom");

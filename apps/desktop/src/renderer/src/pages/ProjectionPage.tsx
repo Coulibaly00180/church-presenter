@@ -98,6 +98,7 @@ export function ProjectionPage() {
   const pdfDocRef = useRef<{ path: string; doc: pdfjsLib.PDFDocumentProxy } | null>(null);
   const [blockCursor, setBlockCursor] = useState<number>(0);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [runtimeFontFamily, setRuntimeFontFamily] = useState<string | null>(null);
 
   // Live controls: arrows/Q/D + click left/right (skip when PDF to avoid conflict with PDF paging)
   useEffect(() => {
@@ -159,6 +160,9 @@ export function ProjectionPage() {
     textBlocks.length > 0 ? textBlocks[Math.max(0, Math.min(blockCursor, textBlocks.length - 1))] : String(current.body ?? "");
 
   const textScale = state?.textScale ?? 1;
+  const configuredTextFont = state?.textFont || "system-ui";
+  const textFontPath = state?.textFontPath || "";
+  const textFont = runtimeFontFamily || configuredTextFont;
   const bgMode = state?.backgroundMode ?? "SOLID";
   const bgSolid = state?.background || "#050505";
   const bgGradientFrom = state?.backgroundGradientFrom || "#2563eb";
@@ -206,6 +210,38 @@ export function ProjectionPage() {
   useEffect(() => {
     setLogoFailed(false);
   }, [logoPath]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let mountedFace: FontFace | null = null;
+
+    const loadCustomFont = async () => {
+      setRuntimeFontFamily(null);
+      if (!textFontPath) return;
+
+      const fontName = (configuredTextFont || "CustomFont").replace(/["']/g, "").trim() || "CustomFont";
+      const runtimeFamily = `cpfont_${fontName.replace(/\s+/g, "_")}`;
+      try {
+        const face = new FontFace(runtimeFamily, `url("${toFileUrl(textFontPath)}")`);
+        const loaded = await face.load();
+        const fontSet = document.fonts as unknown as { add?: (font: FontFace) => void; delete?: (font: FontFace) => void };
+        fontSet.add?.(loaded);
+        mountedFace = loaded;
+        if (!cancelled) setRuntimeFontFamily(`"${runtimeFamily}", system-ui`);
+      } catch {
+        if (!cancelled) setRuntimeFontFamily(null);
+      }
+    };
+
+    void loadCustomFont();
+    return () => {
+      cancelled = true;
+      if (mountedFace) {
+        const fontSet = document.fonts as unknown as { add?: (font: FontFace) => void; delete?: (font: FontFace) => void };
+        fontSet.delete?.(mountedFace);
+      }
+    };
+  }, [textFontPath, configuredTextFont]);
 
   // Reset page when media changes
   useEffect(() => {
@@ -302,7 +338,7 @@ export function ProjectionPage() {
     width: "92%",
     maxWidth: 1600,
     textAlign: lowerThird ? "left" : "center",
-    fontFamily: "system-ui",
+    fontFamily: textFont,
     padding: lowerThird ? "10px 24px 12px" : 24,
     background: lowerThird ? "rgba(0,0,0,0.35)" : "transparent",
     borderRadius: lowerThird ? 16 : 0,
@@ -345,7 +381,7 @@ export function ProjectionPage() {
             {overlayTitle && (
               <div
                 className="inline-block max-w-[70vw] truncate bg-black/55 px-4 py-2 rounded-md font-semibold text-[clamp(14px,2.2vw,28px)]"
-                style={textFillStyle}
+                style={{ ...textFillStyle, fontFamily: textFont }}
               >
                 {overlayTitle}
               </div>

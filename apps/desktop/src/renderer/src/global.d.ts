@@ -72,6 +72,7 @@ declare global {
   type CpLibraryFileKind = Shared.CpLibraryFileKind;
   type CpLibraryFileFolder = Shared.CpLibraryFileFolder;
   type CpFilesPickMediaResult = Shared.CpFilesPickMediaResult;
+  type CpFilesPickFontResult = Shared.CpFilesPickFontResult;
   type CpFilesListMediaResult = Shared.CpFilesListMediaResult;
   type CpFilesDeleteMediaResult = Shared.CpFilesDeleteMediaResult;
   type CpFilesChooseLibraryDirResult = Shared.CpFilesChooseLibraryDirResult;

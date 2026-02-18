@@ -71,7 +71,7 @@ export function MediaTab({ planId }: MediaTabProps) {
 
   const addToPlan = async (file: CpMediaFile) => {
     if (!planId) { toast.error("Selectionnez un plan d'abord."); return; }
-    if (file.kind === "DOCUMENT") {
+    if (file.kind === "DOCUMENT" || file.kind === "FONT") {
       toast.info("Ce document n'est pas projetable pour le moment.");
       return;
     }
@@ -194,10 +194,10 @@ export function MediaTab({ planId }: MediaTabProps) {
                   <p className="text-xs">Apercu image indisponible</p>
                 </div>
               )
-            ) : selectedFile.kind === "DOCUMENT" ? (
+            ) : selectedFile.kind === "DOCUMENT" || selectedFile.kind === "FONT" ? (
               <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-muted-foreground px-2 text-center">
                 <FileText className="h-6 w-6" />
-                <p className="text-xs">Document detecte</p>
+                <p className="text-xs">{selectedFile.kind === "FONT" ? "Police detectee" : "Document detecte"}</p>
                 <p className="text-[10px] opacity-80">Previsualisation non supportee</p>
               </div>
             ) : (
@@ -243,7 +243,7 @@ export function MediaTab({ planId }: MediaTabProps) {
                 selectedPath === file.path && "border-primary/50 bg-accent/40",
               )}
             >
-              {file.kind === "PDF" || file.kind === "DOCUMENT" ? (
+              {file.kind === "PDF" || file.kind === "DOCUMENT" || file.kind === "FONT" ? (
                 <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               ) : (
                 <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -251,14 +251,14 @@ export function MediaTab({ planId }: MediaTabProps) {
               <div className="flex-1 min-w-0">
                 <p className="truncate font-medium" title={file.name}>{file.name}</p>
                 <p className="text-[10px] text-muted-foreground">
-                  {file.kind === "PDF" ? "PDF" : file.kind === "IMAGE" ? "Image" : "Document"} - {file.folder}
+                  {file.kind === "PDF" ? "PDF" : file.kind === "IMAGE" ? "Image" : file.kind === "FONT" ? "Police" : "Document"} - {file.folder}
                 </p>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 className="h-5 w-5"
-                disabled={file.kind === "DOCUMENT"}
+                disabled={file.kind === "DOCUMENT" || file.kind === "FONT"}
                 onClick={(e) => { e.stopPropagation(); addToPlan(file); }}
               >
                 <Plus className="h-2.5 w-2.5" />

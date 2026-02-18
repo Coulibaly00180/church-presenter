@@ -181,6 +181,7 @@ const cpApi: CpApi = {
 
   files: {
     pickMedia: () => ipcRenderer.invoke("files:pickMedia"),
+    pickFont: () => ipcRenderer.invoke("files:pickFont"),
     listMedia: () => ipcRenderer.invoke("files:listMedia"),
     deleteMedia: (payload: { path: string }) => ipcRenderer.invoke("files:deleteMedia", payload),
     chooseLibraryDir: () => ipcRenderer.invoke("files:chooseLibraryDir"),

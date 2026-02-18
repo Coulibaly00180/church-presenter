@@ -96,6 +96,8 @@ type TemplatesConfig = CpPlanTemplate[];
 
 type ProjectionAppearancePrefs = {
   textScale?: number;
+  textFont?: string;
+  textFontPath?: string;
   background?: string;
   backgroundMode?: CpProjectionState["backgroundMode"];
   backgroundGradientFrom?: string;
@@ -282,6 +284,8 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
   const out: ProjectionAppearancePrefs = {};
 
   if (typeof rec.textScale === "number" && Number.isFinite(rec.textScale)) out.textScale = rec.textScale;
+  if (typeof rec.textFont === "string") out.textFont = rec.textFont;
+  if (typeof rec.textFontPath === "string") out.textFontPath = rec.textFontPath;
   if (typeof rec.background === "string") out.background = rec.background;
   if (rec.backgroundMode === "SOLID" || rec.backgroundMode === "GRADIENT_LINEAR" || rec.backgroundMode === "GRADIENT_RADIAL") {
     out.backgroundMode = rec.backgroundMode;
@@ -304,6 +308,8 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
 function pickProjectionAppearancePrefs(state: CpProjectionState): ProjectionAppearancePrefs {
   return {
     textScale: state.textScale,
+    textFont: state.textFont,
+    textFontPath: state.textFontPath,
     background: state.background,
     backgroundMode: state.backgroundMode,
     backgroundGradientFrom: state.backgroundGradientFrom,
@@ -445,6 +451,7 @@ type LibraryDirs = {
   rootDir: string;
   imagesDir: string;
   documentsDir: string;
+  fontsDir: string;
 };
 
 function buildLibraryDirs(rootDir: string): LibraryDirs {
@@ -452,6 +459,7 @@ function buildLibraryDirs(rootDir: string): LibraryDirs {
     rootDir,
     imagesDir: join(rootDir, "images"),
     documentsDir: join(rootDir, "documents"),
+    fontsDir: join(rootDir, "fonts"),
   };
 }
 
@@ -460,6 +468,7 @@ async function ensureLibraryDirs(rootDir: string): Promise<LibraryDirs> {
   await mkdir(dirs.rootDir, { recursive: true });
   await mkdir(dirs.imagesDir, { recursive: true });
   await mkdir(dirs.documentsDir, { recursive: true });
+  await mkdir(dirs.fontsDir, { recursive: true });
   return dirs;
 }
 
@@ -469,7 +478,7 @@ async function getActiveLibraryDirs(): Promise<LibraryDirs> {
   return ensureLibraryDirs(rootDir);
 }
 
-async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "root"): Promise<CpMediaFile[]> {
+async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "fonts" | "root"): Promise<CpMediaFile[]> {
   if (!(await pathExists(dirPath))) return [];
   const entries = await readdir(dirPath);
   const filesRaw = await Promise.all(
@@ -872,16 +881,42 @@ ipcMain.handle("files:pickMedia", async () => {
   }
 });
 
+ipcMain.handle("files:pickFont", async () => {
+  const res = await dialog.showOpenDialog({
+    title: "Choisir une police (.ttf/.otf)",
+    filters: [
+      { name: "Fonts", extensions: ["ttf", "otf"] },
+      { name: "All", extensions: ["*"] },
+    ],
+    properties: ["openFile"],
+  });
+  if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
+  const p = res.filePaths[0];
+  const kind = inferLibraryFileKind(p);
+  if (kind !== "FONT") return { ok: false, error: "Unsupported font extension" };
+
+  const dirs = await getActiveLibraryDirs();
+  const target = join(dirs.fontsDir, basename(p));
+  try {
+    await copyFile(p, target);
+    return { ok: true, path: target };
+  } catch (e) {
+    console.error("copy font failed", e);
+    return { ok: false, error: "Echec de la copie de la police" };
+  }
+});
+
 ipcMain.handle("files:listMedia", async () => {
   try {
     const dirs = await getActiveLibraryDirs();
-    const [imagesFiles, documentFiles, legacyRootFiles] = await Promise.all([
+    const [imagesFiles, documentFiles, fontFiles, legacyRootFiles] = await Promise.all([
       listLibraryFilesInDir(dirs.imagesDir, "images"),
       listLibraryFilesInDir(dirs.documentsDir, "documents"),
+      listLibraryFilesInDir(dirs.fontsDir, "fonts"),
       listLibraryFilesInDir(dirs.rootDir, "root"),
     ]);
     const filesByPath = new Map<string, CpMediaFile>();
-    [...imagesFiles, ...documentFiles, ...legacyRootFiles].forEach((file) => {
+    [...imagesFiles, ...documentFiles, ...fontFiles, ...legacyRootFiles].forEach((file) => {
       filesByPath.set(file.path, file);
     });
     const files = Array.from(filesByPath.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));
