@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Monitor, MonitorOff, Moon, Sun, Settings, Palette, Keyboard, Plus } from "lucide-react";
 import { ProjectionSettings } from "@/components/dialogs/ProjectionSettings";
 import { ShortcutsDialog } from "@/components/dialogs/ShortcutsDialog";
-import { matchAction } from "@/lib/shortcuts";
+import { hydrateShortcuts, matchAction } from "@/lib/shortcuts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { localNowYmd } from "@/lib/date";
@@ -75,6 +75,10 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
     return () => off?.();
   }, []);
 
+  useEffect(() => {
+    void hydrateShortcuts();
+  }, []);
+
   const toggleProjection = async () => {
     if (!window.cp.projectionWindow) return;
     if (projOpen) {
@@ -107,14 +111,14 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
     }
   };
 
-  const handleNewPlan = () => {
-    const templates = getTemplates();
+  const handleNewPlan = async () => {
+    const templates = await getTemplates();
     if (templates.length > 0) {
       setPendingNewDate(newPlanDate);
       setPendingNewTitle(newPlanTitle);
       setTemplatePickerOpen(true);
     } else {
-      createPlanDirect(newPlanDate, newPlanTitle);
+      await createPlanDirect(newPlanDate, newPlanTitle);
     }
     setNewPlanOpen(false);
   };

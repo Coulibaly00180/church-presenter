@@ -36,7 +36,12 @@ import {
   parseScreenMirrorMode,
 } from "./ipc/runtimeValidation";
 import type {
+  CpKeyBinding,
   CpMediaFile,
+  CpPlanTemplate,
+  CpTemplateItem,
+  CpTheme,
+  CpShortcutOverrides,
   CpLiveState,
   CpProjectionState,
   CpScreenMeta,
@@ -82,6 +87,13 @@ type FilesConfig = {
   libraryDir?: string;
 };
 
+type AppConfig = {
+  theme?: CpTheme;
+};
+
+type ShortcutsConfig = CpShortcutOverrides;
+type TemplatesConfig = CpPlanTemplate[];
+
 type ProjectionAppearancePrefs = {
   textScale?: number;
   background?: string;
@@ -101,6 +113,17 @@ type ProjectionConfig = {
   screens?: Partial<Record<ScreenKey, ProjectionAppearancePrefs>>;
 };
 
+type SettingsConfig = {
+  version: number;
+  app?: AppConfig;
+  files?: FilesConfig;
+  projection?: ProjectionConfig;
+  shortcuts?: ShortcutsConfig;
+  templates?: TemplatesConfig;
+};
+
+const SETTINGS_VERSION = 1;
+
 function getFilesConfigPath() {
   return join(app.getPath("userData"), "files.config.json");
 }
@@ -109,7 +132,130 @@ function getProjectionConfigPath() {
   return join(app.getPath("userData"), "projection.config.json");
 }
 
-async function readFilesConfig(): Promise<FilesConfig> {
+function getSettingsConfigPath() {
+  return join(app.getPath("userData"), "settings.json");
+}
+
+function sanitizeNullableString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return typeof value === "string" ? value : undefined;
+}
+
+function sanitizeKeyBinding(value: unknown): CpKeyBinding | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.key !== "string" || rec.key.length === 0) return null;
+  const out: CpKeyBinding = { key: rec.key };
+  if (typeof rec.ctrlKey === "boolean") out.ctrlKey = rec.ctrlKey;
+  if (typeof rec.shiftKey === "boolean") out.shiftKey = rec.shiftKey;
+  return out;
+}
+
+function sanitizeShortcutOverrides(value: unknown): CpShortcutOverrides {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const rec = value as Record<string, unknown>;
+  const out: CpShortcutOverrides = {};
+  Object.entries(rec).forEach(([action, rawBindings]) => {
+    if (!Array.isArray(rawBindings)) return;
+    const bindings = rawBindings.map((entry) => sanitizeKeyBinding(entry)).filter((entry): entry is CpKeyBinding => !!entry);
+    if (bindings.length > 0) out[action] = bindings;
+  });
+  return out;
+}
+
+function sanitizeTemplateItem(value: unknown): CpTemplateItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.kind !== "string" || rec.kind.length === 0) return null;
+  const out: CpTemplateItem = { kind: rec.kind };
+  const title = sanitizeNullableString(rec.title);
+  const content = sanitizeNullableString(rec.content);
+  const refId = sanitizeNullableString(rec.refId);
+  const refSubId = sanitizeNullableString(rec.refSubId);
+  const mediaPath = sanitizeNullableString(rec.mediaPath);
+  if (title !== undefined) out.title = title;
+  if (content !== undefined) out.content = content;
+  if (refId !== undefined) out.refId = refId;
+  if (refSubId !== undefined) out.refSubId = refSubId;
+  if (mediaPath !== undefined) out.mediaPath = mediaPath;
+  return out;
+}
+
+function sanitizePlanTemplate(value: unknown): CpPlanTemplate | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.id !== "string" || rec.id.length === 0) return null;
+  if (typeof rec.name !== "string" || rec.name.length === 0) return null;
+  if (!Array.isArray(rec.items)) return null;
+  if (typeof rec.createdAt !== "string" || rec.createdAt.length === 0) return null;
+
+  const items = rec.items.map((entry) => sanitizeTemplateItem(entry)).filter((entry): entry is CpTemplateItem => !!entry);
+  return {
+    id: rec.id,
+    name: rec.name,
+    items,
+    createdAt: rec.createdAt,
+  };
+}
+
+function sanitizePlanTemplates(value: unknown): CpPlanTemplate[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => sanitizePlanTemplate(entry)).filter((entry): entry is CpPlanTemplate => !!entry);
+}
+
+async function readSettingsConfig(): Promise<SettingsConfig> {
+  const cfgPath = getSettingsConfigPath();
+  if (!(await pathExists(cfgPath))) return { version: SETTINGS_VERSION };
+  try {
+    const raw = await readFile(cfgPath, "utf-8");
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { version: SETTINGS_VERSION };
+    const rec = parsed as Record<string, unknown>;
+    const version =
+      typeof rec.version === "number" && Number.isFinite(rec.version) ? Math.max(1, Math.trunc(rec.version)) : SETTINGS_VERSION;
+    const cfg: SettingsConfig = { version };
+
+    if (rec.app && typeof rec.app === "object" && !Array.isArray(rec.app)) {
+      const appRec = rec.app as Record<string, unknown>;
+      const theme = appRec.theme;
+      if (theme === "light" || theme === "dark") cfg.app = { theme };
+    }
+    if (rec.files && typeof rec.files === "object" && !Array.isArray(rec.files)) {
+      const filesRec = rec.files as Record<string, unknown>;
+      if (typeof filesRec.libraryDir === "string") cfg.files = { libraryDir: filesRec.libraryDir };
+    }
+    if (rec.projection && typeof rec.projection === "object" && !Array.isArray(rec.projection)) {
+      const projectionRec = rec.projection as Record<string, unknown>;
+      const screensRaw = projectionRec.screens;
+      if (screensRaw && typeof screensRaw === "object" && !Array.isArray(screensRaw)) {
+        const screensRec = screensRaw as Record<string, unknown>;
+        const screens: Partial<Record<ScreenKey, ProjectionAppearancePrefs>> = {};
+        (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+          const sanitized = sanitizeProjectionAppearancePrefs(screensRec[key]);
+          if (sanitized) screens[key] = sanitized;
+        });
+        cfg.projection = { screens };
+      }
+    }
+    if (rec.shortcuts && typeof rec.shortcuts === "object" && !Array.isArray(rec.shortcuts)) {
+      cfg.shortcuts = sanitizeShortcutOverrides(rec.shortcuts);
+    }
+    if (Array.isArray(rec.templates)) {
+      cfg.templates = sanitizePlanTemplates(rec.templates);
+    }
+    return cfg;
+  } catch {
+    return { version: SETTINGS_VERSION };
+  }
+}
+
+async function writeSettingsConfig(cfg: SettingsConfig) {
+  const cfgPath = getSettingsConfigPath();
+  await mkdir(join(app.getPath("userData")), { recursive: true });
+  await writeFile(cfgPath, JSON.stringify({ ...cfg, version: SETTINGS_VERSION }, null, 2), "utf-8");
+}
+
+async function readLegacyFilesConfig(): Promise<FilesConfig> {
   const cfgPath = getFilesConfigPath();
   if (!(await pathExists(cfgPath))) return {};
   try {
@@ -125,9 +271,9 @@ async function readFilesConfig(): Promise<FilesConfig> {
 }
 
 async function writeFilesConfig(cfg: FilesConfig) {
-  const cfgPath = getFilesConfigPath();
-  await mkdir(join(app.getPath("userData")), { recursive: true });
-  await writeFile(cfgPath, JSON.stringify(cfg, null, 2), "utf-8");
+  const settings = await readSettingsConfig();
+  const next: SettingsConfig = { ...settings, files: { ...cfg } };
+  await writeSettingsConfig(next);
 }
 
 function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearancePrefs | null {
@@ -172,7 +318,7 @@ function pickProjectionAppearancePrefs(state: CpProjectionState): ProjectionAppe
   };
 }
 
-async function readProjectionConfig(): Promise<ProjectionConfig> {
+async function readLegacyProjectionConfig(): Promise<ProjectionConfig> {
   const cfgPath = getProjectionConfigPath();
   if (!(await pathExists(cfgPath))) return {};
   try {
@@ -195,9 +341,83 @@ async function readProjectionConfig(): Promise<ProjectionConfig> {
 }
 
 async function writeProjectionConfig(cfg: ProjectionConfig) {
-  const cfgPath = getProjectionConfigPath();
-  await mkdir(join(app.getPath("userData")), { recursive: true });
-  await writeFile(cfgPath, JSON.stringify(cfg, null, 2), "utf-8");
+  const settings = await readSettingsConfig();
+  const next: SettingsConfig = { ...settings, projection: { ...cfg } };
+  await writeSettingsConfig(next);
+}
+
+async function readProjectionConfig(): Promise<ProjectionConfig> {
+  const settings = await readSettingsConfig();
+  if (settings.projection?.screens && Object.keys(settings.projection.screens).length > 0) {
+    return { screens: settings.projection.screens };
+  }
+  return readLegacyProjectionConfig();
+}
+
+async function readFilesConfig(): Promise<FilesConfig> {
+  const settings = await readSettingsConfig();
+  if (settings.files?.libraryDir) return { libraryDir: settings.files.libraryDir };
+  return readLegacyFilesConfig();
+}
+
+async function readAppConfig(): Promise<AppConfig> {
+  const settings = await readSettingsConfig();
+  return settings.app ?? {};
+}
+
+async function writeAppConfig(cfg: AppConfig) {
+  const settings = await readSettingsConfig();
+  const next: SettingsConfig = { ...settings, app: { ...cfg } };
+  await writeSettingsConfig(next);
+}
+
+async function readShortcutsConfig(): Promise<ShortcutsConfig> {
+  const settings = await readSettingsConfig();
+  return settings.shortcuts ?? {};
+}
+
+async function writeShortcutsConfig(shortcuts: ShortcutsConfig) {
+  const settings = await readSettingsConfig();
+  const next: SettingsConfig = { ...settings, shortcuts: sanitizeShortcutOverrides(shortcuts) };
+  await writeSettingsConfig(next);
+}
+
+async function readTemplatesConfig(): Promise<TemplatesConfig> {
+  const settings = await readSettingsConfig();
+  return settings.templates ?? [];
+}
+
+async function writeTemplatesConfig(templates: TemplatesConfig) {
+  const settings = await readSettingsConfig();
+  const next: SettingsConfig = { ...settings, templates: sanitizePlanTemplates(templates) };
+  await writeSettingsConfig(next);
+}
+
+async function migrateLegacySettingsIfNeeded() {
+  const settings = await readSettingsConfig();
+  let changed = false;
+  const next: SettingsConfig = { ...settings };
+
+  if (!next.files?.libraryDir) {
+    const legacyFiles = await readLegacyFilesConfig();
+    if (legacyFiles.libraryDir) {
+      next.files = { libraryDir: legacyFiles.libraryDir };
+      changed = true;
+    }
+  }
+
+  if (!next.projection?.screens || Object.keys(next.projection.screens).length === 0) {
+    const legacyProjection = await readLegacyProjectionConfig();
+    if (legacyProjection.screens && Object.keys(legacyProjection.screens).length > 0) {
+      next.projection = { screens: legacyProjection.screens };
+      changed = true;
+    }
+  }
+
+  if (changed || settings.version !== SETTINGS_VERSION) {
+    next.version = SETTINGS_VERSION;
+    await writeSettingsConfig(next);
+  }
 }
 
 async function applyProjectionConfigOnStartup() {
@@ -436,6 +656,7 @@ function closeScreenWindow(key: ScreenKey) {
 
 void app.whenReady().then(async () => {
   await ensureRuntimeDatabaseUrl();
+  await migrateLegacySettingsIfNeeded();
   await applyProjectionConfigOnStartup();
 
   if (app.isPackaged) {
@@ -564,6 +785,65 @@ ipcMain.handle("devtools:open", (_evt, rawTarget: unknown) => {
       SCREEN_C: () => projWins.C?.webContents.openDevTools({ mode: "detach" }),
     },
   });
+});
+
+ipcMain.handle("settings:getTheme", async () => {
+  try {
+    const appCfg = await readAppConfig();
+    return { ok: true, theme: appCfg.theme };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:setTheme", async (_evt, rawTheme: unknown) => {
+  try {
+    if (rawTheme !== "light" && rawTheme !== "dark") {
+      return { ok: false, error: "Invalid theme" };
+    }
+    await writeAppConfig({ theme: rawTheme });
+    return { ok: true, theme: rawTheme };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:getShortcuts", async () => {
+  try {
+    const shortcuts = await readShortcutsConfig();
+    return { ok: true, shortcuts };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:setShortcuts", async (_evt, rawShortcuts: unknown) => {
+  try {
+    const shortcuts = sanitizeShortcutOverrides(rawShortcuts);
+    await writeShortcutsConfig(shortcuts);
+    return { ok: true, shortcuts };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:getTemplates", async () => {
+  try {
+    const templates = await readTemplatesConfig();
+    return { ok: true, templates };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:setTemplates", async (_evt, rawTemplates: unknown) => {
+  try {
+    const templates = sanitizePlanTemplates(rawTemplates);
+    await writeTemplatesConfig(templates);
+    return { ok: true, templates };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
 });
 
 ipcMain.handle("files:pickMedia", async () => {

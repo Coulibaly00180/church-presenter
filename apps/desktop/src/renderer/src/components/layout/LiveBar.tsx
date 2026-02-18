@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { QuickProjectDialog } from "@/components/dialogs/QuickProjectDialog";
-import { matchAction } from "@/lib/shortcuts";
+import { hydrateShortcuts, matchAction } from "@/lib/shortcuts";
 
 function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;
@@ -62,6 +62,10 @@ export function LiveBar() {
   }, []);
 
   // Keyboard shortcuts (global)
+  useEffect(() => {
+    void hydrateShortcuts();
+  }, []);
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;

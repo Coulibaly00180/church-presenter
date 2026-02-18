@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   SHORTCUT_DEFS,
+  hydrateShortcuts,
   getBindings,
   setBindings,
   resetBindings,
@@ -20,14 +21,22 @@ export function ShortcutsDialog({ open, onOpenChange }: Props) {
   const [current, setCurrent] = useState<Record<string, KeyBinding[]>>({});
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    let cancelled = false;
+    const load = async () => {
+      await hydrateShortcuts();
+      if (cancelled) return;
       const state: Record<string, KeyBinding[]> = {};
       for (const def of SHORTCUT_DEFS) {
         state[def.action] = getBindings(def.action);
       }
       setCurrent(state);
       setRecording(null);
-    }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   useEffect(() => {

@@ -10,6 +10,7 @@ declare global {
   type CpMediaType = Shared.CpMediaType;
   type CpBackgroundFillMode = Shared.CpBackgroundFillMode;
   type CpForegroundFillMode = Shared.CpForegroundFillMode;
+  type CpTheme = Shared.CpTheme;
   type CpSongMeta = Shared.CpSongMeta;
   type CpWindowState = Shared.CpWindowState;
 
@@ -76,6 +77,16 @@ declare global {
   type CpFilesChooseLibraryDirResult = Shared.CpFilesChooseLibraryDirResult;
   type CpFilesGetLibraryDirResult = Shared.CpFilesGetLibraryDirResult;
   type CpFilesReadMediaResult = Shared.CpFilesReadMediaResult;
+  type CpKeyBinding = Shared.CpKeyBinding;
+  type CpShortcutOverrides = Shared.CpShortcutOverrides;
+  type CpTemplateItem = Shared.CpTemplateItem;
+  type CpPlanTemplate = Shared.CpPlanTemplate;
+  type CpSettingsGetThemeResult = Shared.CpSettingsGetThemeResult;
+  type CpSettingsSetThemeResult = Shared.CpSettingsSetThemeResult;
+  type CpSettingsGetShortcutsResult = Shared.CpSettingsGetShortcutsResult;
+  type CpSettingsSetShortcutsResult = Shared.CpSettingsSetShortcutsResult;
+  type CpSettingsGetTemplatesResult = Shared.CpSettingsGetTemplatesResult;
+  type CpSettingsSetTemplatesResult = Shared.CpSettingsSetTemplatesResult;
 
   interface Window {
     cp: Shared.CpApi;

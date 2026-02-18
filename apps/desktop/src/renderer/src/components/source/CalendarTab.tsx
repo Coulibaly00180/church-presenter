@@ -61,7 +61,7 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
       onSelectPlan(existing.id);
       return;
     }
-    const templates = getTemplates();
+    const templates = await getTemplates();
     if (templates.length > 0) {
       setPendingDate(ymd);
       setTemplateOpen(true);

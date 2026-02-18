@@ -15,13 +15,22 @@ export function TemplatePickerDialog({ open, onOpenChange, onSelect, onSkip }: P
   const [templates, setTemplates] = useState<PlanTemplate[]>([]);
 
   useEffect(() => {
-    if (open) setTemplates(getTemplates());
+    if (!open) return;
+    let cancelled = false;
+    const load = async () => {
+      const next = await getTemplates();
+      if (!cancelled) setTemplates(next);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    deleteTemplate(id);
-    setTemplates(getTemplates());
+    await deleteTemplate(id);
+    setTemplates(await getTemplates());
   };
 
   return (

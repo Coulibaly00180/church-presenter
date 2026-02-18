@@ -28,44 +28,95 @@ export const SHORTCUT_DEFS: ShortcutDef[] = [
   { action: "toggleProjection", label: "Basculer projection", defaults: [{ key: "p", ctrlKey: true }] },
 ];
 
-const STORAGE_KEY = "cp-shortcuts";
-
 type OverrideMap = Partial<Record<ShortcutAction, KeyBinding[]>>;
+const ACTIONS = new Set<ShortcutAction>(SHORTCUT_DEFS.map((def) => def.action));
 
-function getOverrides(): OverrideMap {
+let overridesCache: OverrideMap = {};
+let hydrated = false;
+let hydratingPromise: Promise<void> | null = null;
+
+function sanitizeBinding(value: unknown): KeyBinding | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.key !== "string" || rec.key.length === 0) return null;
+  const out: KeyBinding = { key: rec.key };
+  if (typeof rec.ctrlKey === "boolean") out.ctrlKey = rec.ctrlKey;
+  if (typeof rec.shiftKey === "boolean") out.shiftKey = rec.shiftKey;
+  return out;
+}
+
+function sanitizeOverrides(value: unknown): OverrideMap {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const rec = value as Record<string, unknown>;
+  const out: OverrideMap = {};
+  Object.entries(rec).forEach(([action, rawBindings]) => {
+    if (!ACTIONS.has(action as ShortcutAction)) return;
+    if (!Array.isArray(rawBindings)) return;
+    const bindings = rawBindings.map((entry) => sanitizeBinding(entry)).filter((entry): entry is KeyBinding => !!entry);
+    out[action as ShortcutAction] = bindings;
+  });
+  return out;
+}
+
+function getCachedOverrides(): OverrideMap {
+  return overridesCache;
+}
+
+async function persistOverrides(overrides: OverrideMap): Promise<void> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    await window.cp.settings.setShortcuts(overrides as Record<string, KeyBinding[]>);
   } catch {
-    return {};
+    // Ignore persistence errors; local cache remains usable.
   }
 }
 
-function saveOverrides(overrides: OverrideMap): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
+export async function hydrateShortcuts(): Promise<void> {
+  if (hydrated) return;
+  if (hydratingPromise) return hydratingPromise;
+  hydratingPromise = (async () => {
+    try {
+      const result = await window.cp.settings.getShortcuts();
+      if (result.ok) {
+        overridesCache = sanitizeOverrides(result.shortcuts);
+      } else {
+        overridesCache = {};
+      }
+    } catch {
+      overridesCache = {};
+    }
+    hydrated = true;
+    hydratingPromise = null;
+  })();
+  return hydratingPromise;
 }
 
 export function getBindings(action: ShortcutAction): KeyBinding[] {
-  const overrides = getOverrides();
+  const overrides = getCachedOverrides();
   if (overrides[action]) return overrides[action]!;
   const def = SHORTCUT_DEFS.find((d) => d.action === action);
   return def?.defaults ?? [];
 }
 
 export function setBindings(action: ShortcutAction, bindings: KeyBinding[]): void {
-  const overrides = getOverrides();
-  overrides[action] = bindings;
-  saveOverrides(overrides);
+  const overrides = { ...getCachedOverrides() };
+  overrides[action] = bindings.map((binding) => ({ ...binding }));
+  overridesCache = overrides;
+  hydrated = true;
+  void persistOverrides(overrides);
 }
 
 export function resetBindings(action: ShortcutAction): void {
-  const overrides = getOverrides();
+  const overrides = { ...getCachedOverrides() };
   delete overrides[action];
-  saveOverrides(overrides);
+  overridesCache = overrides;
+  hydrated = true;
+  void persistOverrides(overrides);
 }
 
 export function resetAll(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  overridesCache = {};
+  hydrated = true;
+  void persistOverrides({});
 }
 
 function matchesBinding(e: KeyboardEvent, binding: KeyBinding): boolean {
@@ -82,7 +133,7 @@ function matchesBinding(e: KeyboardEvent, binding: KeyBinding): boolean {
 }
 
 export function matchAction(e: KeyboardEvent): ShortcutAction | null {
-  const overrides = getOverrides();
+  const overrides = getCachedOverrides();
   for (const def of SHORTCUT_DEFS) {
     const bindings = overrides[def.action] ?? def.defaults;
     for (const b of bindings) {

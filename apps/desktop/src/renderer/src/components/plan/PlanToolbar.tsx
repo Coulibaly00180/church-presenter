@@ -37,13 +37,13 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loop
     }
   };
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
     const name = prompt("Nom du template :");
     if (!name?.trim()) return;
     const items = plan.items.map(({ kind, title, content, refId, refSubId, mediaPath }) => ({
       kind, title, content, refId, refSubId, mediaPath,
     }));
-    saveAsTemplate(name.trim(), items);
+    await saveAsTemplate(name.trim(), items);
     toast.success("Template sauvegarde");
   };
 

@@ -187,6 +187,15 @@ const cpApi: CpApi = {
     getLibraryDir: () => ipcRenderer.invoke("files:getLibraryDir"),
     readMedia: (payload: { path: string }) => ipcRenderer.invoke("files:readMedia", payload),
   },
+
+  settings: {
+    getTheme: () => ipcRenderer.invoke("settings:getTheme"),
+    setTheme: (theme) => ipcRenderer.invoke("settings:setTheme", theme),
+    getShortcuts: () => ipcRenderer.invoke("settings:getShortcuts"),
+    setShortcuts: (shortcuts) => ipcRenderer.invoke("settings:setShortcuts", shortcuts),
+    getTemplates: () => ipcRenderer.invoke("settings:getTemplates"),
+    setTemplates: (templates) => ipcRenderer.invoke("settings:setTemplates", templates),
+  },
 };
 
 contextBridge.exposeInMainWorld("cp", cpApi);

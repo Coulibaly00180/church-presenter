@@ -5,6 +5,7 @@ export type CpProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 export type CpMediaType = "IMAGE" | "PDF";
 export type CpBackgroundFillMode = "SOLID" | "GRADIENT_LINEAR" | "GRADIENT_RADIAL";
 export type CpForegroundFillMode = "SOLID" | "GRADIENT";
+export type CpTheme = "light" | "dark";
 export type CpSongMeta = { title?: string; artist?: string; album?: string; year?: string };
 export type CpWindowState = { isOpen: boolean };
 
@@ -201,6 +202,26 @@ export type CpMediaFile = {
   kind: CpLibraryFileKind;
   folder: CpLibraryFileFolder;
 };
+export type CpKeyBinding = {
+  key: string;
+  ctrlKey?: boolean;
+  shiftKey?: boolean;
+};
+export type CpShortcutOverrides = Record<string, CpKeyBinding[]>;
+export type CpTemplateItem = {
+  kind: string;
+  title?: string | null;
+  content?: string | null;
+  refId?: string | null;
+  refSubId?: string | null;
+  mediaPath?: string | null;
+};
+export type CpPlanTemplate = {
+  id: string;
+  name: string;
+  items: CpTemplateItem[];
+  createdAt: string;
+};
 export type CpFilesPickMediaResult =
   | { ok: true; path: string; mediaType: CpMediaType }
   | { ok: false; canceled: true }
@@ -215,6 +236,12 @@ export type CpFilesGetLibraryDirResult = { ok: true; path: string } | { ok: fals
 export type CpFilesReadMediaResult =
   | { ok: true; base64: string; mimeType: string }
   | { ok: false; error: string };
+export type CpSettingsGetThemeResult = { ok: true; theme?: CpTheme } | { ok: false; error: string };
+export type CpSettingsSetThemeResult = { ok: true; theme: CpTheme } | { ok: false; error: string };
+export type CpSettingsGetShortcutsResult = { ok: true; shortcuts: CpShortcutOverrides } | { ok: false; error: string };
+export type CpSettingsSetShortcutsResult = { ok: true; shortcuts: CpShortcutOverrides } | { ok: false; error: string };
+export type CpSettingsGetTemplatesResult = { ok: true; templates: CpPlanTemplate[] } | { ok: false; error: string };
+export type CpSettingsSetTemplatesResult = { ok: true; templates: CpPlanTemplate[] } | { ok: false; error: string };
 
 export type CpProjectionSetAppearancePayload = {
   textScale?: number;
@@ -348,5 +375,13 @@ export interface CpApi {
     chooseLibraryDir: () => Promise<CpFilesChooseLibraryDirResult>;
     getLibraryDir: () => Promise<CpFilesGetLibraryDirResult>;
     readMedia: (payload: { path: string }) => Promise<CpFilesReadMediaResult>;
+  };
+  settings: {
+    getTheme: () => Promise<CpSettingsGetThemeResult>;
+    setTheme: (theme: CpTheme) => Promise<CpSettingsSetThemeResult>;
+    getShortcuts: () => Promise<CpSettingsGetShortcutsResult>;
+    setShortcuts: (shortcuts: CpShortcutOverrides) => Promise<CpSettingsSetShortcutsResult>;
+    getTemplates: () => Promise<CpSettingsGetTemplatesResult>;
+    setTemplates: (templates: CpPlanTemplate[]) => Promise<CpSettingsSetTemplatesResult>;
   };
 }
