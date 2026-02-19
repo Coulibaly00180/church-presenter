@@ -1,24 +1,14 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Copy, GripVertical, MonitorSmartphone, Pencil, Play, Trash2 } from "lucide-react";
+import { Copy, GripVertical, MonitorSmartphone, Pencil, Play, Radio, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { getPlanKindBadgeVariant, getPlanKindDefaultTitle, getPlanKindLabel } from "@/lib/planKinds";
 import type { PlanItem as PlanItemType } from "@/lib/types";
-
-const KIND_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
-  SONG_BLOCK: { label: "Chant", variant: "default" },
-  BIBLE_VERSE: { label: "Verset", variant: "secondary" },
-  BIBLE_PASSAGE: { label: "Passage", variant: "secondary" },
-  ANNOUNCEMENT_TEXT: { label: "Annonce", variant: "outline" },
-  ANNOUNCEMENT_IMAGE: { label: "Image", variant: "outline" },
-  ANNOUNCEMENT_PDF: { label: "PDF", variant: "outline" },
-  VERSE_MANUAL: { label: "Verset", variant: "secondary" },
-  TIMER: { label: "Timer", variant: "outline" },
-};
 
 type PlanItemProps = {
   item: PlanItemType;
@@ -30,19 +20,35 @@ type PlanItemProps = {
   onDuplicate: () => void;
   onEdit: () => void;
   onRemove: () => void;
+  dragDisabled?: boolean;
 };
 
-export function PlanItem({ item, isLiveCursor, isSelected, onSelect, onProject, onProjectToScreen, onDuplicate, onEdit, onRemove }: PlanItemProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+export function PlanItem({
+  item,
+  isLiveCursor,
+  isSelected,
+  onSelect,
+  onProject,
+  onProjectToScreen,
+  onDuplicate,
+  onEdit,
+  onRemove,
+  dragDisabled = false,
+}: PlanItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: dragDisabled,
+  });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
-  const kind = KIND_CONFIG[item.kind] ?? { label: item.kind, variant: "outline" as const };
+  const kindLabel = getPlanKindLabel(item.kind);
+  const kindVariant = getPlanKindBadgeVariant(item.kind);
   const songOrphaned = item.kind === "SONG_BLOCK" && !item.songId && !item.refId;
-  const displayTitle = songOrphaned ? "[Chant supprime]" : (item.title || item.kind);
+  const displayTitle = songOrphaned ? "[Chant supprime]" : (item.title || getPlanKindDefaultTitle(item.kind));
 
   return (
     <div
@@ -62,7 +68,11 @@ export function PlanItem({ item, isLiveCursor, isSelected, onSelect, onProject, 
       <div
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground"
+        className={cn(
+          "p-1 text-muted-foreground",
+          dragDisabled ? "cursor-not-allowed opacity-40" : "cursor-grab active:cursor-grabbing hover:text-foreground"
+        )}
+        title={dragDisabled ? "Reorganisation desactivee pendant le live" : "Reorganiser"}
       >
         <GripVertical className="h-4 w-4" />
       </div>
@@ -71,9 +81,15 @@ export function PlanItem({ item, isLiveCursor, isSelected, onSelect, onProject, 
         {item.order}
       </span>
 
-      <Badge variant={kind.variant} className="shrink-0 text-[10px]">
-        {kind.label}
+      <Badge variant={kindVariant} className="shrink-0 text-[10px]">
+        {kindLabel}
       </Badge>
+      {isLiveCursor && (
+        <Badge variant="default" className="shrink-0 text-[9px] px-1.5 gap-1">
+          <Radio className="h-2.5 w-2.5" />
+          LIVE
+        </Badge>
+      )}
 
       <div className="flex-1 min-w-0">
         <div className={cn("text-sm font-medium truncate", songOrphaned && "text-destructive")}>
@@ -89,11 +105,12 @@ export function PlanItem({ item, isLiveCursor, isSelected, onSelect, onProject, 
       <div className="flex items-center gap-1 shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onProject(); }}>
-              <Play className="h-3.5 w-3.5" />
+            <Button variant="secondary" size="sm" className="h-7 px-2 text-[11px]" onClick={(e) => { e.stopPropagation(); onProject(); }}>
+              <Play className="h-3.5 w-3.5 mr-1" />
+              Projeter
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Projeter (clic droit = choisir ecran)</TooltipContent>
+          <TooltipContent>Projeter cet element sur la cible live</TooltipContent>
         </Tooltip>
 
         {onProjectToScreen && (

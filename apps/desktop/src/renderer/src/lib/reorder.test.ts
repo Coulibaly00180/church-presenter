@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { reorderPlanItems } from "./reorder";
 import type { PlanItem } from "./types";
 
-function mkItem(id: string, order: number, kind: string): PlanItem {
+function mkItem(id: string, order: number, kind: CpPlanItemKind): PlanItem {
   return { id, order, kind };
 }
 

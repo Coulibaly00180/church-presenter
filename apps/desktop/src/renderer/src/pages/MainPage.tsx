@@ -9,6 +9,7 @@ import { NextPreview } from "@/components/plan/NextPreview";
 import { AddItemDialog } from "@/components/dialogs/AddItemDialog";
 import { EditItemDialog } from "@/components/dialogs/EditItemDialog";
 import { ProjectionHistoryDialog, type ProjectionLogEntry } from "@/components/dialogs/ProjectionHistoryDialog";
+import { getPlanKindDefaultTitle } from "@/lib/planKinds";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import { isoToYmd } from "@/lib/date";
 import type { Plan, PlanItem, ScreenKey } from "@/lib/types";
@@ -141,7 +142,7 @@ export function MainPage() {
         ...prev,
         {
           timestamp: Date.now(),
-          title: `[${target}] ${item.title || item.kind}`,
+          title: `[${target}] ${item.title || getPlanKindDefaultTitle(item.kind)}`,
           kind: item.kind,
           content: item.content ?? undefined,
         },
@@ -175,7 +176,7 @@ export function MainPage() {
       ...prev,
       {
         timestamp: Date.now(),
-        title: `[${target}] ${item.title || item.kind}`,
+        title: `[${target}] ${item.title || getPlanKindDefaultTitle(item.kind)}`,
         kind: item.kind,
         content: item.content ?? undefined,
       },
@@ -303,9 +304,9 @@ export function MainPage() {
       </div>
 
       <PlanEditor
-        planId={planId}
         items={plan.items}
         liveCursor={live?.cursor ?? 0}
+        liveEnabled={!!live?.enabled}
         selectedIndex={selectedIndex}
         onSelect={setSelectedIndex}
         onProject={handleProject}
@@ -323,7 +324,7 @@ export function MainPage() {
             ...prev,
             {
               timestamp: Date.now(),
-              title: `[${screen}] ${item.title || item.kind}`,
+              title: `[${screen}] ${item.title || getPlanKindDefaultTitle(item.kind)}`,
               kind: item.kind,
               content: item.content ?? undefined,
             },

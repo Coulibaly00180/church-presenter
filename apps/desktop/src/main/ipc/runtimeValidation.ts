@@ -24,6 +24,7 @@ import type {
   ScreenKey,
   ScreenMirrorMode,
 } from "../../shared/ipc";
+import { CP_PLAN_ITEM_KIND_VALUES } from "../../shared/planKinds";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -387,7 +388,7 @@ export function parsePlanAddItemPayload(value: unknown): CpPlanAddItemPayload {
   const rec = expectRecord(value, "plans:addItem payload");
   return {
     planId: expectString(rec.planId, "plans:addItem.planId"),
-    kind: expectString(rec.kind, "plans:addItem.kind"),
+    kind: expectEnum(rec.kind, "plans:addItem.kind", CP_PLAN_ITEM_KIND_VALUES),
     title: expectOptionalString(rec.title, "plans:addItem.title", { trim: false, allowEmpty: true }),
     content: expectOptionalString(rec.content, "plans:addItem.content", { trim: false, allowEmpty: true }),
     refId: expectOptionalString(rec.refId, "plans:addItem.refId"),

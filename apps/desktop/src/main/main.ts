@@ -61,6 +61,7 @@ import type {
   ScreenKey,
   ScreenMirrorMode,
 } from "../shared/ipc";
+import { isCpPlanItemKind } from "../shared/planKinds";
 
 type ScreenInfo = CpScreenMeta;
 
@@ -197,7 +198,7 @@ function sanitizeShortcutOverrides(value: unknown): CpShortcutOverrides {
 function sanitizeTemplateItem(value: unknown): CpTemplateItem | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const rec = value as Record<string, unknown>;
-  if (typeof rec.kind !== "string" || rec.kind.length === 0) return null;
+  if (!isCpPlanItemKind(rec.kind)) return null;
   const out: CpTemplateItem = { kind: rec.kind };
   const title = sanitizeNullableString(rec.title);
   const content = sanitizeNullableString(rec.content);

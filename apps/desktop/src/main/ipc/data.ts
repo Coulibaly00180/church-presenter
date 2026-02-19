@@ -4,6 +4,8 @@ import { databasePathFromUrl, getPrisma } from "../db";
 import { copyFile, mkdir, readFile, stat, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
 import type { CpDataImportError } from "../../shared/ipc";
+import type { CpPlanItemKind } from "../../shared/planKinds";
+import { isCpPlanItemKind, normalizeCpPlanItemKind } from "../../shared/planKinds";
 import { parseDataImportPayload } from "./runtimeValidation";
 
 type ImportedSongBlock = {
@@ -64,7 +66,7 @@ export type DataNormalizedSong = NormalizedSong;
 
 type NormalizedPlanItem = {
   order: number;
-  kind: string;
+  kind: CpPlanItemKind;
   refId?: string;
   refSubId?: string;
   title?: string;
@@ -330,9 +332,18 @@ function normalizePlans(rawPlans: unknown, errors: CpDataImportError[]): Normali
             continue;
           }
           const it = rawItem as ImportedPlanItem;
+          const rawKind = asStringLike(it.kind);
+          const kind = normalizeCpPlanItemKind(rawKind);
+          if (!isCpPlanItemKind(rawKind)) {
+            pushValidationError(
+              errors,
+              `plans[${planIdx}].items[${itemIdx}].kind invalide, fallback "${kind}" applique`,
+              title
+            );
+          }
           items.push({
             order: asPositiveInt(it.order, itemIdx + 1),
-            kind: asStringLike(it.kind) || "ANNOUNCEMENT_TEXT",
+            kind,
             refId: asStringLike(it.refId),
             refSubId: asStringLike(it.refSubId),
             title: asStringLike(it.title),
@@ -371,9 +382,19 @@ function normalizeDateToMidnight(dateIso?: string | Date) {
 export function registerDataIpc() {
   ipcMain.handle("data:exportAll", async () => {
     const prisma = getPrisma();
+    const plansRaw = await prisma.servicePlan.findMany({
+      where: { deletedAt: null },
+      include: { items: { orderBy: { order: "asc" } } },
+    });
     const payload = {
       songs: await prisma.song.findMany({ where: { deletedAt: null }, include: { blocks: { orderBy: { order: "asc" } } } }),
-      plans: await prisma.servicePlan.findMany({ where: { deletedAt: null }, include: { items: { orderBy: { order: "asc" } } } }),
+      plans: plansRaw.map((plan) => ({
+        ...plan,
+        items: plan.items.map((item) => ({
+          ...item,
+          kind: normalizeCpPlanItemKind(item.kind),
+        })),
+      })),
       exportedAt: new Date().toISOString(),
     };
 

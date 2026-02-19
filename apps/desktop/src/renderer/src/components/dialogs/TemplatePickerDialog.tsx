@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Trash2, FileText } from "lucide-react";
-import { getTemplates, deleteTemplate, type PlanTemplate } from "@/lib/templates";
+import { getTemplates, deleteTemplate, isBuiltinTemplate, type PlanTemplate } from "@/lib/templates";
 
 type Props = {
   open: boolean;
@@ -52,15 +52,20 @@ export function TemplatePickerDialog({ open, onOpenChange, onSelect, onSkip }: P
                 <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
                 <span className="font-medium truncate">{t.name}</span>
                 <span className="text-muted-foreground shrink-0">({t.items.length} el.)</span>
+                {isBuiltinTemplate(t) && (
+                  <span className="text-[10px] text-primary shrink-0">Base</span>
+                )}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
-                onClick={(e) => handleDelete(e, t.id)}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
+              {!isBuiltinTemplate(t) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 shrink-0 text-destructive hover:text-destructive"
+                  onClick={(e) => handleDelete(e, t.id)}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              )}
             </button>
           ))}
           {templates.length === 0 && (

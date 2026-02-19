@@ -1,5 +1,8 @@
+import type { CpPlanItemKind } from "../../../shared/planKinds";
+import { isCpPlanItemKind } from "../../../shared/planKinds";
+
 export type TemplateItem = {
-  kind: string;
+  kind: CpPlanItemKind;
   title?: string | null;
   content?: string | null;
   refId?: string | null;
@@ -12,7 +15,50 @@ export type PlanTemplate = {
   name: string;
   items: TemplateItem[];
   createdAt: string;
+  builtin?: boolean;
 };
+
+const BUILTIN_TEMPLATE_PREFIX = "builtin:";
+const BUILTIN_TEMPLATES: PlanTemplate[] = [
+  {
+    id: `${BUILTIN_TEMPLATE_PREFIX}standard`,
+    name: "Standard (Culte)",
+    builtin: true,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    items: [
+      { kind: "ANNOUNCEMENT_TEXT", title: "Accueil", content: "Bienvenue a tous." },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Louange", content: "Temps de louange." },
+      { kind: "BIBLE_PASSAGE", title: "Lecture biblique", content: "" },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Predication", content: "Message du jour." },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Annonces", content: "Infos de la semaine." },
+    ],
+  },
+  {
+    id: `${BUILTIN_TEMPLATE_PREFIX}veilee`,
+    name: "Veillee de priere",
+    builtin: true,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    items: [
+      { kind: "ANNOUNCEMENT_TEXT", title: "Accueil", content: "Bienvenue a la veillee." },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Priere 1", content: "Intercession." },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Priere 2", content: "Actions de grace." },
+      { kind: "BIBLE_PASSAGE", title: "Lecture biblique", content: "" },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Cloture", content: "Benediction finale." },
+    ],
+  },
+  {
+    id: `${BUILTIN_TEMPLATE_PREFIX}evenement`,
+    name: "Evenement special",
+    builtin: true,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    items: [
+      { kind: "ANNOUNCEMENT_TEXT", title: "Introduction", content: "Presentation de l'evenement." },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Programme", content: "Deroulement de la soiree." },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Intervenant", content: "Presentation de l'invite." },
+      { kind: "ANNOUNCEMENT_TEXT", title: "Informations", content: "Contacts et suite." },
+    ],
+  },
+];
 
 let templatesCache: PlanTemplate[] = [];
 let hydrated = false;
@@ -27,11 +73,27 @@ function sanitizeNullableString(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function cloneTemplateItem(item: TemplateItem): TemplateItem {
+  return { ...item };
+}
+
+function clonePlanTemplate(template: PlanTemplate): PlanTemplate {
+  return { ...template, items: template.items.map(cloneTemplateItem) };
+}
+
+function cloneTemplates(templates: PlanTemplate[]): PlanTemplate[] {
+  return templates.map((template) => clonePlanTemplate(template));
+}
+
+function withBuiltinTemplates(userTemplates: PlanTemplate[]): PlanTemplate[] {
+  return [...cloneTemplates(BUILTIN_TEMPLATES), ...cloneTemplates(userTemplates)];
+}
+
 function sanitizeTemplateItem(value: unknown): TemplateItem | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const rec = value as Record<string, unknown>;
-  if (typeof rec.kind !== "string" || rec.kind.length === 0) return null;
-  const out: TemplateItem = { kind: rec.kind };
+  if (!isCpPlanItemKind(rec.kind)) return null;
+  const out: TemplateItem = { kind: rec.kind as CpPlanItemKind };
   const title = sanitizeNullableString(rec.title);
   const content = sanitizeNullableString(rec.content);
   const refId = sanitizeNullableString(rec.refId);
@@ -63,11 +125,28 @@ function sanitizeTemplate(value: unknown): PlanTemplate | null {
 
 function sanitizeTemplates(value: unknown): PlanTemplate[] {
   if (!Array.isArray(value)) return [];
-  return value.map((entry) => sanitizeTemplate(entry)).filter((entry): entry is PlanTemplate => !!entry);
+  return value
+    .map((entry) => sanitizeTemplate(entry))
+    .filter((entry): entry is PlanTemplate => !!entry)
+    .filter((entry) => !isBuiltinTemplateId(entry.id));
+}
+
+function toPersistedTemplates(templates: PlanTemplate[]): PlanTemplate[] {
+  return templates
+    .filter((template) => !isBuiltinTemplateId(template.id))
+    .map((template) => ({ ...template, builtin: undefined, items: template.items.map(cloneTemplateItem) }));
+}
+
+export function isBuiltinTemplateId(id: string): boolean {
+  return id.startsWith(BUILTIN_TEMPLATE_PREFIX);
+}
+
+export function isBuiltinTemplate(template: Pick<PlanTemplate, "id">): boolean {
+  return isBuiltinTemplateId(template.id);
 }
 
 async function persistTemplates(templates: PlanTemplate[]): Promise<void> {
-  templatesCache = templates;
+  templatesCache = toPersistedTemplates(templates);
   try {
     await window.cp.settings.setTemplates(templatesCache);
   } catch {
@@ -97,7 +176,7 @@ export async function hydrateTemplates(): Promise<void> {
 
 export async function getTemplates(): Promise<PlanTemplate[]> {
   await hydrateTemplates();
-  return templatesCache.map((template) => ({ ...template, items: template.items.map((item) => ({ ...item })) }));
+  return withBuiltinTemplates(templatesCache);
 }
 
 export async function saveAsTemplate(name: string, items: TemplateItem[]): Promise<PlanTemplate> {
@@ -108,12 +187,14 @@ export async function saveAsTemplate(name: string, items: TemplateItem[]): Promi
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
+  if (isBuiltinTemplateId(id)) return;
   await hydrateTemplates();
   const next = templatesCache.filter((template) => template.id !== id);
   await persistTemplates(next);
 }
 
 export async function renameTemplate(id: string, name: string): Promise<void> {
+  if (isBuiltinTemplateId(id)) return;
   await hydrateTemplates();
   const next = templatesCache.map((template) => {
     if (template.id !== id) return template;
@@ -123,5 +204,5 @@ export async function renameTemplate(id: string, name: string): Promise<void> {
 }
 
 export function getTemplatesSnapshot(): PlanTemplate[] {
-  return templatesCache.map((template) => ({ ...template, items: template.items.map((item) => ({ ...item })) }));
+  return withBuiltinTemplates(templatesCache);
 }

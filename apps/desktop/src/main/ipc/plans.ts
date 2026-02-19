@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { readFile, writeFile } from "fs/promises";
 import mammoth from "mammoth";
 import { getPrisma } from "../db";
+import { normalizeCpPlanItemKind } from "../../shared/planKinds";
 import { validatePlanReorderPayload } from "./reorderValidation";
 import {
   parseNonEmptyString,
@@ -91,10 +92,18 @@ export function registerPlansIpc() {
   ipcMain.handle("plans:get", async (_evt, rawPlanId: unknown) => {
     const prisma = getPrisma();
     const planId = parseNonEmptyString(rawPlanId, "plans:get.planId");
-    return prisma.servicePlan.findUnique({
+    const plan = await prisma.servicePlan.findUnique({
       where: { id: planId },
       include: { items: { orderBy: { order: "asc" } } },
     });
+    if (!plan) return null;
+    return {
+      ...plan,
+      items: plan.items.map((item) => ({
+        ...item,
+        kind: normalizeCpPlanItemKind(item.kind),
+      })),
+    };
   });
 
   ipcMain.handle("plans:duplicate", async (_evt, rawPayload: unknown) => {
@@ -121,7 +130,7 @@ export function registerPlansIpc() {
               data: {
                 planId: created.id,
                 order: it.order,
-                kind: it.kind,
+                kind: normalizeCpPlanItemKind(it.kind),
                 title: it.title,
                 content: it.content,
                 refId: it.refId,
@@ -271,7 +280,14 @@ export function registerPlansIpc() {
     });
     if (!plan) throw new Error("Plan not found");
 
-    const data = JSON.stringify(plan, null, 2);
+    const normalizedPlan = {
+      ...plan,
+      items: plan.items.map((item) => ({
+        ...item,
+        kind: normalizeCpPlanItemKind(item.kind),
+      })),
+    };
+    const data = JSON.stringify(normalizedPlan, null, 2);
 
     const res = await dialog.showSaveDialog({
       title: "Exporter le plan",

@@ -20,11 +20,12 @@ import { PlanItem } from "./PlanItem";
 import { cn } from "@/lib/utils";
 import { reorderPlanItems } from "@/lib/reorder";
 import type { PlanItem as PlanItemType } from "@/lib/types";
+import { isCpPlanItemKind } from "../../../../shared/planKinds";
 
 type PlanEditorProps = {
-  planId: string;
   items: PlanItemType[];
   liveCursor: number;
+  liveEnabled?: boolean;
   selectedIndex: number;
   onSelect: (index: number) => void;
   onProject: (item: PlanItemType) => void;
@@ -34,12 +35,13 @@ type PlanEditorProps = {
   onRemove: (item: PlanItemType) => void;
   onReorder: (orderedItemIds: string[], newItems: PlanItemType[]) => void;
   onAddItem?: () => void;
-  onDropItem?: (data: { kind: string; title?: string; content?: string; refId?: string; refSubId?: string; mediaPath?: string }) => void;
+  onDropItem?: (data: { kind: CpPlanItemKind; title?: string; content?: string; refId?: string; refSubId?: string; mediaPath?: string }) => void;
 };
 
 export function PlanEditor({
   items,
   liveCursor,
+  liveEnabled = false,
   selectedIndex,
   onSelect,
   onProject,
@@ -59,8 +61,23 @@ export function PlanEditor({
     const raw = e.dataTransfer.getData("application/cp-item");
     if (!raw || !onDropItem) return;
     try {
-      const data = JSON.parse(raw);
-      onDropItem(data);
+      const data = JSON.parse(raw) as {
+        kind?: unknown;
+        title?: string;
+        content?: string;
+        refId?: string;
+        refSubId?: string;
+        mediaPath?: string;
+      };
+      if (!isCpPlanItemKind(data.kind)) return;
+      onDropItem({
+        kind: data.kind,
+        title: data.title,
+        content: data.content,
+        refId: data.refId,
+        refSubId: data.refSubId,
+        mediaPath: data.mediaPath,
+      });
     } catch { /* ignore invalid data */ }
   }, [onDropItem]);
 
@@ -80,6 +97,7 @@ export function PlanEditor({
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      if (liveEnabled) return;
       const { active, over } = event;
       if (!over || active.id === over.id) return;
 
@@ -95,7 +113,7 @@ export function PlanEditor({
         onReorder(result.orderedItemIds, result.newItems);
       }
     },
-    [items, onReorder],
+    [items, liveEnabled, onReorder],
   );
 
   if (items.length === 0) {
@@ -127,6 +145,13 @@ export function PlanEditor({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
+      <div className="px-1 pb-1">
+        <div className={cn("rounded-md border px-2 py-1.5 text-[11px]", liveEnabled ? "border-amber-400/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-muted bg-muted/30 text-muted-foreground")}>
+          {liveEnabled
+            ? "Live actif: la reorganisation est temporairement verrouillee pour garder le curseur stable."
+            : "Astuce: double-clic ou bouton Projeter pour envoyer l'element en direct."}
+        </div>
+      </div>
       <ScrollArea className="flex-1">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
@@ -143,6 +168,7 @@ export function PlanEditor({
                   onDuplicate={() => onDuplicate(item)}
                   onEdit={() => onEdit(item)}
                   onRemove={() => onRemove(item)}
+                  dragDisabled={liveEnabled}
                 />
               ))}
             </div>

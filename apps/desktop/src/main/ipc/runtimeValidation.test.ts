@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parsePlanAddItemPayload,
   parseFilesRenameMediaPayload,
   parseDataImportPayload,
   parseLiveSetPayload,
@@ -30,6 +31,26 @@ describe("runtime validation", () => {
       orderedItemIds: ["a", "b"],
     });
     expect(() => parsePlanReorderPayload({ planId: "p1", orderedItemIds: "bad" })).toThrow("must be an array");
+  });
+
+  it("validates plans:addItem kind", () => {
+    expect(
+      parsePlanAddItemPayload({
+        planId: "p1",
+        kind: "ANNOUNCEMENT_TEXT",
+        title: "Title",
+        content: "Body",
+      })
+    ).toEqual({
+      planId: "p1",
+      kind: "ANNOUNCEMENT_TEXT",
+      title: "Title",
+      content: "Body",
+      refId: undefined,
+      refSubId: undefined,
+      mediaPath: undefined,
+    });
+    expect(() => parsePlanAddItemPayload({ planId: "p1", kind: "LEGACY_KIND" })).toThrow("must be one of");
   });
 
   it("validates projection media payload", () => {

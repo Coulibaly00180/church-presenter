@@ -1,3 +1,6 @@
+import type { CpPlanItemKind } from "./planKinds";
+export type { CpPlanItemKind } from "./planKinds";
+
 export type ScreenKey = "A" | "B" | "C";
 export type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
 
@@ -114,16 +117,6 @@ export type CpSongImportAutoResult =
   | { ok: true; imported: number; docFiles: number; jsonFiles: number; errors: CpSongImportDocError[]; files: string[] }
   | { ok: false; canceled: true };
 
-export type CpPlanItemKind =
-  | "ANNOUNCEMENT_TEXT"
-  | "ANNOUNCEMENT_IMAGE"
-  | "ANNOUNCEMENT_PDF"
-  | "VERSE_MANUAL"
-  | "BIBLE_VERSE"
-  | "BIBLE_PASSAGE"
-  | "SONG_BLOCK"
-  | string;
-
 export type CpPlanItem = {
   id: string;
   planId: string;
@@ -211,7 +204,7 @@ export type CpKeyBinding = {
 };
 export type CpShortcutOverrides = Record<string, CpKeyBinding[]>;
 export type CpTemplateItem = {
-  kind: string;
+  kind: CpPlanItemKind;
   title?: string | null;
   content?: string | null;
   refId?: string | null;

@@ -4,23 +4,13 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
+import { getPlanKindLabel } from "@/lib/planKinds";
 
 export type ProjectionLogEntry = {
   timestamp: number;
   title: string;
   kind: string;
   content?: string;
-};
-
-const KIND_LABELS: Record<string, string> = {
-  SONG_BLOCK: "Chant",
-  BIBLE_VERSE: "Verset",
-  BIBLE_PASSAGE: "Passage",
-  ANNOUNCEMENT_TEXT: "Annonce",
-  ANNOUNCEMENT_IMAGE: "Image",
-  ANNOUNCEMENT_PDF: "PDF",
-  VERSE_MANUAL: "Verset",
-  TIMER: "Timer",
 };
 
 function formatTime(ts: number) {
@@ -58,7 +48,7 @@ export function ProjectionHistoryDialog({ open, onOpenChange, entries, onClear }
                 <div key={`${entry.timestamp}-${i}`} className="flex items-start gap-2 px-2 py-1.5 rounded-md border text-xs">
                   <span className="font-mono text-muted-foreground shrink-0">{formatTime(entry.timestamp)}</span>
                   <Badge variant="outline" className="text-[9px] px-1 py-0 shrink-0">
-                    {KIND_LABELS[entry.kind] ?? entry.kind}
+                    {getPlanKindLabel(entry.kind)}
                   </Badge>
                   <div className="flex-1 min-w-0">
                     <span className="font-medium truncate block">{entry.title}</span>

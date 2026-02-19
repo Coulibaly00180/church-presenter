@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { isoToYmd, localNowYmd } from "@/lib/date";
 import { toast } from "sonner";
@@ -18,8 +19,10 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth());
   const [plans, setPlans] = useState<PlanEntry[]>([]);
+  const [createModeOpen, setCreateModeOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [pendingDate, setPendingDate] = useState<string | null>(null);
+  const [pendingDuplicateSource, setPendingDuplicateSource] = useState<PlanEntry | null>(null);
 
   useEffect(() => {
     window.cp.plans.list().then(setPlans).catch(() => null);
@@ -34,6 +37,14 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
       if (ymd) map.set(ymd, p);
     }
     return map;
+  }, [plans]);
+
+  const plansSortedAsc = useMemo(() => {
+    return [...plans].sort((a, b) => {
+      const left = isoToYmd(a.date) ?? "";
+      const right = isoToYmd(b.date) ?? "";
+      return left.localeCompare(right);
+    });
   }, [plans]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -54,6 +65,22 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
     }
   };
 
+  const duplicatePlanToDate = async (sourcePlan: PlanEntry, ymd: string) => {
+    const duplicated = await window.cp.plans.duplicate({
+      planId: sourcePlan.id,
+      dateIso: ymd,
+      title: sourcePlan.title || "Culte",
+    });
+    if (!duplicated?.id) {
+      toast.error("Duplication echouee");
+      return;
+    }
+    toast.success("Plan duplique depuis un culte precedent");
+    const refreshed = await window.cp.plans.list();
+    setPlans(refreshed);
+    onSelectPlan(duplicated.id);
+  };
+
   const handleDayClick = async (day: number) => {
     const ymd = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     const existing = planByDate.get(ymd);
@@ -61,13 +88,16 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
       onSelectPlan(existing.id);
       return;
     }
-    const templates = await getTemplates();
-    if (templates.length > 0) {
-      setPendingDate(ymd);
-      setTemplateOpen(true);
-    } else {
-      await createPlanDirect(ymd);
-    }
+    const duplicateSource =
+      [...plansSortedAsc]
+        .reverse()
+        .find((entry) => {
+          const date = isoToYmd(entry.date);
+          return !!date && date < ymd;
+        }) ?? null;
+    setPendingDate(ymd);
+    setPendingDuplicateSource(duplicateSource);
+    setCreateModeOpen(true);
   };
 
   const handleTemplateSelect = async (template: PlanTemplate) => {
@@ -91,6 +121,7 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
       onSelectPlan(created.id);
     }
     setPendingDate(null);
+    setPendingDuplicateSource(null);
   };
 
   return (
@@ -143,10 +174,86 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
 
       <TemplatePickerDialog
         open={templateOpen}
-        onOpenChange={(v) => { setTemplateOpen(v); if (!v) setPendingDate(null); }}
+        onOpenChange={(v) => {
+          setTemplateOpen(v);
+          if (!v && !createModeOpen) {
+            setPendingDate(null);
+            setPendingDuplicateSource(null);
+          }
+        }}
         onSelect={handleTemplateSelect}
-        onSkip={() => { if (pendingDate) createPlanDirect(pendingDate); setPendingDate(null); }}
+        onSkip={() => {
+          if (pendingDate) void createPlanDirect(pendingDate);
+          setPendingDate(null);
+          setPendingDuplicateSource(null);
+        }}
       />
+
+      <Dialog
+        open={createModeOpen}
+        onOpenChange={(open) => {
+          setCreateModeOpen(open);
+          if (!open && !templateOpen) {
+            setPendingDate(null);
+            setPendingDuplicateSource(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nouveau plan</DialogTitle>
+            <DialogDescription>
+              {pendingDate ? `Date: ${pendingDate}` : "Choisissez le mode de creation"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Button
+              variant="default"
+              className="w-full justify-start text-xs"
+              onClick={async () => {
+                if (!pendingDate) return;
+                await createPlanDirect(pendingDate);
+                setCreateModeOpen(false);
+                setPendingDate(null);
+                setPendingDuplicateSource(null);
+              }}
+            >
+              Plan vide
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start text-xs"
+              disabled={!pendingDate || !pendingDuplicateSource}
+              onClick={async () => {
+                if (!pendingDate || !pendingDuplicateSource) return;
+                await duplicatePlanToDate(pendingDuplicateSource, pendingDate);
+                setCreateModeOpen(false);
+                setPendingDate(null);
+                setPendingDuplicateSource(null);
+              }}
+            >
+              {pendingDuplicateSource
+                ? `Dupliquer le culte precedent (${pendingDuplicateSource.title || "Culte"})`
+                : "Aucun culte precedent a dupliquer"}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start text-xs"
+              onClick={async () => {
+                const templates = await getTemplates();
+                if (templates.length === 0) {
+                  toast.info("Aucun template disponible.");
+                  return;
+                }
+                setCreateModeOpen(false);
+                setTemplateOpen(true);
+              }}
+            >
+              Utiliser un template
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

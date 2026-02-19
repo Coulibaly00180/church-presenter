@@ -1,18 +1,8 @@
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Radio } from "lucide-react";
+import { getPlanKindBadgeVariant, getPlanKindDefaultTitle, getPlanKindLabel, isPlanKindMedia } from "@/lib/planKinds";
 import type { PlanItem as PlanItemType } from "@/lib/types";
-
-const KIND_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "outline" }> = {
-  SONG_BLOCK: { label: "Chant", variant: "default" },
-  BIBLE_VERSE: { label: "Verset", variant: "secondary" },
-  BIBLE_PASSAGE: { label: "Passage", variant: "secondary" },
-  ANNOUNCEMENT_TEXT: { label: "Annonce", variant: "outline" },
-  ANNOUNCEMENT_IMAGE: { label: "Image", variant: "outline" },
-  ANNOUNCEMENT_PDF: { label: "PDF", variant: "outline" },
-  VERSE_MANUAL: { label: "Verset", variant: "secondary" },
-  TIMER: { label: "Timer", variant: "outline" },
-};
 
 function SideCard({ item, label, icon }: {
   item: PlanItemType | null;
@@ -31,9 +21,10 @@ function SideCard({ item, label, icon }: {
     );
   }
 
-  const kind = KIND_CONFIG[item.kind] ?? { label: item.kind, variant: "outline" as const };
-  const displayTitle = item.title || item.kind;
-  const isMedia = item.kind === "ANNOUNCEMENT_IMAGE" || item.kind === "ANNOUNCEMENT_PDF";
+  const kindLabel = getPlanKindLabel(item.kind);
+  const kindVariant = getPlanKindBadgeVariant(item.kind);
+  const displayTitle = item.title || getPlanKindDefaultTitle(item.kind);
+  const isMedia = isPlanKindMedia(item.kind);
 
   return (
     <div className="flex-1 min-w-0 px-2 py-1.5 rounded-md border border-border/40 bg-muted/20">
@@ -42,8 +33,8 @@ function SideCard({ item, label, icon }: {
         <span>{label}</span>
       </div>
       <div className="flex items-center gap-1.5">
-        <Badge variant={kind.variant} className="shrink-0 text-[9px] px-1 py-0">
-          {kind.label}
+        <Badge variant={kindVariant} className="shrink-0 text-[9px] px-1 py-0">
+          {kindLabel}
         </Badge>
         <span className="text-xs truncate font-medium">{displayTitle}</span>
       </div>
@@ -70,9 +61,10 @@ function LivePreviewCard({ item }: { item: PlanItemType | null }) {
     );
   }
 
-  const kind = KIND_CONFIG[item.kind] ?? { label: item.kind, variant: "outline" as const };
-  const displayTitle = item.title || item.kind;
-  const isMedia = item.kind === "ANNOUNCEMENT_IMAGE" || item.kind === "ANNOUNCEMENT_PDF";
+  const kindLabel = getPlanKindLabel(item.kind);
+  const kindVariant = getPlanKindBadgeVariant(item.kind);
+  const displayTitle = item.title || getPlanKindDefaultTitle(item.kind);
+  const isMedia = isPlanKindMedia(item.kind);
 
   return (
     <div className="flex-[2] min-w-0 rounded-md border-2 border-primary/50 bg-black/90 overflow-hidden relative aspect-video max-h-[120px]">
@@ -96,8 +88,8 @@ function LivePreviewCard({ item }: { item: PlanItemType | null }) {
       </div>
       {/* Kind badge */}
       <div className="absolute top-1 left-1.5">
-        <Badge variant={kind.variant} className="text-[8px] px-1 py-0 opacity-70">
-          {kind.label}
+        <Badge variant={kindVariant} className="text-[8px] px-1 py-0 opacity-70">
+          {kindLabel}
         </Badge>
       </div>
       {/* LIVE indicator */}

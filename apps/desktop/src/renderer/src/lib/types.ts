@@ -1,3 +1,5 @@
+import type { CpPlanItemKind } from "../../../shared/planKinds";
+
 export type PlanListItem = {
   id: string;
   date: string | Date;
@@ -8,7 +10,7 @@ export type PlanListItem = {
 export type PlanItem = {
   id: string;
   order: number;
-  kind: string;
+  kind: CpPlanItemKind;
   title?: string | null;
   content?: string | null;
   refId?: string | null;
