@@ -31,7 +31,11 @@ describe("ProjectionSettings", () => {
     const cp = createCpMock();
     render(<ProjectionSettings open onOpenChange={vi.fn()} />);
 
-    const saveBtn = await screen.findByRole("button", { name: /save/i });
+    await screen.findByText("Assemblee Test");
+    const saveBtn = screen.getByRole("button", { name: /save/i });
+    await waitFor(() => {
+      expect((saveBtn as HTMLButtonElement).disabled).toBe(false);
+    });
     fireEvent.click(saveBtn);
 
     await waitFor(() => {

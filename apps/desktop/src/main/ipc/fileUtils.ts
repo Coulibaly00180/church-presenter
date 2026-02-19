@@ -1,4 +1,4 @@
-import { basename, extname, resolve, sep } from "path";
+import { extname, resolve, sep } from "path";
 import type { CpLibraryFileKind, CpMediaType } from "../../shared/ipc";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
@@ -49,7 +49,8 @@ export function isFontPath(filePath: string): boolean {
 }
 
 export function inferFontFamilyFromPath(filePath: string): string {
-  const fileName = basename(filePath);
+  // Handle both POSIX and Windows separators regardless of host OS.
+  const fileName = filePath.split(/[\\/]/).pop() ?? "";
   const name = fileName.replace(/\.(ttf|otf)$/i, "").trim();
   return name || "CustomFont";
 }
