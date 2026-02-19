@@ -11,6 +11,8 @@ import {
   Trash2,
   Wifi,
   WifiOff,
+  FileText,
+  Type,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,9 +35,140 @@ function isTypingTarget(el: EventTarget | null) {
   return tag === "input" || tag === "textarea" || t.isContentEditable;
 }
 
+function toFileUrl(path?: string) {
+  if (!path) return "";
+  if (path.startsWith("file://") || path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
+  const [pathOnly, frag] = path.split("#");
+  const base =
+    pathOnly.startsWith("\\\\")
+      ? `file:${pathOnly.replace(/\\/g, "/")}`
+      : `file:///${pathOnly.replace(/\\/g, "/")}`;
+  return frag ? `${base}#${frag}` : base;
+}
+
+function projectionBackground(state: CpProjectionState | null) {
+  if (!state) return "#050505";
+  if (state.mode === "BLACK") return "#000000";
+  if (state.mode === "WHITE") return "#ffffff";
+
+  const bgMode = state.backgroundMode || "SOLID";
+  const from = state.backgroundGradientFrom || "#2563eb";
+  const to = state.backgroundGradientTo || "#7c3aed";
+  const angle = state.backgroundGradientAngle ?? 135;
+
+  if (bgMode === "GRADIENT_LINEAR") return `linear-gradient(${angle}deg, ${from} 0%, ${to} 100%)`;
+  if (bgMode === "GRADIENT_RADIAL") return `radial-gradient(circle at center, ${from} 0%, ${to} 100%)`;
+  return state.background || "#050505";
+}
+
+function modeLabel(mode: CpProjectionMode) {
+  if (mode === "BLACK") return "Noir";
+  if (mode === "WHITE") return "Blanc";
+  return "Normal";
+}
+
+function currentPreview(current: CpProjectionCurrent) {
+  if (current.kind === "TEXT") {
+    const title = (current.title || "").trim() || "Texte";
+    const body = String(current.body || "").trim();
+    return { title, body: body.slice(0, 120), kind: "TEXT" as const };
+  }
+  if (current.kind === "MEDIA") {
+    const fileName = current.mediaPath?.split(/[\\/]/).pop() || "";
+    if (current.mediaType === "IMAGE") {
+      return {
+        title: (current.title || "").trim() || "Image",
+        body: fileName,
+        kind: "MEDIA_IMAGE" as const,
+      };
+    }
+    return {
+      title: (current.title || "").trim() || "PDF",
+      body: fileName,
+      kind: "MEDIA_PDF" as const,
+    };
+  }
+  return { title: "Vide", body: "", kind: "EMPTY" as const };
+}
+
+type ScreenMiniCardProps = {
+  screen: ScreenKey;
+  state: CpProjectionState | null;
+  isTarget: boolean;
+  isOpen: boolean;
+  isLocked: boolean;
+  onClick: () => void;
+  onDoubleClick: () => void;
+};
+
+function ScreenMiniCard({
+  screen,
+  state,
+  isTarget,
+  isOpen,
+  isLocked,
+  onClick,
+  onDoubleClick,
+}: ScreenMiniCardProps) {
+  const mode = state?.mode || "NORMAL";
+  const current = currentPreview(state?.current ?? { kind: "EMPTY" });
+  const bg = projectionBackground(state);
+  const textColor = mode === "WHITE" ? "#111111" : "#ffffff";
+  const isImage = current.kind === "MEDIA_IMAGE" && state?.current.kind === "MEDIA" && state.current.mediaPath;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onDoubleClick={onDoubleClick}
+      className={cn(
+        "group w-[132px] rounded-md border overflow-hidden text-left transition-colors",
+        isTarget ? "border-primary ring-1 ring-primary/40" : "border-border/60 hover:border-primary/50",
+        !isOpen && "opacity-65",
+      )}
+      title={`Ecran ${screen} - ${isOpen ? "ouvert" : "ferme"} - double clic pour ouvrir/fermer`}
+    >
+      <div className="flex items-center justify-between px-1.5 py-0.5 border-b border-border/60 bg-muted/50">
+        <span className="text-[10px] font-semibold tracking-wide">ECRAN {screen}</span>
+        <div className="flex items-center gap-1">
+          {isLocked && <Lock className="h-2.5 w-2.5 text-destructive" />}
+          <span className="text-[9px] text-muted-foreground">{modeLabel(mode)}</span>
+        </div>
+      </div>
+
+      <div className="relative aspect-video" style={{ background: bg, color: textColor }}>
+        {isImage && (
+          <img
+            src={toFileUrl(state.current.mediaPath)}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
+        <div className="absolute inset-0 p-1.5 flex flex-col justify-center bg-black/25">
+          <div className="text-[10px] font-semibold truncate leading-tight">{current.title}</div>
+          {current.body ? (
+            <div className="text-[9px] opacity-90 line-clamp-2 leading-tight mt-0.5">{current.body}</div>
+          ) : null}
+        </div>
+
+        <div className="absolute top-1 right-1 rounded-sm bg-black/40 px-1 py-0.5">
+          {current.kind === "TEXT" && <Type className="h-2.5 w-2.5 text-white/90" />}
+          {current.kind === "MEDIA_PDF" && <FileText className="h-2.5 w-2.5 text-white/90" />}
+          {current.kind === "MEDIA_IMAGE" && <ImagePlus className="h-2.5 w-2.5 text-white/90" />}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export function LiveBar() {
   const [live, setLive] = useState<CpLiveState | null>(null);
   const [screens, setScreens] = useState<CpScreenMeta[]>([]);
+  const [screenStates, setScreenStates] = useState<Record<ScreenKey, CpProjectionState | null>>({
+    A: null,
+    B: null,
+    C: null,
+  });
   const [quickOpen, setQuickOpen] = useState(false);
   const [bg, setBg] = useState("#050505");
   const [fg, setFg] = useState("#ffffff");
@@ -59,6 +192,36 @@ export function LiveBar() {
       )
     );
     return () => offs.forEach((off) => off?.());
+  }, []);
+
+  useEffect(() => {
+    if (!window.cp.screens) return;
+    const keys = ["A", "B", "C"] as ScreenKey[];
+    let canceled = false;
+
+    void Promise.all(keys.map(async (key) => ({ key, state: await window.cp.screens.getState(key) })))
+      .then((rows) => {
+        if (canceled) return;
+        setScreenStates((prev) => {
+          const next = { ...prev };
+          rows.forEach(({ key, state }) => {
+            next[key] = state;
+          });
+          return next;
+        });
+      })
+      .catch(() => null);
+
+    const offs = keys.map((key) =>
+      window.cp.screens.onState(key, (state) => {
+        setScreenStates((prev) => ({ ...prev, [key]: state }));
+      })
+    );
+
+    return () => {
+      canceled = true;
+      offs.forEach((off) => off?.());
+    };
   }, []);
 
   // Keyboard shortcuts (global)
@@ -182,7 +345,7 @@ export function LiveBar() {
       {/* Screen target */}
       {(["A", "B", "C"] as ScreenKey[]).map((k) => {
         const meta = screens.find((s) => s.key === k);
-        const isOpen = k === "A" ? true : !!meta?.isOpen;
+        const isOpen = !!meta?.isOpen;
         return (
           <Tooltip key={k}>
             <TooltipTrigger asChild>
@@ -203,6 +366,24 @@ export function LiveBar() {
           </Tooltip>
         );
       })}
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {(["A", "B", "C"] as ScreenKey[]).map((k) => {
+          const meta = screens.find((s) => s.key === k);
+          return (
+            <ScreenMiniCard
+              key={`mini-${k}`}
+              screen={k}
+              state={screenStates[k]}
+              isTarget={target === k}
+              isOpen={!!meta?.isOpen}
+              isLocked={!!locked[k]}
+              onClick={() => window.cp.live?.setTarget(k)}
+              onDoubleClick={() => openScreen(k)}
+            />
+          );
+        })}
+      </div>
 
       <Separator orientation="vertical" className="h-5 mx-0.5" />
 

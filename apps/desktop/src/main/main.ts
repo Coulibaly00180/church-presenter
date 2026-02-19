@@ -1,13 +1,24 @@
 import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
-import { join, basename } from "path";
-import { access, copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from "fs/promises";
+import { randomUUID } from "crypto";
+import { constants as fsConstants } from "fs";
+import { join, basename, dirname, extname } from "path";
+import { access, copyFile, mkdir, readdir, readFile, stat, unlink, writeFile, rename } from "fs/promises";
 import { registerSongsIpc } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
 import { openDevtoolsWithGuard } from "./ipc/devtools";
 import { registerSyncIpc, syncBroadcastLive, syncBroadcastScreenState } from "./ipc/syncServer";
-import { inferLibraryFileKind, inferMediaType, inferMimeType, isPathInDir, getErrorMessage } from "./ipc/fileUtils";
+import {
+  inferLibraryFileKind,
+  inferMediaType,
+  inferMimeType,
+  inferFontFamilyFromPath,
+  isFontPath,
+  isPathInDir,
+  getErrorMessage,
+  validateFontHeader,
+} from "./ipc/fileUtils";
 import {
   createDefaultProjectionState,
   createDefaultLiveState,
@@ -24,6 +35,7 @@ import { ensureRuntimeDatabaseUrl, runSafeMigrationForPackagedRuntime } from "./
 import {
   parseDevtoolsTarget,
   parseFilesDeleteMediaPayload,
+  parseFilesRenameMediaPayload,
   parseLiveCursor,
   parseLiveSetLockedPayload,
   parseLiveSetPayload,
@@ -36,6 +48,7 @@ import {
   parseScreenMirrorMode,
 } from "./ipc/runtimeValidation";
 import type {
+  CpDiagnosticsFolderState,
   CpKeyBinding,
   CpMediaFile,
   CpPlanTemplate,
@@ -115,6 +128,21 @@ type ProjectionConfig = {
   screens?: Partial<Record<ScreenKey, ProjectionAppearancePrefs>>;
 };
 
+type SettingsProfileConfig = {
+  id: string;
+  name: string;
+  files?: FilesConfig;
+  projection?: ProjectionConfig;
+  mirrors?: Partial<Record<ScreenKey, ScreenMirrorMode>>;
+  createdAt: number;
+  updatedAt: number;
+};
+
+type ProfilesConfig = {
+  activeProfileId?: string | null;
+  entries?: SettingsProfileConfig[];
+};
+
 type SettingsConfig = {
   version: number;
   app?: AppConfig;
@@ -122,6 +150,7 @@ type SettingsConfig = {
   projection?: ProjectionConfig;
   shortcuts?: ShortcutsConfig;
   templates?: TemplatesConfig;
+  profiles?: ProfilesConfig;
 };
 
 const SETTINGS_VERSION = 1;
@@ -205,6 +234,106 @@ function sanitizePlanTemplates(value: unknown): CpPlanTemplate[] {
   return value.map((entry) => sanitizePlanTemplate(entry)).filter((entry): entry is CpPlanTemplate => !!entry);
 }
 
+function cloneScreenMirrorMode(mode: ScreenMirrorMode): ScreenMirrorMode {
+  return mode.kind === "MIRROR" ? { kind: "MIRROR", from: mode.from } : { kind: "FREE" };
+}
+
+function sanitizeProjectionConfig(value: unknown): ProjectionConfig | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const projectionRec = value as Record<string, unknown>;
+  const screensRaw = projectionRec.screens;
+  if (!screensRaw || typeof screensRaw !== "object" || Array.isArray(screensRaw)) return null;
+  const screensRec = screensRaw as Record<string, unknown>;
+  const screens: Partial<Record<ScreenKey, ProjectionAppearancePrefs>> = {};
+  (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+    const sanitized = sanitizeProjectionAppearancePrefs(screensRec[key]);
+    if (sanitized) screens[key] = sanitized;
+  });
+  return Object.keys(screens).length > 0 ? { screens } : null;
+}
+
+function sanitizeScreenMirrorMode(value: unknown): ScreenMirrorMode | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  if (rec.kind === "FREE") return { kind: "FREE" };
+  if (rec.kind === "MIRROR" && (rec.from === "A" || rec.from === "B" || rec.from === "C")) {
+    return { kind: "MIRROR", from: rec.from };
+  }
+  return null;
+}
+
+function sanitizeMirrorsConfig(value: unknown): Partial<Record<ScreenKey, ScreenMirrorMode>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as Record<string, unknown>;
+  const out: Partial<Record<ScreenKey, ScreenMirrorMode>> = {};
+  (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+    const mode = sanitizeScreenMirrorMode(rec[key]);
+    if (mode) out[key] = mode;
+  });
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function sanitizeSettingsProfile(value: unknown): SettingsProfileConfig | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.id !== "string" || rec.id.trim().length === 0) return null;
+  if (typeof rec.name !== "string" || rec.name.trim().length === 0) return null;
+
+  const now = Date.now();
+  const createdAt =
+    typeof rec.createdAt === "number" && Number.isFinite(rec.createdAt) ? Math.trunc(rec.createdAt) : now;
+  const updatedAt =
+    typeof rec.updatedAt === "number" && Number.isFinite(rec.updatedAt) ? Math.trunc(rec.updatedAt) : createdAt;
+
+  const profile: SettingsProfileConfig = {
+    id: rec.id.trim(),
+    name: rec.name.trim(),
+    createdAt,
+    updatedAt,
+  };
+
+  if (rec.files && typeof rec.files === "object" && !Array.isArray(rec.files)) {
+    const filesRec = rec.files as Record<string, unknown>;
+    if (typeof filesRec.libraryDir === "string" && filesRec.libraryDir.trim().length > 0) {
+      profile.files = { libraryDir: filesRec.libraryDir };
+    }
+  }
+
+  const projection = sanitizeProjectionConfig(rec.projection);
+  if (projection) profile.projection = projection;
+
+  const mirrorsCfg = sanitizeMirrorsConfig(rec.mirrors);
+  if (mirrorsCfg) profile.mirrors = mirrorsCfg;
+
+  return profile;
+}
+
+function normalizeProfilesConfig(value?: ProfilesConfig): { activeProfileId: string | null; entries: SettingsProfileConfig[] } {
+  const seen = new Set<string>();
+  const entries = (value?.entries ?? []).filter((entry) => {
+    if (!entry?.id || seen.has(entry.id)) return false;
+    seen.add(entry.id);
+    return true;
+  });
+
+  let activeProfileId = value?.activeProfileId ?? null;
+  if (activeProfileId && !entries.some((entry) => entry.id === activeProfileId)) {
+    activeProfileId = entries[0]?.id ?? null;
+  }
+  return { activeProfileId, entries };
+}
+
+function sanitizeProfilesConfig(value: unknown): ProfilesConfig | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const rec = value as Record<string, unknown>;
+  const entriesRaw = Array.isArray(rec.entries) ? rec.entries : [];
+  const entries = entriesRaw.map((entry) => sanitizeSettingsProfile(entry)).filter((entry): entry is SettingsProfileConfig => !!entry);
+  const activeRaw = rec.activeProfileId;
+  const activeProfileId = activeRaw === null ? null : typeof activeRaw === "string" ? activeRaw : null;
+  const normalized = normalizeProfilesConfig({ activeProfileId, entries });
+  return { activeProfileId: normalized.activeProfileId, entries: normalized.entries };
+}
+
 async function readSettingsConfig(): Promise<SettingsConfig> {
   const cfgPath = getSettingsConfigPath();
   if (!(await pathExists(cfgPath))) return { version: SETTINGS_VERSION };
@@ -226,25 +355,16 @@ async function readSettingsConfig(): Promise<SettingsConfig> {
       const filesRec = rec.files as Record<string, unknown>;
       if (typeof filesRec.libraryDir === "string") cfg.files = { libraryDir: filesRec.libraryDir };
     }
-    if (rec.projection && typeof rec.projection === "object" && !Array.isArray(rec.projection)) {
-      const projectionRec = rec.projection as Record<string, unknown>;
-      const screensRaw = projectionRec.screens;
-      if (screensRaw && typeof screensRaw === "object" && !Array.isArray(screensRaw)) {
-        const screensRec = screensRaw as Record<string, unknown>;
-        const screens: Partial<Record<ScreenKey, ProjectionAppearancePrefs>> = {};
-        (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
-          const sanitized = sanitizeProjectionAppearancePrefs(screensRec[key]);
-          if (sanitized) screens[key] = sanitized;
-        });
-        cfg.projection = { screens };
-      }
-    }
+    const projection = sanitizeProjectionConfig(rec.projection);
+    if (projection) cfg.projection = projection;
     if (rec.shortcuts && typeof rec.shortcuts === "object" && !Array.isArray(rec.shortcuts)) {
       cfg.shortcuts = sanitizeShortcutOverrides(rec.shortcuts);
     }
     if (Array.isArray(rec.templates)) {
       cfg.templates = sanitizePlanTemplates(rec.templates);
     }
+    const profiles = sanitizeProfilesConfig(rec.profiles);
+    if (profiles) cfg.profiles = profiles;
     return cfg;
   } catch {
     return { version: SETTINGS_VERSION };
@@ -330,17 +450,8 @@ async function readLegacyProjectionConfig(): Promise<ProjectionConfig> {
   try {
     const raw = await readFile(cfgPath, "utf-8");
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    const rec = parsed as Record<string, unknown>;
-    const screensRaw = rec.screens;
-    if (!screensRaw || typeof screensRaw !== "object" || Array.isArray(screensRaw)) return {};
-    const screensRec = screensRaw as Record<string, unknown>;
-    const screens: Partial<Record<ScreenKey, ProjectionAppearancePrefs>> = {};
-    (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
-      const sanitized = sanitizeProjectionAppearancePrefs(screensRec[key]);
-      if (sanitized) screens[key] = sanitized;
-    });
-    return { screens };
+    const projection = sanitizeProjectionConfig(parsed);
+    return projection ?? {};
   } catch {
     return {};
   }
@@ -399,6 +510,193 @@ async function writeTemplatesConfig(templates: TemplatesConfig) {
   await writeSettingsConfig(next);
 }
 
+function cloneProjectionConfig(cfg?: ProjectionConfig): ProjectionConfig | undefined {
+  if (!cfg?.screens) return undefined;
+  const screens: Partial<Record<ScreenKey, ProjectionAppearancePrefs>> = {};
+  (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+    const prefs = cfg.screens?.[key];
+    if (prefs) screens[key] = { ...prefs };
+  });
+  return Object.keys(screens).length > 0 ? { screens } : undefined;
+}
+
+function cloneMirrorsConfig(cfg?: Partial<Record<ScreenKey, ScreenMirrorMode>>): Partial<Record<ScreenKey, ScreenMirrorMode>> | undefined {
+  if (!cfg) return undefined;
+  const out: Partial<Record<ScreenKey, ScreenMirrorMode>> = {};
+  (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+    const mode = cfg[key];
+    if (mode) out[key] = cloneScreenMirrorMode(mode);
+  });
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function cloneSettingsProfile(profile: SettingsProfileConfig): SettingsProfileConfig {
+  return {
+    id: profile.id,
+    name: profile.name,
+    files: profile.files ? { ...profile.files } : undefined,
+    projection: cloneProjectionConfig(profile.projection),
+    mirrors: cloneMirrorsConfig(profile.mirrors),
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  };
+}
+
+type ProfilesState = { activeProfileId: string | null; entries: SettingsProfileConfig[] };
+
+async function readProfilesState(): Promise<ProfilesState> {
+  const settings = await readSettingsConfig();
+  return normalizeProfilesConfig(settings.profiles);
+}
+
+async function writeProfilesState(state: ProfilesState) {
+  const normalized = normalizeProfilesConfig({
+    activeProfileId: state.activeProfileId,
+    entries: state.entries.map((entry) => cloneSettingsProfile(entry)),
+  });
+  const settings = await readSettingsConfig();
+  const next: SettingsConfig = {
+    ...settings,
+    profiles: {
+      activeProfileId: normalized.activeProfileId,
+      entries: normalized.entries,
+    },
+  };
+  await writeSettingsConfig(next);
+}
+
+function getProfilesSnapshot(state: ProfilesState) {
+  return {
+    activeProfileId: state.activeProfileId,
+    profiles: state.entries.map((entry) => cloneSettingsProfile(entry)),
+  };
+}
+
+function buildProjectionSnapshotFromRuntime(): ProjectionConfig {
+  const screens: Partial<Record<ScreenKey, ProjectionAppearancePrefs>> = {};
+  (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+    screens[key] = pickProjectionAppearancePrefs(screenStates[key]);
+  });
+  return { screens };
+}
+
+function buildMirrorsSnapshotFromRuntime(): Partial<Record<ScreenKey, ScreenMirrorMode>> {
+  return {
+    A: cloneScreenMirrorMode(mirrors.A),
+    B: cloneScreenMirrorMode(mirrors.B),
+    C: cloneScreenMirrorMode(mirrors.C),
+  };
+}
+
+async function buildProfileFromRuntime(name: string, existing?: SettingsProfileConfig): Promise<SettingsProfileConfig> {
+  const files = await readFilesConfig();
+  const now = Date.now();
+  return {
+    id: existing?.id ?? randomUUID(),
+    name,
+    files: files.libraryDir ? { libraryDir: files.libraryDir } : undefined,
+    projection: buildProjectionSnapshotFromRuntime(),
+    mirrors: buildMirrorsSnapshotFromRuntime(),
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+async function applyProfileToRuntime(profile: SettingsProfileConfig) {
+  if (profile.files?.libraryDir?.trim()) {
+    await ensureLibraryDirs(profile.files.libraryDir);
+    await writeFilesConfig({ libraryDir: profile.files.libraryDir });
+  }
+
+  const screenPrefs = profile.projection?.screens;
+  if (screenPrefs) {
+    (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+      const prefs = screenPrefs[key];
+      if (!prefs) return;
+      screenStates[key] = {
+        ...screenStates[key],
+        ...prefs,
+        updatedAt: Date.now(),
+      };
+    });
+    await writeProjectionConfig(buildProjectionSnapshotFromRuntime());
+  }
+
+  const mirrorPrefs = profile.mirrors;
+  if (mirrorPrefs) {
+    (["A", "B", "C"] as ScreenKey[]).forEach((key) => {
+      const mode = mirrorPrefs[key];
+      if (!mode) return;
+      mirrors[key] = cloneScreenMirrorMode(mode);
+      regieWin?.webContents.send("screens:meta", { key, mirror: mirrors[key] });
+    });
+  }
+
+  broadcastAllScreensState();
+}
+
+async function syncActiveProfileFromRuntime() {
+  const state = await readProfilesState();
+  if (!state.activeProfileId) return null;
+  const idx = state.entries.findIndex((entry) => entry.id === state.activeProfileId);
+  if (idx === -1) return null;
+
+  const current = state.entries[idx];
+  const updated = await buildProfileFromRuntime(current.name, current);
+  state.entries[idx] = updated;
+  await writeProfilesState(state);
+  return updated;
+}
+
+async function ensureProfilesOnStartup() {
+  const state = await readProfilesState();
+  if (state.entries.length > 0) return state;
+
+  const defaultProfile = await buildProfileFromRuntime("Profil principal");
+  const next: ProfilesState = {
+    activeProfileId: defaultProfile.id,
+    entries: [defaultProfile],
+  };
+  await writeProfilesState(next);
+  return next;
+}
+
+async function applyActiveProfileOnStartup() {
+  const state = await ensureProfilesOnStartup();
+  if (!state.activeProfileId) return;
+  const active = state.entries.find((entry) => entry.id === state.activeProfileId);
+  if (!active) return;
+  await applyProfileToRuntime(active);
+}
+
+function parseProfileIdPayload(value: unknown): { profileId: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid profile payload");
+  }
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.profileId !== "string" || rec.profileId.trim().length === 0) {
+    throw new Error("Invalid profileId");
+  }
+  return { profileId: rec.profileId.trim() };
+}
+
+function parseProfileNamePayload(value: unknown): { name: string } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Invalid profile payload");
+  }
+  const rec = value as Record<string, unknown>;
+  if (typeof rec.name !== "string" || rec.name.trim().length === 0) {
+    throw new Error("Invalid profile name");
+  }
+  return { name: rec.name.trim() };
+}
+
+function parseProfileRenamePayload(value: unknown): { profileId: string; name: string } {
+  const idPayload = parseProfileIdPayload(value);
+  const namePayload = parseProfileNamePayload(value);
+  return { profileId: idPayload.profileId, name: namePayload.name };
+}
+
 async function migrateLegacySettingsIfNeeded() {
   const settings = await readSettingsConfig();
   let changed = false;
@@ -445,6 +743,7 @@ async function persistProjectionAppearanceForScreen(key: ScreenKey) {
   const screens = { ...(cfg.screens ?? {}) };
   screens[key] = pickProjectionAppearancePrefs(screenStates[key]);
   await writeProjectionConfig({ screens });
+  await syncActiveProfileFromRuntime();
 }
 
 type LibraryDirs = {
@@ -476,6 +775,69 @@ async function getActiveLibraryDirs(): Promise<LibraryDirs> {
   const cfg = await readFilesConfig();
   const rootDir = cfg.libraryDir?.trim() || getMediaDir();
   return ensureLibraryDirs(rootDir);
+}
+
+async function getFolderDiagnostics(path: string): Promise<CpDiagnosticsFolderState> {
+  const exists = await pathExists(path);
+  if (!exists) {
+    return {
+      path,
+      exists: false,
+      readable: false,
+      writable: false,
+      fileCount: 0,
+      error: "Folder not found",
+    };
+  }
+
+  let readable = true;
+  let writable = true;
+  let fileCount = 0;
+  let error: string | undefined;
+
+  try {
+    await access(path, fsConstants.R_OK);
+  } catch {
+    readable = false;
+  }
+  try {
+    await access(path, fsConstants.W_OK);
+  } catch {
+    writable = false;
+  }
+  try {
+    const entries = await readdir(path);
+    fileCount = entries.length;
+  } catch (e: unknown) {
+    error = getErrorMessage(e);
+  }
+
+  return {
+    path,
+    exists: true,
+    readable,
+    writable,
+    fileCount,
+    error,
+  };
+}
+
+async function validateFontFilePath(filePath: string): Promise<{ valid: boolean; reason?: string; family?: string }> {
+  if (!isFontPath(filePath)) {
+    return { valid: false, reason: "Unsupported font extension" };
+  }
+  if (!(await pathExists(filePath))) {
+    return { valid: false, reason: "Font file not found" };
+  }
+
+  try {
+    const data = await readFile(filePath);
+    const validation = validateFontHeader(data.subarray(0, 4));
+    if (!validation.valid) return { valid: false, reason: validation.reason };
+    return { valid: true, family: inferFontFamilyFromPath(filePath) };
+  } catch (e: unknown) {
+    return { valid: false, reason: getErrorMessage(e) };
+  }
 }
 
 async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "fonts" | "root"): Promise<CpMediaFile[]> {
@@ -667,6 +1029,7 @@ void app.whenReady().then(async () => {
   await ensureRuntimeDatabaseUrl();
   await migrateLegacySettingsIfNeeded();
   await applyProjectionConfigOnStartup();
+  await applyActiveProfileOnStartup();
 
   if (app.isPackaged) {
     try {
@@ -796,6 +1159,41 @@ ipcMain.handle("devtools:open", (_evt, rawTarget: unknown) => {
   });
 });
 
+ipcMain.handle("diagnostics:getState", async () => {
+  try {
+    const dirs = await getActiveLibraryDirs();
+    const [root, images, documents, fonts] = await Promise.all([
+      getFolderDiagnostics(dirs.rootDir),
+      getFolderDiagnostics(dirs.imagesDir),
+      getFolderDiagnostics(dirs.documentsDir),
+      getFolderDiagnostics(dirs.fontsDir),
+    ]);
+
+    const screens = (["A", "B", "C"] as ScreenKey[]).map((key) => ({
+      key,
+      isOpen: !!projWins[key],
+      mirror: cloneScreenMirrorMode(mirrors[key]),
+      mode: screenStates[key].mode,
+      currentKind: screenStates[key].current.kind,
+      updatedAt: screenStates[key].updatedAt,
+    }));
+
+    return {
+      ok: true,
+      diagnostics: {
+        generatedAt: Date.now(),
+        appVersion: app.getVersion(),
+        userDataDir: app.getPath("userData"),
+        libraryDir: dirs.rootDir,
+        screens,
+        folders: { root, images, documents, fonts },
+      },
+    };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
 ipcMain.handle("settings:getTheme", async () => {
   try {
     const appCfg = await readAppConfig();
@@ -855,6 +1253,114 @@ ipcMain.handle("settings:setTemplates", async (_evt, rawTemplates: unknown) => {
   }
 });
 
+ipcMain.handle("settings:getProfiles", async () => {
+  try {
+    const state = await ensureProfilesOnStartup();
+    return { ok: true, snapshot: getProfilesSnapshot(state) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:createProfile", async (_evt, rawPayload: unknown) => {
+  try {
+    const { name } = parseProfileNamePayload(rawPayload);
+    const state = await ensureProfilesOnStartup();
+    const profile = await buildProfileFromRuntime(name);
+    state.entries.push(profile);
+    state.activeProfileId = profile.id;
+    await writeProfilesState(state);
+    return { ok: true, snapshot: getProfilesSnapshot(state), profile: cloneSettingsProfile(profile) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:activateProfile", async (_evt, rawPayload: unknown) => {
+  try {
+    const { profileId } = parseProfileIdPayload(rawPayload);
+    const state = await ensureProfilesOnStartup();
+    const profile = state.entries.find((entry) => entry.id === profileId);
+    if (!profile) return { ok: false, error: "Profile not found" };
+
+    state.activeProfileId = profile.id;
+    await writeProfilesState(state);
+    await applyProfileToRuntime(profile);
+
+    return { ok: true, snapshot: getProfilesSnapshot(state), profile: cloneSettingsProfile(profile) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:renameProfile", async (_evt, rawPayload: unknown) => {
+  try {
+    const { profileId, name } = parseProfileRenamePayload(rawPayload);
+    const state = await ensureProfilesOnStartup();
+    const idx = state.entries.findIndex((entry) => entry.id === profileId);
+    if (idx === -1) return { ok: false, error: "Profile not found" };
+
+    const nextProfile: SettingsProfileConfig = {
+      ...state.entries[idx],
+      name,
+      updatedAt: Date.now(),
+    };
+    state.entries[idx] = nextProfile;
+    await writeProfilesState(state);
+
+    return { ok: true, snapshot: getProfilesSnapshot(state), profile: cloneSettingsProfile(nextProfile) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:saveActiveProfile", async () => {
+  try {
+    const state = await ensureProfilesOnStartup();
+    if (!state.activeProfileId) return { ok: false, error: "No active profile" };
+
+    const idx = state.entries.findIndex((entry) => entry.id === state.activeProfileId);
+    if (idx === -1) return { ok: false, error: "Active profile not found" };
+
+    const updated = await buildProfileFromRuntime(state.entries[idx].name, state.entries[idx]);
+    state.entries[idx] = updated;
+    await writeProfilesState(state);
+
+    return { ok: true, snapshot: getProfilesSnapshot(state), profile: cloneSettingsProfile(updated) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("settings:deleteProfile", async (_evt, rawPayload: unknown) => {
+  try {
+    const { profileId } = parseProfileIdPayload(rawPayload);
+    const state = await ensureProfilesOnStartup();
+    if (state.entries.length <= 1) {
+      return { ok: false, error: "At least one profile is required" };
+    }
+
+    const idx = state.entries.findIndex((entry) => entry.id === profileId);
+    if (idx === -1) return { ok: false, error: "Profile not found" };
+
+    const deletedWasActive = state.activeProfileId === profileId;
+    state.entries.splice(idx, 1);
+    if (!state.activeProfileId || deletedWasActive) {
+      state.activeProfileId = state.entries[0]?.id ?? null;
+    }
+    await writeProfilesState(state);
+
+    if (deletedWasActive && state.activeProfileId) {
+      const active = state.entries.find((entry) => entry.id === state.activeProfileId);
+      if (active) await applyProfileToRuntime(active);
+    }
+
+    return { ok: true, snapshot: getProfilesSnapshot(state) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
 ipcMain.handle("files:pickMedia", async () => {
   const res = await dialog.showOpenDialog({
     title: "Choisir un fichier media (image / PDF)",
@@ -894,6 +1400,10 @@ ipcMain.handle("files:pickFont", async () => {
   const p = res.filePaths[0];
   const kind = inferLibraryFileKind(p);
   if (kind !== "FONT") return { ok: false, error: "Unsupported font extension" };
+  const sourceValidation = await validateFontFilePath(p);
+  if (!sourceValidation.valid) {
+    return { ok: false, error: sourceValidation.reason || "Invalid font file" };
+  }
 
   const dirs = await getActiveLibraryDirs();
   const target = join(dirs.fontsDir, basename(p));
@@ -946,6 +1456,7 @@ ipcMain.handle("files:chooseLibraryDir", async () => {
     const path = result.filePaths[0];
     await ensureLibraryDirs(path);
     await writeFilesConfig({ libraryDir: path });
+    await syncActiveProfileFromRuntime();
     return { ok: true, path };
   } catch (e: unknown) {
     return { ok: false, error: getErrorMessage(e) };
@@ -965,6 +1476,77 @@ ipcMain.handle("files:readMedia", async (_evt, rawPayload: unknown) => {
     }
     const data = await readFile(payload.path);
     return { ok: true, base64: data.toString("base64"), mimeType: inferMimeType(payload.path) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("files:validateFont", async (_evt, rawPayload: unknown) => {
+  try {
+    const payload = parseFilesDeleteMediaPayload(rawPayload);
+    if (!payload?.path) return { ok: false, error: "Missing media path" };
+    const dirs = await getActiveLibraryDirs();
+    if (!isPathInDir(dirs.rootDir, payload.path)) {
+      return { ok: false, error: "Path outside media directory" };
+    }
+    const validation = await validateFontFilePath(payload.path);
+    return {
+      ok: true,
+      valid: validation.valid,
+      reason: validation.reason,
+      family: validation.family,
+    };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
+ipcMain.handle("files:renameMedia", async (_evt, rawPayload: unknown) => {
+  try {
+    const payload = parseFilesRenameMediaPayload(rawPayload);
+    if (!payload?.path) return { ok: false, error: "Missing media path" };
+    const dirs = await getActiveLibraryDirs();
+    if (!isPathInDir(dirs.rootDir, payload.path)) {
+      return { ok: false, error: "Path outside media directory" };
+    }
+    if (!(await pathExists(payload.path))) {
+      return { ok: false, error: "Media file not found" };
+    }
+    const kind = inferLibraryFileKind(payload.path);
+    if (!kind) return { ok: false, error: "Unsupported file kind" };
+
+    const requestedName = payload.name.trim();
+    if (!requestedName) return { ok: false, error: "Missing destination name" };
+    if (requestedName.includes("\\") || requestedName.includes("/")) {
+      return { ok: false, error: "Invalid destination name" };
+    }
+
+    const currentExt = extname(payload.path).toLowerCase();
+    const requestedExt = extname(requestedName).toLowerCase();
+    const finalName =
+      requestedExt.length === 0
+        ? `${requestedName}${currentExt}`
+        : requestedExt === currentExt
+          ? requestedName
+          : "";
+
+    if (!finalName) {
+      return { ok: false, error: "Extension must match current file extension" };
+    }
+
+    const nextPath = join(dirname(payload.path), finalName);
+    if (!isPathInDir(dirs.rootDir, nextPath)) {
+      return { ok: false, error: "Path outside media directory" };
+    }
+    if (nextPath === payload.path) {
+      return { ok: true, path: payload.path, name: basename(payload.path) };
+    }
+    if (await pathExists(nextPath)) {
+      return { ok: false, error: "A file with this name already exists" };
+    }
+
+    await rename(payload.path, nextPath);
+    return { ok: true, path: nextPath, name: basename(nextPath) };
   } catch (e: unknown) {
     return { ok: false, error: getErrorMessage(e) };
   }
@@ -1061,6 +1643,7 @@ ipcMain.handle("screens:setMirror", (_evt, rawKey: unknown, rawMirror: unknown) 
   const result = _setMirror(screenCtx, key, mirror);
   // Notify regie
   regieWin?.webContents.send("screens:meta", { key, mirror });
+  void syncActiveProfileFromRuntime();
   return result;
 });
 

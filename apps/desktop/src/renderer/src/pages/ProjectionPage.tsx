@@ -162,7 +162,7 @@ export function ProjectionPage() {
   const textScale = state?.textScale ?? 1;
   const configuredTextFont = state?.textFont || "system-ui";
   const textFontPath = state?.textFontPath || "";
-  const textFont = runtimeFontFamily || configuredTextFont;
+  const textFont = textFontPath ? (runtimeFontFamily || "system-ui") : configuredTextFont;
   const bgMode = state?.backgroundMode ?? "SOLID";
   const bgSolid = state?.background || "#050505";
   const bgGradientFrom = state?.backgroundGradientFrom || "#2563eb";

@@ -179,11 +179,17 @@ const cpApi: CpApi = {
       ipcRenderer.invoke("devtools:open", target),
   },
 
+  diagnostics: {
+    getState: () => ipcRenderer.invoke("diagnostics:getState"),
+  },
+
   files: {
     pickMedia: () => ipcRenderer.invoke("files:pickMedia"),
     pickFont: () => ipcRenderer.invoke("files:pickFont"),
+    validateFont: (payload: { path: string }) => ipcRenderer.invoke("files:validateFont", payload),
     listMedia: () => ipcRenderer.invoke("files:listMedia"),
     deleteMedia: (payload: { path: string }) => ipcRenderer.invoke("files:deleteMedia", payload),
+    renameMedia: (payload: { path: string; name: string }) => ipcRenderer.invoke("files:renameMedia", payload),
     chooseLibraryDir: () => ipcRenderer.invoke("files:chooseLibraryDir"),
     getLibraryDir: () => ipcRenderer.invoke("files:getLibraryDir"),
     readMedia: (payload: { path: string }) => ipcRenderer.invoke("files:readMedia", payload),
@@ -196,6 +202,12 @@ const cpApi: CpApi = {
     setShortcuts: (shortcuts) => ipcRenderer.invoke("settings:setShortcuts", shortcuts),
     getTemplates: () => ipcRenderer.invoke("settings:getTemplates"),
     setTemplates: (templates) => ipcRenderer.invoke("settings:setTemplates", templates),
+    getProfiles: () => ipcRenderer.invoke("settings:getProfiles"),
+    createProfile: (payload: { name: string }) => ipcRenderer.invoke("settings:createProfile", payload),
+    activateProfile: (payload: { profileId: string }) => ipcRenderer.invoke("settings:activateProfile", payload),
+    renameProfile: (payload: { profileId: string; name: string }) => ipcRenderer.invoke("settings:renameProfile", payload),
+    saveActiveProfile: () => ipcRenderer.invoke("settings:saveActiveProfile"),
+    deleteProfile: (payload: { profileId: string }) => ipcRenderer.invoke("settings:deleteProfile", payload),
   },
 };
 

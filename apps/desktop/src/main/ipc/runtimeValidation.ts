@@ -188,6 +188,14 @@ export function parseFilesDeleteMediaPayload(value: unknown): { path: string } {
   return { path: expectString(rec.path, "files:deleteMedia.path") };
 }
 
+export function parseFilesRenameMediaPayload(value: unknown): { path: string; name: string } {
+  const rec = expectRecord(value, "files:renameMedia payload");
+  return {
+    path: expectString(rec.path, "files:renameMedia.path"),
+    name: expectString(rec.name, "files:renameMedia.name"),
+  };
+}
+
 export function parseProjectionStatePatch(value: unknown): Partial<CpProjectionState> {
   const rec = expectRecord(value, "projection:setState payload");
   const patch: Partial<CpProjectionState> = {};

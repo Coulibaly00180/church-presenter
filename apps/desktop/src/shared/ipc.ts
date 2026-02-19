@@ -234,6 +234,10 @@ export type CpFilesPickFontResult =
   | { ok: false; error: string };
 export type CpFilesListMediaResult = { ok: true; rootDir: string; files: CpMediaFile[] } | { ok: false; error: string };
 export type CpFilesDeleteMediaResult = { ok: true } | { ok: false; error: string };
+export type CpFilesRenameMediaResult = { ok: true; path: string; name: string } | { ok: false; error: string };
+export type CpFilesValidateFontResult =
+  | { ok: true; valid: boolean; reason?: string; family?: string }
+  | { ok: false; error: string };
 export type CpFilesChooseLibraryDirResult =
   | { ok: true; path: string }
   | { ok: false; canceled: true }
@@ -248,6 +252,24 @@ export type CpSettingsGetShortcutsResult = { ok: true; shortcuts: CpShortcutOver
 export type CpSettingsSetShortcutsResult = { ok: true; shortcuts: CpShortcutOverrides } | { ok: false; error: string };
 export type CpSettingsGetTemplatesResult = { ok: true; templates: CpPlanTemplate[] } | { ok: false; error: string };
 export type CpSettingsSetTemplatesResult = { ok: true; templates: CpPlanTemplate[] } | { ok: false; error: string };
+export type CpSettingsProfile = {
+  id: string;
+  name: string;
+  files?: { libraryDir?: string };
+  projection?: { screens?: Partial<Record<ScreenKey, CpProjectionSetAppearancePayload>> };
+  mirrors?: Partial<Record<ScreenKey, ScreenMirrorMode>>;
+  createdAt: number;
+  updatedAt: number;
+};
+export type CpSettingsProfilesSnapshot = {
+  profiles: CpSettingsProfile[];
+  activeProfileId: string | null;
+};
+export type CpSettingsGetProfilesResult = { ok: true; snapshot: CpSettingsProfilesSnapshot } | { ok: false; error: string };
+export type CpSettingsProfileSaveResult =
+  | { ok: true; snapshot: CpSettingsProfilesSnapshot; profile: CpSettingsProfile }
+  | { ok: false; error: string };
+export type CpSettingsProfileDeleteResult = { ok: true; snapshot: CpSettingsProfilesSnapshot } | { ok: false; error: string };
 
 export type CpProjectionSetAppearancePayload = {
   textScale?: number;
@@ -285,6 +307,37 @@ export type CpSyncStatus = {
 
 export type CpSyncStartResult = { ok: true; port: number; addresses: string[] } | { ok: false; error: string };
 export type CpSyncStopResult = { ok: true };
+
+export type CpDiagnosticsFolderState = {
+  path: string;
+  exists: boolean;
+  readable: boolean;
+  writable: boolean;
+  fileCount: number;
+  error?: string;
+};
+export type CpDiagnosticsScreenState = {
+  key: ScreenKey;
+  isOpen: boolean;
+  mirror: ScreenMirrorMode;
+  mode: CpProjectionMode;
+  currentKind: CpProjectionCurrent["kind"];
+  updatedAt: number;
+};
+export type CpDiagnosticsState = {
+  generatedAt: number;
+  appVersion: string;
+  userDataDir: string;
+  libraryDir: string;
+  screens: CpDiagnosticsScreenState[];
+  folders: {
+    root: CpDiagnosticsFolderState;
+    images: CpDiagnosticsFolderState;
+    documents: CpDiagnosticsFolderState;
+    fonts: CpDiagnosticsFolderState;
+  };
+};
+export type CpDiagnosticsGetResult = { ok: true; diagnostics: CpDiagnosticsState } | { ok: false; error: string };
 
 export type CpScreenStateEventPayload = { key: ScreenKey; state: CpProjectionState };
 export type CpScreenWindowEventPayload = { key: ScreenKey; isOpen: boolean };
@@ -376,10 +429,15 @@ export interface CpApi {
   devtools: {
     open: (target: CpDevtoolsTarget) => Promise<CpDevtoolsOpenResult>;
   };
+  diagnostics: {
+    getState: () => Promise<CpDiagnosticsGetResult>;
+  };
   files: {
     pickMedia: () => Promise<CpFilesPickMediaResult>;
     pickFont: () => Promise<CpFilesPickFontResult>;
+    validateFont: (payload: { path: string }) => Promise<CpFilesValidateFontResult>;
     deleteMedia: (payload: { path: string }) => Promise<CpFilesDeleteMediaResult>;
+    renameMedia: (payload: { path: string; name: string }) => Promise<CpFilesRenameMediaResult>;
     listMedia: () => Promise<CpFilesListMediaResult>;
     chooseLibraryDir: () => Promise<CpFilesChooseLibraryDirResult>;
     getLibraryDir: () => Promise<CpFilesGetLibraryDirResult>;
@@ -392,5 +450,11 @@ export interface CpApi {
     setShortcuts: (shortcuts: CpShortcutOverrides) => Promise<CpSettingsSetShortcutsResult>;
     getTemplates: () => Promise<CpSettingsGetTemplatesResult>;
     setTemplates: (templates: CpPlanTemplate[]) => Promise<CpSettingsSetTemplatesResult>;
+    getProfiles: () => Promise<CpSettingsGetProfilesResult>;
+    createProfile: (payload: { name: string }) => Promise<CpSettingsProfileSaveResult>;
+    activateProfile: (payload: { profileId: string }) => Promise<CpSettingsProfileSaveResult>;
+    renameProfile: (payload: { profileId: string; name: string }) => Promise<CpSettingsProfileSaveResult>;
+    saveActiveProfile: () => Promise<CpSettingsProfileSaveResult>;
+    deleteProfile: (payload: { profileId: string }) => Promise<CpSettingsProfileDeleteResult>;
   };
 }

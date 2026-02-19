@@ -64,6 +64,10 @@ declare global {
 
   type CpDevtoolsTarget = Shared.CpDevtoolsTarget;
   type CpDevtoolsOpenResult = Shared.CpDevtoolsOpenResult;
+  type CpDiagnosticsFolderState = Shared.CpDiagnosticsFolderState;
+  type CpDiagnosticsScreenState = Shared.CpDiagnosticsScreenState;
+  type CpDiagnosticsState = Shared.CpDiagnosticsState;
+  type CpDiagnosticsGetResult = Shared.CpDiagnosticsGetResult;
 
   type CpLiveSetPayload = Shared.CpLiveSetPayload;
   type CpSyncStatus = Shared.CpSyncStatus;
@@ -75,6 +79,8 @@ declare global {
   type CpFilesPickFontResult = Shared.CpFilesPickFontResult;
   type CpFilesListMediaResult = Shared.CpFilesListMediaResult;
   type CpFilesDeleteMediaResult = Shared.CpFilesDeleteMediaResult;
+  type CpFilesRenameMediaResult = Shared.CpFilesRenameMediaResult;
+  type CpFilesValidateFontResult = Shared.CpFilesValidateFontResult;
   type CpFilesChooseLibraryDirResult = Shared.CpFilesChooseLibraryDirResult;
   type CpFilesGetLibraryDirResult = Shared.CpFilesGetLibraryDirResult;
   type CpFilesReadMediaResult = Shared.CpFilesReadMediaResult;
@@ -88,6 +94,11 @@ declare global {
   type CpSettingsSetShortcutsResult = Shared.CpSettingsSetShortcutsResult;
   type CpSettingsGetTemplatesResult = Shared.CpSettingsGetTemplatesResult;
   type CpSettingsSetTemplatesResult = Shared.CpSettingsSetTemplatesResult;
+  type CpSettingsProfile = Shared.CpSettingsProfile;
+  type CpSettingsProfilesSnapshot = Shared.CpSettingsProfilesSnapshot;
+  type CpSettingsGetProfilesResult = Shared.CpSettingsGetProfilesResult;
+  type CpSettingsProfileSaveResult = Shared.CpSettingsProfileSaveResult;
+  type CpSettingsProfileDeleteResult = Shared.CpSettingsProfileDeleteResult;
 
   interface Window {
     cp: Shared.CpApi;

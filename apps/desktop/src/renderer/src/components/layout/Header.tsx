@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Monitor, MonitorOff, Moon, Sun, Settings, Palette, Keyboard, Plus } from "lucide-react";
+import { Monitor, MonitorOff, Moon, Sun, Settings, Palette, Keyboard, Plus, Bug } from "lucide-react";
 import { ProjectionSettings } from "@/components/dialogs/ProjectionSettings";
 import { ShortcutsDialog } from "@/components/dialogs/ShortcutsDialog";
+import { DebugDialog } from "@/components/dialogs/DebugDialog";
 import { hydrateShortcuts, matchAction } from "@/lib/shortcuts";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
@@ -61,6 +62,7 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [pendingNewDate, setPendingNewDate] = useState<string | null>(null);
   const [pendingNewTitle, setPendingNewTitle] = useState("Culte");
+  const [debugOpen, setDebugOpen] = useState(false);
 
   const refreshPlans = () => window.cp.plans.list().then(setPlans).catch(() => null);
 
@@ -256,11 +258,15 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
           <DropdownMenuItem onClick={() => window.cp.devtools?.open?.("PROJECTION")}>
             DevTools Projection
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setDebugOpen(true)}>
+            <Bug className="h-3.5 w-3.5 mr-1.5" /> Diagnostic debug
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <ProjectionSettings open={appearanceOpen} onOpenChange={setAppearanceOpen} />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <DebugDialog open={debugOpen} onOpenChange={setDebugOpen} />
       <TemplatePickerDialog
         open={templatePickerOpen}
         onOpenChange={(v) => { setTemplatePickerOpen(v); if (!v) setPendingNewDate(null); }}
