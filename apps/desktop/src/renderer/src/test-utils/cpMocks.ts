@@ -91,6 +91,10 @@ export function createCpMock() {
         void key;
         return { ok: true, state: projectionState };
       }),
+      setState: vi.fn(async (key: ScreenKey) => {
+        void key;
+        return { ok: true, state: projectionState };
+      }),
       setAppearance: vi.fn(async (key: ScreenKey) => {
         void key;
         return { ok: true, state: projectionState };

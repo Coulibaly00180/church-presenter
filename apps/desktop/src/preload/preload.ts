@@ -73,6 +73,8 @@ const cpApi: CpApi = {
     setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) =>
       ipcRenderer.invoke("screens:setMirror", key, mirror),
     getState: (key: ScreenKey) => ipcRenderer.invoke("screens:getState", key),
+    setState: (key: ScreenKey, patch: Partial<CpProjectionState>) =>
+      ipcRenderer.invoke("screens:setState", key, patch),
     setContentText: (key: ScreenKey, payload: CpProjectionSetTextPayload) =>
       ipcRenderer.invoke("screens:setContentText", key, payload),
     setContentMedia: (key: ScreenKey, payload: CpProjectionSetMediaPayload) =>

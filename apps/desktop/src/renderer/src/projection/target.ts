@@ -55,7 +55,14 @@ export async function projectTextToScreen(payload: TextProjectionPayload) {
 
   const res = await route.screensApi.setContentText(route.destination, { title, body, metaSong });
   if (!res.ok && res.reason === "MIRROR") {
-    await window.cp.projection.setContentText({ title, body, metaSong });
+    const list = await route.screensApi.list();
+    const meta = list.find((screen) => screen.key === target);
+    const fallback = resolveProjectionDestination(target, meta);
+    if (fallback === "A") {
+      await window.cp.projection.setContentText({ title, body, metaSong });
+      return;
+    }
+    await route.screensApi.setContentText(fallback, { title, body, metaSong });
   }
 }
 
@@ -71,6 +78,13 @@ export async function projectMediaToScreen(payload: MediaProjectionPayload) {
 
   const res = await route.screensApi.setContentMedia(route.destination, { title, mediaPath, mediaType });
   if (!res.ok && res.reason === "MIRROR") {
-    await window.cp.projection.setContentMedia({ title, mediaPath, mediaType });
+    const list = await route.screensApi.list();
+    const meta = list.find((screen) => screen.key === target);
+    const fallback = resolveProjectionDestination(target, meta);
+    if (fallback === "A") {
+      await window.cp.projection.setContentMedia({ title, mediaPath, mediaType });
+      return;
+    }
+    await route.screensApi.setContentMedia(fallback, { title, mediaPath, mediaType });
   }
 }

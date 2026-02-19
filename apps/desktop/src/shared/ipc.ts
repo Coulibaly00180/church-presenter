@@ -365,6 +365,7 @@ export interface CpApi {
     close: (key: ScreenKey) => Promise<CpWindowState>;
     setMirror: (key: ScreenKey, mirror: ScreenMirrorMode) => Promise<CpScreenMirrorResult>;
     getState: (key: ScreenKey) => Promise<CpProjectionState>;
+    setState: (key: ScreenKey, patch: Partial<CpProjectionState>) => Promise<CpScreenMutationResult>;
     setContentText: (key: ScreenKey, payload: CpProjectionSetTextPayload) => Promise<CpScreenMutationResult>;
     setContentMedia: (key: ScreenKey, payload: CpProjectionSetMediaPayload) => Promise<CpScreenMutationResult>;
     setMode: (key: ScreenKey, mode: CpProjectionMode) => Promise<CpScreenMutationResult>;

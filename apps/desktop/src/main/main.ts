@@ -543,6 +543,7 @@ function cloneSettingsProfile(profile: SettingsProfileConfig): SettingsProfileCo
 }
 
 type ProfilesState = { activeProfileId: string | null; entries: SettingsProfileConfig[] };
+let ensureProfilesInFlight: Promise<ProfilesState> | null = null;
 
 async function readProfilesState(): Promise<ProfilesState> {
   const settings = await readSettingsConfig();
@@ -643,22 +644,46 @@ async function syncActiveProfileFromRuntime() {
 
   const current = state.entries[idx];
   const updated = await buildProfileFromRuntime(current.name, current);
-  state.entries[idx] = updated;
-  await writeProfilesState(state);
+
+  // Re-read the latest state before writing to avoid dropping concurrent
+  // profile changes (create/rename/delete) with stale snapshots.
+  const latest = await readProfilesState();
+  const latestIdx = latest.entries.findIndex((entry) => entry.id === updated.id);
+  if (latestIdx === -1) {
+    latest.entries.push(updated);
+  } else {
+    latest.entries[latestIdx] = updated;
+  }
+  if (!latest.activeProfileId) {
+    latest.activeProfileId = updated.id;
+  }
+  await writeProfilesState(latest);
   return updated;
 }
 
 async function ensureProfilesOnStartup() {
-  const state = await readProfilesState();
-  if (state.entries.length > 0) return state;
+  if (ensureProfilesInFlight) return ensureProfilesInFlight;
+  ensureProfilesInFlight = (async () => {
+    const state = await readProfilesState();
+    if (state.entries.length > 0) return state;
 
-  const defaultProfile = await buildProfileFromRuntime("Profil principal");
-  const next: ProfilesState = {
-    activeProfileId: defaultProfile.id,
-    entries: [defaultProfile],
-  };
-  await writeProfilesState(next);
-  return next;
+    const defaultProfile = await buildProfileFromRuntime("Profil principal");
+    const latest = await readProfilesState();
+    if (latest.entries.length > 0) return latest;
+
+    const next: ProfilesState = {
+      activeProfileId: defaultProfile.id,
+      entries: [defaultProfile],
+    };
+    await writeProfilesState(next);
+    return next;
+  })();
+
+  try {
+    return await ensureProfilesInFlight;
+  } finally {
+    ensureProfilesInFlight = null;
+  }
 }
 
 async function applyActiveProfileOnStartup() {
@@ -1650,6 +1675,12 @@ ipcMain.handle("screens:setMirror", (_evt, rawKey: unknown, rawMirror: unknown) 
 ipcMain.handle("screens:getState", (_evt, rawKey: unknown) => {
   const key = parseScreenKey(rawKey, "screens:getState.key");
   return screenStates[key];
+});
+
+ipcMain.handle("screens:setState", (_evt, rawKey: unknown, rawPatch: unknown) => {
+  const key = parseScreenKey(rawKey, "screens:setState.key");
+  const patch = parseProjectionStatePatch(rawPatch);
+  return _setStatePatch(screenCtx, key, patch);
 });
 
 ipcMain.handle("screens:setContentText", (_evt, rawKey: unknown, rawPayload: unknown) => {

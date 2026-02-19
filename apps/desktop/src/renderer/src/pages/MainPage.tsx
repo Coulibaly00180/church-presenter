@@ -11,7 +11,7 @@ import { EditItemDialog } from "@/components/dialogs/EditItemDialog";
 import { ProjectionHistoryDialog, type ProjectionLogEntry } from "@/components/dialogs/ProjectionHistoryDialog";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import { isoToYmd } from "@/lib/date";
-import type { Plan, PlanItem } from "@/lib/types";
+import type { Plan, PlanItem, ScreenKey } from "@/lib/types";
 
 type MainPageContext = {
   planId: string | null;
@@ -33,6 +33,8 @@ export function MainPage() {
   const [loopActive, setLoopActive] = useState(false);
   const [loopInterval, setLoopInterval] = useState(10);
   const loopRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastAutoProjectionRef = useRef("");
+  const prevLiveRef = useRef<CpLiveState | null>(null);
 
   // Load plan
   useEffect(() => {
@@ -61,6 +63,11 @@ export function MainPage() {
     }
   }, [planId]);
 
+  useEffect(() => {
+    lastAutoProjectionRef.current = "";
+    prevLiveRef.current = null;
+  }, [planId]);
+
   // Loop mode: auto-advance through plan items
   useEffect(() => {
     if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
@@ -73,20 +80,78 @@ export function MainPage() {
       const nextIdx = currentIdx >= items.length - 1 ? 0 : currentIdx + 1;
       const nextItem = items[nextIdx];
       if (nextItem) {
-        const target = live?.target ?? "A";
-        projectPlanItemToTarget(target, nextItem, live);
         window.cp.live?.setCursor(nextItem.order);
-        setProjectionLog((prev) => [...prev, {
-          timestamp: Date.now(),
-          title: nextItem.title || nextItem.kind,
-          kind: nextItem.kind,
-          content: nextItem.content ?? undefined,
-        }]);
       }
     }, loopInterval * 1000);
 
     return () => { if (loopRef.current) clearInterval(loopRef.current); };
   }, [loopActive, loopInterval, plan, live]);
+
+  // Live -> projection chain (single source of truth for in-service reliability)
+  useEffect(() => {
+    const previous = prevLiveRef.current;
+    prevLiveRef.current = live;
+
+    if (!plan || !live || !live.enabled || plan.items.length === 0) return;
+
+    const item = plan.items.find((entry) => entry.order === live.cursor) ?? plan.items[0];
+    if (!item) return;
+
+    const target: ScreenKey = live.target ?? "A";
+    if (live.lockedScreens?.[target]) return;
+
+    const lockStable =
+      !!previous &&
+      previous.lockedScreens.A === live.lockedScreens.A &&
+      previous.lockedScreens.B === live.lockedScreens.B &&
+      previous.lockedScreens.C === live.lockedScreens.C;
+
+    const cursorChanged = !previous || previous.cursor !== live.cursor;
+    const targetChanged = !previous || previous.target !== live.target;
+    const enabledBecameTrue = !!previous && !previous.enabled && live.enabled;
+    const resumed = !!previous && (previous.black || previous.white) && !live.black && !live.white;
+    const sameProjectionFields =
+      !!previous &&
+      previous.cursor === live.cursor &&
+      previous.target === live.target &&
+      previous.black === live.black &&
+      previous.white === live.white &&
+      previous.planId === live.planId &&
+      previous.enabled === live.enabled;
+    const explicitReproject = !!previous && sameProjectionFields && lockStable && previous.updatedAt !== live.updatedAt;
+
+    const signature = `${plan.id}:${item.id}:${target}:${live.black ? 1 : 0}:${live.white ? 1 : 0}:${live.enabled ? 1 : 0}`;
+    const shouldProject =
+      cursorChanged ||
+      targetChanged ||
+      enabledBecameTrue ||
+      resumed ||
+      explicitReproject ||
+      lastAutoProjectionRef.current.length === 0;
+
+    if (!shouldProject) return;
+    if (!explicitReproject && lastAutoProjectionRef.current === signature) return;
+
+    let cancelled = false;
+    void (async () => {
+      await projectPlanItemToTarget(target, item, live);
+      if (cancelled) return;
+      lastAutoProjectionRef.current = signature;
+      setProjectionLog((prev) => [
+        ...prev,
+        {
+          timestamp: Date.now(),
+          title: `[${target}] ${item.title || item.kind}`,
+          kind: item.kind,
+          content: item.content ?? undefined,
+        },
+      ]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [plan, live]);
 
   const reload = useCallback(() => {
     if (!planId) return;
@@ -97,16 +162,24 @@ export function MainPage() {
 
   const handleProject = useCallback(async (item: PlanItem) => {
     const target = live?.target ?? "A";
-    await projectPlanItemToTarget(target, item, live);
+    if (live?.lockedScreens?.[target]) {
+      toast.error(`Ecran ${target} verrouille`);
+      return;
+    }
     if (window.cp.live) {
       await window.cp.live.setCursor(item.order);
+      return;
     }
-    setProjectionLog((prev) => [...prev, {
-      timestamp: Date.now(),
-      title: item.title || item.kind,
-      kind: item.kind,
-      content: item.content ?? undefined,
-    }]);
+    await projectPlanItemToTarget(target, item, live);
+    setProjectionLog((prev) => [
+      ...prev,
+      {
+        timestamp: Date.now(),
+        title: `[${target}] ${item.title || item.kind}`,
+        kind: item.kind,
+        content: item.content ?? undefined,
+      },
+    ]);
   }, [live]);
 
   const handleRemove = useCallback(async (item: PlanItem) => {
@@ -237,13 +310,24 @@ export function MainPage() {
         onSelect={setSelectedIndex}
         onProject={handleProject}
         onProjectToScreen={async (item, screen) => {
+          if (live?.lockedScreens?.[screen]) {
+            toast.error(`Ecran ${screen} verrouille`);
+            return;
+          }
+          if (window.cp.live) {
+            await window.cp.live.set({ target: screen, cursor: item.order, enabled: true });
+            return;
+          }
           await projectPlanItemToTarget(screen, item, live);
-          setProjectionLog((prev) => [...prev, {
-            timestamp: Date.now(),
-            title: `[${screen}] ${item.title || item.kind}`,
-            kind: item.kind,
-            content: item.content ?? undefined,
-          }]);
+          setProjectionLog((prev) => [
+            ...prev,
+            {
+              timestamp: Date.now(),
+              title: `[${screen}] ${item.title || item.kind}`,
+              kind: item.kind,
+              content: item.content ?? undefined,
+            },
+          ]);
         }}
         onDuplicate={handleDuplicate}
         onEdit={(item) => setEditItem(item)}

@@ -7,9 +7,12 @@ describe("projection routing helpers", () => {
     expect(shouldSkipProjection("B", { A: true })).toBe(false);
   });
 
-  it("routes mirrored B/C to A", () => {
+  it("routes mirrored B/C to their mirror source", () => {
     const mirrorMeta: CpScreenMeta = { key: "B", isOpen: true, mirror: { kind: "MIRROR", from: "A" } };
     expect(resolveProjectionDestination("B", mirrorMeta)).toBe("A");
+
+    const mirrorFromC: CpScreenMeta = { key: "B", isOpen: true, mirror: { kind: "MIRROR", from: "C" } };
+    expect(resolveProjectionDestination("B", mirrorFromC)).toBe("C");
   });
 
   it("keeps free screens on their own destination", () => {

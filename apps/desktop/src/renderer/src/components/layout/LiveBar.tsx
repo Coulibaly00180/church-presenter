@@ -5,6 +5,7 @@ import {
   MonitorSmartphone,
   Lock,
   Unlock,
+  RotateCcw,
   MessageSquarePlus,
   Palette,
   ImagePlus,
@@ -97,6 +98,7 @@ type ScreenMiniCardProps = {
   isTarget: boolean;
   isOpen: boolean;
   isLocked: boolean;
+  disabled: boolean;
   onClick: () => void;
   onDoubleClick: () => void;
 };
@@ -107,6 +109,7 @@ function ScreenMiniCard({
   isTarget,
   isOpen,
   isLocked,
+  disabled,
   onClick,
   onDoubleClick,
 }: ScreenMiniCardProps) {
@@ -121,10 +124,12 @@ function ScreenMiniCard({
       type="button"
       onClick={onClick}
       onDoubleClick={onDoubleClick}
+      disabled={disabled}
       className={cn(
         "group w-[132px] rounded-md border overflow-hidden text-left transition-colors",
         isTarget ? "border-primary ring-1 ring-primary/40" : "border-border/60 hover:border-primary/50",
         !isOpen && "opacity-65",
+        disabled && "pointer-events-none opacity-55",
       )}
       title={`Ecran ${screen} - ${isOpen ? "ouvert" : "ferme"} - double clic pour ouvrir/fermer`}
     >
@@ -234,24 +239,27 @@ export function LiveBar() {
       if (isTypingTarget(e.target)) return;
       if (!window.cp.live) return;
 
+      const liveLocked = live?.lockedScreens ?? { A: false, B: false, C: false };
+      const liveTarget = live?.target ?? "A";
       const action = matchAction(e);
       if (!action || action === "toggleProjection") return;
       e.preventDefault();
+      e.stopPropagation();
 
       switch (action) {
-        case "targetA": window.cp.live.setTarget("A"); break;
-        case "targetB": window.cp.live.setTarget("B"); break;
-        case "targetC": window.cp.live.setTarget("C"); break;
-        case "toggleBlack": window.cp.live.toggleBlack(); break;
-        case "toggleWhite": window.cp.live.toggleWhite(); break;
-        case "resume": window.cp.live.resume(); break;
+        case "targetA": if (!liveLocked.A) window.cp.live.setTarget("A"); break;
+        case "targetB": if (!liveLocked.B) window.cp.live.setTarget("B"); break;
+        case "targetC": if (!liveLocked.C) window.cp.live.setTarget("C"); break;
+        case "toggleBlack": if (!(liveLocked[liveTarget])) window.cp.live.toggleBlack(); break;
+        case "toggleWhite": if (!(liveLocked[liveTarget])) window.cp.live.toggleWhite(); break;
+        case "resume": if (!(liveLocked[liveTarget])) window.cp.live.resume(); break;
         case "prev": window.cp.live.prev(); break;
         case "next": window.cp.live.next(); break;
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [live]);
 
   // Sync status
   useEffect(() => {
@@ -297,8 +305,12 @@ export function LiveBar() {
 
   const target = live?.target ?? "A";
   const locked = live?.lockedScreens ?? { A: false, B: false, C: false };
+  const isTargetLocked = !!locked[target];
+  const targetState = screenStates[target];
+  const lowerThirdEnabled = !!targetState?.lowerThirdEnabled;
 
   const openScreen = async (key: ScreenKey) => {
+    if (locked[key]) return;
     const meta = screens.find((s) => s.key === key);
     if (key === "A") {
       if (meta?.isOpen) {
@@ -313,6 +325,21 @@ export function LiveBar() {
         await window.cp.screens.open(key);
       }
     }
+  };
+
+  const setTarget = async (key: ScreenKey) => {
+    if (locked[key]) return;
+    await window.cp.live?.setTarget(key);
+  };
+
+  const toggleLowerThird = async () => {
+    if (isTargetLocked) return;
+    const next = !lowerThirdEnabled;
+    if (target === "A") {
+      await window.cp.projection.setState({ lowerThirdEnabled: next });
+      return;
+    }
+    await window.cp.screens.setState(target, { lowerThirdEnabled: next });
   };
 
   return (
@@ -353,8 +380,9 @@ export function LiveBar() {
                 variant={target === k ? "default" : "outline"}
                 size="xs"
                 className={cn(!isOpen && "opacity-50")}
-                onClick={() => window.cp.live?.setTarget(k)}
-                onDoubleClick={() => openScreen(k)}
+                onClick={() => { void setTarget(k); }}
+                onDoubleClick={() => { void openScreen(k); }}
+                disabled={!!locked[k]}
               >
                 <MonitorSmartphone className="h-3 w-3" />
                 {k}
@@ -378,11 +406,22 @@ export function LiveBar() {
               isTarget={target === k}
               isOpen={!!meta?.isOpen}
               isLocked={!!locked[k]}
-              onClick={() => window.cp.live?.setTarget(k)}
-              onDoubleClick={() => openScreen(k)}
+              disabled={!!locked[k]}
+              onClick={() => { void setTarget(k); }}
+              onDoubleClick={() => { void openScreen(k); }}
             />
           );
         })}
+      </div>
+
+      <Separator orientation="vertical" className="h-5 mx-0.5" />
+
+      <div className="flex items-center gap-1">
+        {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+          <Badge key={`lock-badge-${k}`} variant={locked[k] ? "destructive" : "secondary"} className="text-[10px] px-1.5 h-6">
+            {k}:{locked[k] ? "LOCK" : "LIVE"}
+          </Badge>
+        ))}
       </div>
 
       <Separator orientation="vertical" className="h-5 mx-0.5" />
@@ -394,6 +433,7 @@ export function LiveBar() {
             variant={live?.black ? "destructive" : "outline"}
             size="xs"
             onClick={() => window.cp.live?.toggleBlack()}
+            disabled={isTargetLocked}
           >
             Noir
           </Button>
@@ -407,6 +447,7 @@ export function LiveBar() {
             variant={live?.white ? "secondary" : "outline"}
             size="xs"
             onClick={() => window.cp.live?.toggleWhite()}
+            disabled={isTargetLocked}
           >
             Blanc
           </Button>
@@ -416,11 +457,30 @@ export function LiveBar() {
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="xs" onClick={() => window.cp.live?.resume()}>
+          <Button variant="outline" size="xs" onClick={() => window.cp.live?.resume()} disabled={isTargetLocked}>
             Normal
           </Button>
         </TooltipTrigger>
         <TooltipContent>Reprendre (R)</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant={lowerThirdEnabled ? "default" : "outline"} size="xs" onClick={toggleLowerThird} disabled={isTargetLocked}>
+            Lower-third
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Bas de page</TooltipContent>
+      </Tooltip>
+
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="xs" onClick={() => window.cp.live?.setCursor(live?.cursor ?? 0)} disabled={isTargetLocked}>
+            <RotateCcw className="h-3 w-3" />
+            Reprojeter
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Reprojeter l'item en cours</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" className="h-5 mx-0.5" />

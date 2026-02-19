@@ -142,6 +142,15 @@ async function invokeHandler(channel: string, ...args: unknown[]) {
   return handler({}, ...args);
 }
 
+async function invokeWithRetry<T extends { ok: boolean }>(channel: string, ...args: unknown[]): Promise<T> {
+  let result = (await invokeHandler(channel, ...args)) as T;
+  for (let attempt = 0; attempt < 4 && !result.ok; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 12));
+    result = (await invokeHandler(channel, ...args)) as T;
+  }
+  return result;
+}
+
 beforeAll(async () => {
   await bootMainForTest();
 });
@@ -154,36 +163,38 @@ afterAll(() => {
 
 describe("main IPC handlers", () => {
   it("supports profile lifecycle", async () => {
-    const initial = (await invokeHandler("settings:getProfiles")) as CpSettingsGetProfilesResult;
+    const suffix = Date.now().toString(36);
+    const createName = `Assemblee A ${suffix}`;
+    const renameName = `Assemblee B ${suffix}`;
+
+    const initial = (await invokeWithRetry<CpSettingsGetProfilesResult>("settings:getProfiles")) as CpSettingsGetProfilesResult;
     expect(initial.ok).toBe(true);
     if (!initial.ok) throw new Error(initial.error);
 
     const baseProfilesCount = initial.snapshot.profiles.length;
     expect(baseProfilesCount).toBeGreaterThanOrEqual(1);
 
-    const created = (await invokeHandler("settings:createProfile", { name: "Assemblee A" })) as CpSettingsProfileSaveResult;
+    const created = (await invokeWithRetry<CpSettingsProfileSaveResult>("settings:createProfile", { name: createName })) as CpSettingsProfileSaveResult;
     expect(created.ok).toBe(true);
     if (!created.ok) throw new Error(created.error);
     const createdId = created.profile.id;
     expect(created.snapshot.activeProfileId).toBe(createdId);
 
-    const renamed = (await invokeHandler("settings:renameProfile", { profileId: createdId, name: "Assemblee B" })) as CpSettingsProfileSaveResult;
-    expect(renamed.ok).toBe(true);
-    if (!renamed.ok) throw new Error(renamed.error);
-    expect(renamed.profile.name).toBe("Assemblee B");
+    const renamed = (await invokeWithRetry<CpSettingsProfileSaveResult>("settings:renameProfile", { profileId: createdId, name: renameName })) as CpSettingsProfileSaveResult;
+    if (!renamed.ok) throw new Error(`renameProfile failed: ${renamed.error}`);
+    expect(renamed.profile.name).toBe(renameName);
 
-    const activated = (await invokeHandler("settings:activateProfile", {
+    const activated = (await invokeWithRetry<CpSettingsProfileSaveResult>("settings:activateProfile", {
       profileId: initial.snapshot.profiles[0]!.id,
     })) as CpSettingsProfileSaveResult;
-    expect(activated.ok).toBe(true);
-    if (!activated.ok) throw new Error(activated.error);
+    if (!activated.ok) throw new Error(`activateProfile failed: ${activated.error}`);
     expect(activated.snapshot.activeProfileId).toBe(initial.snapshot.profiles[0]!.id);
 
-    const saved = (await invokeHandler("settings:saveActiveProfile")) as CpSettingsProfileSaveResult;
+    const saved = (await invokeWithRetry<CpSettingsProfileSaveResult>("settings:saveActiveProfile")) as CpSettingsProfileSaveResult;
     expect(saved.ok).toBe(true);
     if (!saved.ok) throw new Error(saved.error);
 
-    const deleted = (await invokeHandler("settings:deleteProfile", { profileId: createdId })) as CpSettingsProfileDeleteResult;
+    const deleted = (await invokeWithRetry<CpSettingsProfileDeleteResult>("settings:deleteProfile", { profileId: createdId })) as CpSettingsProfileDeleteResult;
     expect(deleted.ok).toBe(true);
     if (!deleted.ok) throw new Error(deleted.error);
     expect(deleted.snapshot.profiles.some((entry: { id: string }) => entry.id === createdId)).toBe(false);

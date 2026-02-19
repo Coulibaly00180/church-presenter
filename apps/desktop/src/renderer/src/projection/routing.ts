@@ -5,6 +5,8 @@ export function shouldSkipProjection(target: ScreenKey, lockedScreens: LockedScr
 }
 
 export function resolveProjectionDestination(target: ScreenKey, meta?: CpScreenMeta) {
-  const isMirrorOfA = target !== "A" && meta?.mirror?.kind === "MIRROR" && meta.mirror.from === "A";
-  return isMirrorOfA ? ("A" as ScreenKey) : target;
+  if (target !== "A" && meta?.mirror?.kind === "MIRROR") {
+    return meta.mirror.from;
+  }
+  return target;
 }
