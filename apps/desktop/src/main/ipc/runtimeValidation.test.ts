@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  parseFilesRenameMediaPayload,
   parseDataImportPayload,
   parseLiveSetPayload,
   parsePlanReorderPayload,
@@ -64,6 +65,19 @@ describe("runtime validation", () => {
     expect(parseDataImportPayload({ mode: "REPLACE" })).toEqual({ mode: "REPLACE", atomicity: "STRICT" });
     expect(parseDataImportPayload({ mode: "MERGE", atomicity: "STRICT" })).toEqual({ mode: "MERGE", atomicity: "STRICT" });
     expect(() => parseDataImportPayload({ mode: "INVALID" })).toThrow("must be one of");
+  });
+
+  it("parses files:renameMedia payload", () => {
+    expect(parseFilesRenameMediaPayload({ path: "C:\\media\\fonts\\A.ttf", name: "B.ttf" })).toEqual({
+      path: "C:\\media\\fonts\\A.ttf",
+      name: "B.ttf",
+    });
+  });
+
+  it("rejects invalid files:renameMedia payload", () => {
+    expect(() => parseFilesRenameMediaPayload(null)).toThrow("must be an object");
+    expect(() => parseFilesRenameMediaPayload({ path: "", name: "B.ttf" })).toThrow("must not be empty");
+    expect(() => parseFilesRenameMediaPayload({ path: "C:\\media\\A.ttf", name: "" })).toThrow("must not be empty");
   });
 
   it("sanitizes projection state patch", () => {

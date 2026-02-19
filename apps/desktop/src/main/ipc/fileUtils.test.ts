@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { inferMediaType, isPathInDir, getErrorMessage } from "./fileUtils";
+import {
+  getErrorMessage,
+  inferFontFamilyFromPath,
+  inferLibraryFileKind,
+  inferMediaType,
+  isFontPath,
+  isPathInDir,
+  validateFontHeader,
+} from "./fileUtils";
 
 describe("inferMediaType", () => {
   it("returns IMAGE for common image extensions", () => {
@@ -21,6 +29,51 @@ describe("inferMediaType", () => {
     expect(inferMediaType("file.txt")).toBeNull();
     expect(inferMediaType("archive.zip")).toBeNull();
     expect(inferMediaType("noext")).toBeNull();
+  });
+});
+
+describe("inferLibraryFileKind", () => {
+  it("detects supported library kinds", () => {
+    expect(inferLibraryFileKind("slide.png")).toBe("IMAGE");
+    expect(inferLibraryFileKind("document.pdf")).toBe("PDF");
+    expect(inferLibraryFileKind("notes.docx")).toBe("DOCUMENT");
+    expect(inferLibraryFileKind("font.otf")).toBe("FONT");
+  });
+
+  it("returns null for unknown extension", () => {
+    expect(inferLibraryFileKind("archive.7z")).toBeNull();
+  });
+});
+
+describe("font helpers", () => {
+  it("detects font paths case-insensitively", () => {
+    expect(isFontPath("MyFont.ttf")).toBe(true);
+    expect(isFontPath("MyFont.OTF")).toBe(true);
+    expect(isFontPath("MyFont.woff2")).toBe(false);
+  });
+
+  it("infers font family from file name and fallback", () => {
+    expect(inferFontFamilyFromPath("C:\\fonts\\Open Sans.ttf")).toBe("Open Sans");
+    expect(inferFontFamilyFromPath("/fonts/Roboto.otf")).toBe("Roboto");
+    expect(inferFontFamilyFromPath("/fonts/.ttf")).toBe("CustomFont");
+  });
+
+  it("validates known TrueType/OpenType signatures", () => {
+    expect(validateFontHeader(new Uint8Array([0x00, 0x01, 0x00, 0x00]))).toEqual({ valid: true });
+    expect(validateFontHeader(new Uint8Array([0x4f, 0x54, 0x54, 0x4f]))).toEqual({ valid: true }); // OTTO
+    expect(validateFontHeader(new Uint8Array([0x74, 0x72, 0x75, 0x65]))).toEqual({ valid: true }); // true
+    expect(validateFontHeader(new Uint8Array([0x74, 0x79, 0x70, 0x31]))).toEqual({ valid: true }); // typ1
+  });
+
+  it("rejects invalid or too-short headers", () => {
+    expect(validateFontHeader(new Uint8Array([0x00, 0x00, 0x00]))).toEqual({
+      valid: false,
+      reason: "Font file too short",
+    });
+    expect(validateFontHeader(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))).toEqual({
+      valid: false,
+      reason: "Unsupported or corrupted font header",
+    });
   });
 });
 
