@@ -6,47 +6,23 @@ import mammoth from "mammoth";
 import { readFile, writeFile } from "fs/promises";
 import path from "path";
 import AdmZip from "adm-zip";
+import type { CpSongImportDocError, CpSongImportJsonError, CpSongImportReportEntry } from "../../shared/ipc";
 import {
   parseNonEmptyString,
   parseOptionalQuery,
   parseSongCreatePayload,
+  parseSongExportWordPackPayload,
   parseSongReplaceBlocksPayload,
   parseSongUpdateMetaPayload,
 } from "./runtimeValidation";
 
-const SUPPORTED_DOC_EXTENSIONS = [".docx", ".odt"];
+const SUPPORTED_DOC_EXTENSIONS = [".docx", ".odt"] as const;
+const SONGS_JSON_KIND = "CHURCH_PRESENTER_SONGS_EXPORT" as const;
+const SONGS_JSON_SCHEMA_VERSION = 2 as const;
+
 type PrismaClientType = ReturnType<typeof getPrisma>;
 type SongImportPrisma = Pick<PrismaClientType, "$transaction">;
-type ImportSongBlock = { order?: number; type?: string; title?: string; content?: string };
-type ImportSongMeta = {
-  paroles?: string;
-  titre?: string;
-  auteur_interprete?: string;
-  auteur?: string;
-  interprete?: string;
-  album_inclus_dans?: string;
-  langue?: string;
-  annee_de_sortie_single?: string | number;
-};
-type ImportSongEntry = {
-  title?: string;
-  titre?: string;
-  artist?: string;
-  auteur?: string;
-  album?: string;
-  year?: string | number;
-  annee?: string | number;
-  published?: string | number;
-  release_year?: string | number;
-  language?: string;
-  lang?: string;
-  tags?: string;
-  lyrics?: string;
-  paroles?: string;
-  blocks?: ImportSongBlock[];
-  meta?: ImportSongMeta;
-  songs?: ImportSongEntry[];
-};
+
 type NormalizedImportSongBlock = { order: number; type: string; title?: string; content: string };
 type NormalizedImportSong = {
   title: string;
@@ -56,6 +32,43 @@ type NormalizedImportSong = {
   language?: string;
   tags?: string;
   blocks: NormalizedImportSongBlock[];
+};
+
+type ParsedSongTextResult = {
+  title: string;
+  artist?: string;
+  album?: string;
+  year?: string;
+  language?: string;
+  tags?: string;
+  lyrics: string;
+  blocks: NormalizedImportSongBlock[];
+  warnings: string[];
+};
+
+type ImportedJsonEnvelope = {
+  songs: unknown[];
+  warnings: string[];
+};
+
+type SongImportDocSuccess = {
+  song: NonNullable<Awaited<ReturnType<PrismaClientType["song"]["findUnique"]>>>;
+  report: CpSongImportReportEntry;
+};
+
+type SongJsonImportResult = {
+  imported: number;
+  errors: CpSongImportJsonError[];
+  report: CpSongImportReportEntry[];
+};
+
+type WordSongSource = {
+  title: string;
+  artist?: string | null;
+  album?: string | null;
+  year?: string | null;
+  tags?: string | null;
+  blocks: Array<{ content?: string | null }>;
 };
 
 export type SongImportEntity = NormalizedImportSong;
@@ -77,83 +90,250 @@ function asString(value: unknown): string | undefined {
 
 function asStringLike(value: unknown): string | undefined {
   if (typeof value === "string") return asString(value);
-  if (typeof value === "number") return String(value);
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
   return undefined;
 }
 
-function asMeta(value: unknown): ImportSongMeta {
-  if (!isRecord(value)) return {};
-  return value as ImportSongMeta;
+function normalizeWhitespace(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
-function normalizeBlock(rawBlock: unknown, idx: number): NormalizedImportSongBlock | null {
-  if (!isRecord(rawBlock)) return null;
-  const content = asStringLike(rawBlock.content) || "";
-  const parsedOrder = typeof rawBlock.order === "number" && Number.isFinite(rawBlock.order) ? Math.floor(rawBlock.order) : idx + 1;
-  return {
-    order: parsedOrder > 0 ? parsedOrder : idx + 1,
-    type: asString(rawBlock.type) || "VERSE",
-    title: asString(rawBlock.title),
-    content: content.trim(),
-  };
+function normalizeMultiline(value: string): string {
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
-function splitBlocks(text: string) {
-  return text
+function stripDiacritics(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function canonicalLabel(value: string): string {
+  return stripDiacritics(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeYear(value?: string): string | undefined {
+  if (!value) return undefined;
+  const clean = normalizeWhitespace(value);
+  const explicit = clean.match(/\b(19\d{2}|20\d{2}|21\d{2})\b/);
+  if (explicit?.[1]) return explicit[1];
+
+  const digits = clean.replace(/\D/g, "");
+  if (/^\d{4}$/.test(digits)) return digits;
+  return undefined;
+}
+
+function sanitizeFilename(value: string): string {
+  const normalized = normalizeWhitespace(value)
+    .replace(/[<>:"/\\|?*]/g, " ")
+    .split("")
+    .map((char) => (char.charCodeAt(0) < 32 ? " " : char))
+    .join("")
+    .replace(/\s+/g, " ")
+    .trim();
+  const compact = normalized.replace(/[. ]+$/g, "");
+  return compact.length > 0 ? compact : "chant";
+}
+
+function splitBlocks(text: string): string[] {
+  return normalizeMultiline(text)
     .split(/\n\s*\n/g)
     .map((s) => s.trim())
     .filter(Boolean);
 }
 
-function parseSongText(raw: string, filename?: string) {
-  const rawLines = raw.split(/\r?\n/);
-  const lines = rawLines.map((l) => l.trim()).filter(Boolean);
-  const title =
-    lines.find((l) => /^titre\s*:/i.test(l))?.split(":").slice(1).join(":").trim() ||
-    filename?.replace(/\.(docx|odt)$/i, "") ||
-    "Sans titre";
-  const artist = lines.find((l) => /^auteur\s*:/i.test(l))?.split(":").slice(1).join(":").trim();
-  const album = lines.find((l) => /^album\s*:/i.test(l))?.split(":").slice(1).join(":").trim();
-  const year =
-    lines.find((l) => /^ann[eé]e/i.test(l))?.split(":").slice(1).join(":").trim() ||
-    lines.find((l) => /^année de parution/i.test(l))?.split(":").slice(1).join(":").trim();
+function classifyMetadataLabel(labelRaw: string):
+  | "TITLE"
+  | "ARTIST"
+  | "ALBUM"
+  | "YEAR"
+  | "LANGUAGE"
+  | "TAGS"
+  | "LYRICS"
+  | null {
+  const label = canonicalLabel(labelRaw);
+  if (!label) return null;
 
-  // Keep empty lines to preserve stanza boundaries.
-  let lyrics = "";
-  const parolesIdx = rawLines.findIndex((l) => /^paroles\s*:?/i.test(l.trim()));
-  if (parolesIdx >= 0) {
-    lyrics = rawLines.slice(parolesIdx + 1).join("\n").trim();
-  } else {
-    const metaKeys = ["titre", "auteur", "album", "ann", "année", "annee"];
-    lyrics = rawLines
-      .filter((l) => {
-        const trimmed = l.trim().toLowerCase();
-        if (!trimmed) return true;
-        return !metaKeys.some((k) => trimmed.startsWith(k));
-      })
-      .join("\n")
-      .trim();
+  if (label === "title" || label.startsWith("titre") || label === "nom") return "TITLE";
+  if (
+    label === "artist" ||
+    label.startsWith("auteur") ||
+    label.includes("interprete") ||
+    label.includes("compositeur")
+  ) return "ARTIST";
+  if (label.startsWith("album")) return "ALBUM";
+  if (
+    label === "year" ||
+    label.includes("annee") ||
+    label.includes("published") ||
+    label.includes("release year") ||
+    label.includes("sortie")
+  ) return "YEAR";
+  if (label === "lang" || label === "language" || label.startsWith("langue")) return "LANGUAGE";
+  if (label.startsWith("tag")) return "TAGS";
+  if (label === "lyrics" || label.startsWith("paroles") || label === "texte") return "LYRICS";
+
+  return null;
+}
+
+function parseParagraphToBlock(paragraph: string, idx: number): NormalizedImportSongBlock {
+  const lines = paragraph.split("\n").map((line) => line.trim());
+  const first = lines[0] ?? "";
+  const heading = first.match(/^(refrain|chorus|couplet|verse|pont|bridge)\s*([0-9]+)?\s*[:\-\u2013\u2014]?\s*(.*)$/i);
+
+  let type = "VERSE";
+  let title = `Couplet ${idx + 1}`;
+  let bodyLines = [...lines];
+
+  if (heading) {
+    const head = canonicalLabel(heading[1] ?? "");
+    const sequence = heading[2] ? heading[2].trim() : "";
+    const inline = heading[3] ? heading[3].trim() : "";
+
+    if (head === "refrain" || head === "chorus") {
+      type = "CHORUS";
+      title = sequence ? `Refrain ${sequence}` : "Refrain";
+    } else if (head === "pont" || head === "bridge") {
+      type = "BRIDGE";
+      title = sequence ? `Pont ${sequence}` : "Pont";
+    } else {
+      type = "VERSE";
+      title = sequence ? `Couplet ${sequence}` : `Couplet ${idx + 1}`;
+    }
+
+    bodyLines = lines.slice(1);
+    if (inline.length > 0) bodyLines.unshift(inline);
   }
 
-  const paragraphs = splitBlocks(lyrics);
-  const blocks =
-    paragraphs.length > 0
-      ? paragraphs.map((content, idx) => ({
-          order: idx + 1,
-          type: idx === 0 ? "VERSE" : "CHORUS",
-          title: idx === 0 ? "Couplet" : "Refrain",
-          content,
-        }))
-      : [
-          {
-            order: 1,
-            type: "VERSE",
-            title: "Couplet",
-            content: lyrics.trim(),
-          },
-        ];
+  const content = bodyLines.join("\n").trim();
+  return {
+    order: idx + 1,
+    type,
+    title,
+    content,
+  };
+}
 
-  return { title, artist, album, year, blocks };
+function parseLyricsToBlocks(lyrics: string): NormalizedImportSongBlock[] {
+  const paragraphs = splitBlocks(lyrics);
+  if (paragraphs.length === 0) {
+    return [{ order: 1, type: "VERSE", title: "Couplet 1", content: normalizeMultiline(lyrics) }];
+  }
+  const blocks = paragraphs.map((paragraph, idx) => parseParagraphToBlock(paragraph, idx));
+  const filtered = blocks.filter((block) => block.content.length > 0);
+  const base = filtered.length > 0 ? filtered : blocks;
+  return base.map((block, idx) => ({ ...block, order: idx + 1 }));
+}
+
+function buildCanonicalMap(record: Record<string, unknown>): Map<string, unknown> {
+  const out = new Map<string, unknown>();
+  Object.entries(record).forEach(([key, value]) => {
+    const canonical = canonicalLabel(key);
+    if (!canonical || out.has(canonical)) return;
+    out.set(canonical, value);
+  });
+  return out;
+}
+
+function pickFromMaps(
+  primary: Map<string, unknown>,
+  secondary: Map<string, unknown>,
+  keys: string[],
+): string | undefined {
+  for (const key of keys) {
+    const canonical = canonicalLabel(key);
+    const primaryValue = asStringLike(primary.get(canonical));
+    if (primaryValue) return normalizeWhitespace(primaryValue);
+    const secondaryValue = asStringLike(secondary.get(canonical));
+    if (secondaryValue) return normalizeWhitespace(secondaryValue);
+  }
+  return undefined;
+}
+
+export function parseSongText(raw: string, filename?: string): ParsedSongTextResult {
+  const warnings: string[] = [];
+  const rawLines = raw.replace(/\r\n?/g, "\n").split("\n");
+  let title: string | undefined;
+  let artist: string | undefined;
+  let album: string | undefined;
+  let yearRaw: string | undefined;
+  let language: string | undefined;
+  let tags: string | undefined;
+  let lyricsStarted = false;
+  const lyricsLines: string[] = [];
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trim();
+    if (!lyricsStarted) {
+      const labelOnly = classifyMetadataLabel(line.replace(/[:\uFF1A]\s*$/, ""));
+      if (labelOnly === "LYRICS") {
+        lyricsStarted = true;
+        continue;
+      }
+
+      const match = line.match(/^([^:\uFF1A]{1,120})\s*[:\uFF1A]\s*(.*)$/);
+      if (match) {
+        const field = classifyMetadataLabel(match[1] ?? "");
+        const value = normalizeWhitespace(match[2] ?? "");
+
+        if (field === "LYRICS") {
+          lyricsStarted = true;
+          if (value) lyricsLines.push(value);
+          continue;
+        }
+
+        if (field) {
+          if (field === "TITLE" && !title) title = value || undefined;
+          if (field === "ARTIST" && !artist) artist = value || undefined;
+          if (field === "ALBUM" && !album) album = value || undefined;
+          if (field === "YEAR" && !yearRaw) yearRaw = value || undefined;
+          if (field === "LANGUAGE" && !language) language = value || undefined;
+          if (field === "TAGS" && !tags) tags = value || undefined;
+          continue;
+        }
+      }
+
+      if (line.length > 0) {
+        lyricsStarted = true;
+        lyricsLines.push(rawLine);
+      }
+      continue;
+    }
+
+    lyricsLines.push(rawLine);
+  }
+
+  const fallbackTitle = filename?.replace(/\.(docx|odt)$/i, "").trim();
+  const normalizedTitle = normalizeWhitespace(title || fallbackTitle || "Sans titre");
+  if (!title && fallbackTitle) {
+    warnings.push("Titre absent: nom de fichier utilise.");
+  }
+
+  const normalizedYear = normalizeYear(yearRaw);
+  if (yearRaw && !normalizedYear) {
+    warnings.push(`Annee ignoree (format invalide): "${yearRaw}".`);
+  }
+
+  const lyrics = normalizeMultiline(lyricsLines.join("\n"));
+  if (!lyrics) warnings.push("Paroles absentes ou vides.");
+  const blocks = parseLyricsToBlocks(lyrics);
+
+  return {
+    title: normalizedTitle,
+    artist: artist ? normalizeWhitespace(artist) : undefined,
+    album: album ? normalizeWhitespace(album) : undefined,
+    year: normalizedYear,
+    language: language ? normalizeWhitespace(language) : undefined,
+    tags: tags ? normalizeWhitespace(tags) : undefined,
+    lyrics,
+    blocks,
+    warnings,
+  };
 }
 
 async function extractTextFromDoc(buffer: Buffer, ext: string) {
@@ -173,6 +353,188 @@ async function extractTextFromDoc(buffer: Buffer, ext: string) {
       .trim();
   }
   throw new Error("Extension non supportee");
+}
+
+function normalizeBlock(rawBlock: unknown, idx: number): NormalizedImportSongBlock | null {
+  if (!isRecord(rawBlock)) return null;
+  const content = normalizeMultiline(asStringLike(rawBlock.content) || "");
+  const parsedOrder =
+    typeof rawBlock.order === "number" && Number.isFinite(rawBlock.order) ? Math.floor(rawBlock.order) : idx + 1;
+  return {
+    order: parsedOrder > 0 ? parsedOrder : idx + 1,
+    type: normalizeWhitespace(asString(rawBlock.type) || "VERSE"),
+    title: asString(rawBlock.title) ? normalizeWhitespace(asString(rawBlock.title) as string) : undefined,
+    content,
+  };
+}
+
+function normalizeSongFromJson(rawSong: unknown, songIdx: number, filePath: string):
+  | { ok: true; song: NormalizedImportSong; warnings: string[] }
+  | { ok: false; error: CpSongImportJsonError; report: CpSongImportReportEntry } {
+  if (!isRecord(rawSong)) {
+    const message = `Entree #${songIdx + 1}: format invalide (objet attendu)`;
+    return {
+      ok: false,
+      error: { path: filePath, message },
+      report: { path: filePath, status: "ERROR", message },
+    };
+  }
+
+  const warnings: string[] = [];
+  const topMap = buildCanonicalMap(rawSong);
+  const metaRaw = isRecord(rawSong.meta) ? rawSong.meta : {};
+  const metaMap = buildCanonicalMap(metaRaw);
+
+  const title = pickFromMaps(topMap, metaMap, ["title", "titre", "nom"]) || "Sans titre";
+  const artist = pickFromMaps(topMap, metaMap, [
+    "artist",
+    "auteur",
+    "interprete",
+    "auteur interprete",
+    "compositeur",
+  ]);
+  const album = pickFromMaps(topMap, metaMap, ["album", "album inclus dans"]);
+  const yearRaw = pickFromMaps(topMap, metaMap, [
+    "year",
+    "annee",
+    "annee de parution",
+    "annee de sortie",
+    "annee de sortie single",
+    "published",
+    "release year",
+  ]);
+  const year = normalizeYear(yearRaw);
+  if (yearRaw && !year) warnings.push(`Annee ignoree (format invalide): "${yearRaw}"`);
+
+  const language = pickFromMaps(topMap, metaMap, ["language", "lang", "langue"]);
+  const tags = pickFromMaps(topMap, metaMap, ["tags", "tag"]);
+  const lyrics = pickFromMaps(topMap, metaMap, ["lyrics", "paroles", "texte"]);
+
+  let blocks: NormalizedImportSongBlock[] = [];
+  if (Array.isArray(rawSong.blocks)) {
+    const parsedBlocks = rawSong.blocks
+      .map((block, idx) => normalizeBlock(block, idx))
+      .filter((block): block is NormalizedImportSongBlock => !!block);
+    if (parsedBlocks.length !== rawSong.blocks.length) {
+      warnings.push("Certains blocs ont ete ignores (format invalide).");
+    }
+    blocks = parsedBlocks;
+  } else if (rawSong.blocks != null) {
+    warnings.push("Le champ blocks est ignore (tableau attendu).");
+  }
+
+  if (blocks.length === 0 && lyrics) {
+    blocks = parseLyricsToBlocks(lyrics);
+  }
+
+  if (blocks.length === 0) {
+    blocks = [{ order: 1, type: "VERSE", title: "Couplet 1", content: "" }];
+    warnings.push("Aucun contenu detecte: bloc vide ajoute.");
+  }
+
+  const normalizedSong: NormalizedImportSong = {
+    title: normalizeWhitespace(title),
+    artist: artist ? normalizeWhitespace(artist) : undefined,
+    album: album ? normalizeWhitespace(album) : undefined,
+    year,
+    language: language ? normalizeWhitespace(language) : undefined,
+    tags: tags ? normalizeWhitespace(tags) : undefined,
+    blocks: blocks.map((block, idx) => ({ ...block, order: idx + 1 })),
+  };
+
+  return { ok: true, song: normalizedSong, warnings };
+}
+
+export function migrateSongsJsonPayload(raw: unknown): ImportedJsonEnvelope {
+  if (Array.isArray(raw)) return { songs: raw, warnings: [] };
+  if (!isRecord(raw)) {
+    throw new Error("Le fichier doit contenir un tableau de chants ou un objet.");
+  }
+
+  const kind = asStringLike(raw.kind);
+  const schemaVersionRaw = raw.schemaVersion;
+  const schemaVersion =
+    typeof schemaVersionRaw === "number" && Number.isFinite(schemaVersionRaw)
+      ? Math.trunc(schemaVersionRaw)
+      : undefined;
+
+  if (schemaVersion != null || kind != null || "payload" in raw) {
+    if (kind != null && kind !== SONGS_JSON_KIND) {
+      throw new Error(`Unsupported songs export kind: ${kind}`);
+    }
+    const detectedVersion = schemaVersion ?? 1;
+    if (detectedVersion > SONGS_JSON_SCHEMA_VERSION) {
+      throw new Error(`Unsupported songs schema version: ${detectedVersion}`);
+    }
+
+    if (detectedVersion >= 2) {
+      if (!isRecord(raw.payload) || !Array.isArray(raw.payload.songs)) {
+        throw new Error("Invalid songs JSON: payload.songs must be an array");
+      }
+      return { songs: raw.payload.songs, warnings: [] };
+    }
+
+    const legacySongs = Array.isArray(raw.songs)
+      ? raw.songs
+      : isRecord(raw.payload) && Array.isArray(raw.payload.songs)
+        ? raw.payload.songs
+        : [];
+    return {
+      songs: legacySongs,
+      warnings: [
+        "Legacy songs JSON detected (v1). Migration applied automatically.",
+      ],
+    };
+  }
+
+  if (Array.isArray(raw.songs)) {
+    return {
+      songs: raw.songs,
+      warnings: [
+        "Legacy songs JSON detected (missing schema metadata). Migration applied automatically.",
+      ],
+    };
+  }
+
+  return { songs: [raw], warnings: [] };
+}
+
+function buildWordLyrics(song: WordSongSource): string {
+  return (song.blocks || [])
+    .map((block) => normalizeMultiline(block.content || ""))
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function buildSongWordDocument(song: WordSongSource) {
+  const title = normalizeWhitespace(song.title || "Sans titre");
+  const artist = normalizeWhitespace(song.artist || "");
+  const album = normalizeWhitespace(song.album || "");
+  const year = normalizeYear(song.year || undefined) || normalizeYear(song.tags || undefined) || "";
+  const lyrics = buildWordLyrics(song);
+
+  const children: Paragraph[] = [
+    new Paragraph({
+      children: [new TextRun({ text: `Titre : ${title}`, bold: true })],
+    }),
+    new Paragraph(`Auteur : ${artist}`),
+    new Paragraph(`Annee de parution : ${year}`),
+    new Paragraph(`Album : ${album}`),
+    new Paragraph(""),
+    new Paragraph({
+      children: [new TextRun({ text: "Paroles :", bold: true })],
+    }),
+    ...lyrics.split("\n").map((line) => new Paragraph(line)),
+  ];
+
+  return new Document({
+    sections: [{ properties: {}, children }],
+  });
+}
+
+async function buildSongWordBuffer(song: WordSongSource) {
+  const document = buildSongWordDocument(song);
+  return Packer.toBuffer(document);
 }
 
 export async function createSongWithBlocksAtomic(prisma: SongImportPrisma, songEntry: SongImportEntity) {
@@ -202,121 +564,116 @@ export async function createSongWithBlocksAtomic(prisma: SongImportPrisma, songE
   });
 }
 
-async function importDocSong(prisma: PrismaClientType, filePath: string) {
+async function importDocSong(prisma: PrismaClientType, filePath: string): Promise<SongImportDocSuccess> {
   const buffer = Buffer.from(await readFile(filePath));
   const ext = path.extname(filePath).toLowerCase();
-  if (!SUPPORTED_DOC_EXTENSIONS.includes(ext)) throw new Error("Extension non supportee (docx / odt)");
+  if (!SUPPORTED_DOC_EXTENSIONS.includes(ext as (typeof SUPPORTED_DOC_EXTENSIONS)[number])) {
+    throw new Error("Extension non supportee (docx / odt)");
+  }
 
   const raw = await extractTextFromDoc(buffer, ext);
   const parsed = parseSongText(raw, path.basename(filePath));
-
-  const song = await createSongWithBlocksAtomic(prisma, {
+  const created = await createSongWithBlocksAtomic(prisma, {
     title: parsed.title,
     artist: parsed.artist,
     album: parsed.album,
     year: parsed.year,
+    language: parsed.language,
+    tags: parsed.tags,
     blocks: parsed.blocks,
   });
-  return song;
+
+  const song = await prisma.song.findUnique({
+    where: { id: created.id },
+    include: { blocks: { orderBy: { order: "asc" } } },
+  });
+  if (!song) throw new Error("Chant introuvable apres importation");
+
+  const report: CpSongImportReportEntry = {
+    path: filePath,
+    status: "SUCCESS",
+    title: song.title,
+    warnings: parsed.warnings,
+    normalized: {
+      title: song.title,
+      artist: song.artist || undefined,
+      album: song.album || undefined,
+      year: song.year || undefined,
+      language: song.language || undefined,
+    },
+  };
+
+  return { song, report };
 }
 
-async function importJsonFile(prisma: PrismaClientType, filePath: string) {
-  const raw = await readFile(filePath, "utf-8");
-  let payload: unknown = JSON.parse(raw);
+async function importJsonFile(prisma: PrismaClientType, filePath: string): Promise<SongJsonImportResult> {
+  const rawText = await readFile(filePath, "utf-8");
+  const parsedRaw = JSON.parse(rawText) as unknown;
+  const envelope = migrateSongsJsonPayload(parsedRaw);
 
-  if (isRecord(payload) && "songs" in payload) {
-    payload = (payload as ImportSongEntry).songs ?? [];
-  }
+  const report: CpSongImportReportEntry[] = envelope.warnings.map((warning) => ({
+    path: filePath,
+    status: "ERROR",
+    message: warning,
+  }));
+  const errors: CpSongImportJsonError[] = [];
+  let imported = 0;
 
-  if (isRecord(payload)) {
-    payload = [payload]; // accepte un seul chant
-  }
-
-  if (!Array.isArray(payload)) {
-    throw new Error("Le fichier doit contenir un tableau de chants ou un objet unique.");
-  }
-
-  const normalizedSongs: NormalizedImportSong[] = [];
-  const errors: Array<{ path: string; title?: string; message: string }> = [];
-
-  for (const [songIdx, rawSong] of payload.entries()) {
-    if (!isRecord(rawSong)) {
-      errors.push({ path: filePath, message: `Entree #${songIdx + 1}: format invalide (objet attendu)` });
+  for (const [songIdx, rawSong] of envelope.songs.entries()) {
+    const normalized = normalizeSongFromJson(rawSong, songIdx, filePath);
+    if (!normalized.ok) {
+      errors.push(normalized.error);
+      report.push(normalized.report);
       continue;
     }
 
-    const s = rawSong as ImportSongEntry;
-    const meta = asMeta(s.meta);
-    let blocks: NormalizedImportSongBlock[] = [];
-
-    if (Array.isArray(s.blocks)) {
-      blocks = s.blocks
-        .map((b, idx) => normalizeBlock(b, idx))
-        .filter((b): b is NormalizedImportSongBlock => !!b);
-      if (blocks.length !== s.blocks.length) {
-        errors.push({
-          path: filePath,
-          title: asStringLike(s.title) || asStringLike(s.titre),
-          message: `Entree #${songIdx + 1}: certains blocs sont ignores (format invalide)`,
-        });
-      }
-    } else if (s.blocks != null) {
-      errors.push({
+    try {
+      await createSongWithBlocksAtomic(prisma, normalized.song);
+      imported += 1;
+      report.push({
         path: filePath,
-        title: asStringLike(s.title) || asStringLike(s.titre),
-        message: `Entree #${songIdx + 1}: blocks doit etre un tableau`,
+        status: "SUCCESS",
+        title: normalized.song.title,
+        warnings: normalized.warnings,
+        normalized: {
+          title: normalized.song.title,
+          artist: normalized.song.artist,
+          album: normalized.song.album,
+          year: normalized.song.year,
+          language: normalized.song.language,
+        },
+      });
+    } catch (e: unknown) {
+      const message = getErrorMessage(e);
+      errors.push({ path: filePath, title: normalized.song.title, message });
+      report.push({
+        path: filePath,
+        status: "ERROR",
+        title: normalized.song.title,
+        message,
       });
     }
-
-    const lyrics = asStringLike(s.lyrics) || asStringLike(s.paroles) || asStringLike(meta.paroles);
-    if (blocks.length === 0 && lyrics) {
-      blocks = splitBlocks(lyrics).map((content, idx) => ({
-        order: idx + 1,
-        type: idx === 0 ? "VERSE" : "CHORUS",
-        title: idx === 0 ? "Couplet" : "Refrain",
-        content,
-      }));
-    }
-
-    const year =
-      asStringLike(s.year) ||
-      asStringLike(s.annee) ||
-      asStringLike(s.published) ||
-      asStringLike(s.release_year) ||
-      asStringLike(meta.annee_de_sortie_single);
-    const tags = asStringLike(s.tags) || (year != null ? String(year).slice(0, 10) : undefined);
-    const title = asStringLike(s.title) || asStringLike(s.titre) || asStringLike(meta.titre) || "Sans titre";
-    const artist =
-      asStringLike(s.artist) ||
-      asStringLike(s.auteur) ||
-      asStringLike(meta.auteur_interprete) ||
-      asStringLike(meta.auteur) ||
-      asStringLike(meta.interprete);
-    const album = asStringLike(s.album) || asStringLike(meta.album_inclus_dans);
-    const language = asStringLike(s.language) || asStringLike(s.lang) || asStringLike(meta.langue);
-
-    normalizedSongs.push({
-      title,
-      artist,
-      album,
-      year,
-      language,
-      tags,
-      blocks,
-    });
   }
 
-  let imported = 0;
-  for (const songEntry of normalizedSongs) {
-    try {
-      await createSongWithBlocksAtomic(prisma, songEntry);
-      imported += 1;
-    } catch (e: unknown) {
-      errors.push({ path: filePath, title: songEntry.title, message: getErrorMessage(e) });
-    }
-  }
+  return { imported, errors, report };
+}
 
-  return { imported, errors };
+function toDocErrors(report: CpSongImportReportEntry[]): CpSongImportDocError[] {
+  return report
+    .filter((entry) => entry.status === "ERROR")
+    .map((entry) => ({ path: entry.path, message: entry.message || "Import failed" }));
+}
+
+function uniqueDocxName(baseTitle: string, used: Set<string>) {
+  const base = sanitizeFilename(baseTitle);
+  let candidate = `${base}.docx`;
+  let index = 2;
+  while (used.has(candidate.toLowerCase())) {
+    candidate = `${base} (${index}).docx`;
+    index += 1;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
 }
 
 export function registerSongsIpc() {
@@ -353,7 +710,10 @@ export function registerSongsIpc() {
           if (idx >= 0) {
             const start = Math.max(0, idx - 30);
             const end = Math.min(content.length, idx + query.length + 50);
-            matchSnippet = (start > 0 ? "..." : "") + content.slice(start, end).trim() + (end < content.length ? "..." : "");
+            matchSnippet =
+              (start > 0 ? "..." : "") +
+              content.slice(start, end).trim() +
+              (end < content.length ? "..." : "");
           }
         }
         return { ...rest, matchSnippet };
@@ -439,69 +799,66 @@ export function registerSongsIpc() {
   ipcMain.handle("songs:exportWord", async (_evt, rawSongId: unknown) => {
     const prisma = getPrisma();
     const songId = parseNonEmptyString(rawSongId, "songs:exportWord.songId");
-    const song = await prisma.song.findUnique({ where: { id: songId }, include: { blocks: { orderBy: { order: "asc" } } } });
+    const song = await prisma.song.findUnique({
+      where: { id: songId },
+      include: { blocks: { orderBy: { order: "asc" } } },
+    });
     if (!song) throw new Error("Song not found");
 
-    const lyrics = (song.blocks || [])
-      .map((b: { content?: string | null }) => (b.content || "").trim())
-      .filter(Boolean)
-      .join("\n\n");
-    const doc = new Document({
-      sections: [
-        {
-          properties: {},
-          children: [
-            new Paragraph({ children: [new TextRun({ text: `Titre : ${song.title}`, bold: true })] }),
-            new Paragraph(`Auteur : ${song.artist || ""}`),
-            new Paragraph(`Annee de parution : ${song.year || song.tags || ""}`),
-            new Paragraph(`Album : ${song.album || ""}`),
-            new Paragraph(""),
-            new Paragraph({ children: [new TextRun({ text: "Paroles :", bold: true })] }),
-            ...lyrics.split("\n").map((line: string) => new Paragraph(line)),
-          ],
-        },
-      ],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-
+    const buffer = await buildSongWordBuffer(song);
     const res = await dialog.showSaveDialog({
       title: "Exporter le chant",
-      defaultPath: `${song.title}.docx`,
+      defaultPath: `${sanitizeFilename(song.title)}.docx`,
       filters: [{ name: "Word", extensions: ["docx"] }],
     });
     if (res.canceled || !res.filePath) return { ok: false, canceled: true };
     await writeFile(res.filePath, buffer);
-    return { ok: true, path: res.filePath };
+    return { ok: true, path: res.filePath, format: "SINGLE_DOCX" };
+  });
+
+  ipcMain.handle("songs:exportWordPack", async (_evt, rawPayload: unknown) => {
+    const prisma = getPrisma();
+    const payload = parseSongExportWordPackPayload(rawPayload);
+    const where = payload.songIds?.length
+      ? { deletedAt: null, id: { in: payload.songIds } }
+      : { deletedAt: null };
+
+    const songs = await prisma.song.findMany({
+      where,
+      include: { blocks: { orderBy: { order: "asc" } } },
+      orderBy: { title: "asc" },
+    });
+    if (songs.length === 0) throw new Error("No songs to export");
+
+    const zip = new AdmZip();
+    const usedNames = new Set<string>();
+    for (const song of songs) {
+      const fileName = uniqueDocxName(song.title || "chant", usedNames);
+      const buffer = await buildSongWordBuffer(song);
+      zip.addFile(fileName, buffer);
+    }
+
+    const output = await dialog.showSaveDialog({
+      title: "Exporter un pack DOCX",
+      defaultPath: "chants-pack.zip",
+      filters: [{ name: "ZIP", extensions: ["zip"] }],
+    });
+    if (output.canceled || !output.filePath) return { ok: false, canceled: true };
+    await writeFile(output.filePath, zip.toBuffer());
+    return { ok: true, path: output.filePath, count: songs.length, format: "PACK_ZIP_DOCX" };
   });
 
   ipcMain.handle("songs:importWord", async () => {
     const res = await dialog.showOpenDialog({
       title: "Importer un chant (Word)",
-      filters: [{ name: "Word", extensions: ["docx"] }],
+      filters: [{ name: "Word", extensions: ["docx", "odt"] }],
       properties: ["openFile"],
     });
     if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
 
-    const filePath = res.filePaths[0];
-    const { value } = await mammoth.extractRawText({ path: filePath });
-    const parsed = parseSongText(value || "", path.basename(filePath));
-
     const prisma = getPrisma();
-    const created = await prisma.song.create({
-      data: {
-        title: parsed.title,
-        artist: parsed.artist,
-        album: parsed.album,
-        year: parsed.year,
-        blocks: {
-          create: parsed.blocks,
-        },
-      },
-      include: { blocks: { orderBy: { order: "asc" } } },
-    });
-
-    return { ok: true, song: created };
+    const imported = await importDocSong(prisma, res.filePaths[0]);
+    return { ok: true, song: imported.song, report: [imported.report] };
   });
 
   ipcMain.handle("songs:importJson", async () => {
@@ -514,8 +871,14 @@ export function registerSongsIpc() {
     if (res.canceled || !res.filePaths?.[0]) return { ok: false, canceled: true };
 
     try {
-      const r = await importJsonFile(prisma, res.filePaths[0]);
-      return { ok: true, imported: r.imported, errors: r.errors, path: res.filePaths[0] };
+      const imported = await importJsonFile(prisma, res.filePaths[0]);
+      return {
+        ok: true,
+        imported: imported.imported,
+        errors: imported.errors,
+        path: res.filePaths[0],
+        report: imported.report,
+      };
     } catch (e: unknown) {
       return { ok: false, error: getErrorMessage(e) };
     }
@@ -531,16 +894,29 @@ export function registerSongsIpc() {
 
     const prisma = getPrisma();
     let imported = 0;
-    const errors: Array<{ path: string; message: string }> = [];
-    for (const p of res.filePaths) {
+    const report: CpSongImportReportEntry[] = [];
+
+    for (const filePath of res.filePaths) {
       try {
-        await importDocSong(prisma, p);
+        const created = await importDocSong(prisma, filePath);
         imported += 1;
+        report.push(created.report);
       } catch (e: unknown) {
-        errors.push({ path: p, message: getErrorMessage(e) });
+        report.push({
+          path: filePath,
+          status: "ERROR",
+          message: getErrorMessage(e),
+        });
       }
     }
-    return { ok: true, imported, errors, files: res.filePaths };
+
+    return {
+      ok: true,
+      imported,
+      errors: toDocErrors(report),
+      files: res.filePaths,
+      report,
+    };
   });
 
   ipcMain.handle("songs:importAuto", async () => {
@@ -558,28 +934,45 @@ export function registerSongsIpc() {
     let imported = 0;
     let jsonFiles = 0;
     let docFiles = 0;
-    const errors: Array<{ path: string; message: string }> = [];
+    const report: CpSongImportReportEntry[] = [];
 
-    for (const p of res.filePaths) {
-      const ext = path.extname(p).toLowerCase();
+    for (const filePath of res.filePaths) {
+      const ext = path.extname(filePath).toLowerCase();
       try {
         if (ext === ".json") {
-          const r = await importJsonFile(prisma, p);
-          imported += r.imported;
+          const result = await importJsonFile(prisma, filePath);
+          imported += result.imported;
           jsonFiles += 1;
-          if (r.errors.length) errors.push(...r.errors.map((e) => ({ path: e.path, message: e.message })));
-        } else if (SUPPORTED_DOC_EXTENSIONS.includes(ext)) {
-          await importDocSong(prisma, p);
+          report.push(...result.report);
+        } else if (SUPPORTED_DOC_EXTENSIONS.includes(ext as (typeof SUPPORTED_DOC_EXTENSIONS)[number])) {
+          const result = await importDocSong(prisma, filePath);
           imported += 1;
           docFiles += 1;
-      } else {
-        errors.push({ path: p, message: "Extension non supportee" });
-      }
+          report.push(result.report);
+        } else {
+          report.push({
+            path: filePath,
+            status: "ERROR",
+            message: "Extension non supportee",
+          });
+        }
       } catch (e: unknown) {
-        errors.push({ path: p, message: getErrorMessage(e) });
+        report.push({
+          path: filePath,
+          status: "ERROR",
+          message: getErrorMessage(e),
+        });
       }
     }
 
-    return { ok: true, imported, docFiles, jsonFiles, errors, files: res.filePaths };
+    return {
+      ok: true,
+      imported,
+      docFiles,
+      jsonFiles,
+      errors: toDocErrors(report),
+      files: res.filePaths,
+      report,
+    };
   });
 }

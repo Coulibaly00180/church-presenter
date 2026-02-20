@@ -202,7 +202,7 @@ export function useSongsState() {
       setInfo({ kind: "info", text: "Bloc deja present dans le plan." });
       return;
     }
-    const payload = {
+    const payload: CpPlanAddItemPayload = {
       planId,
       kind: "SONG_BLOCK",
       title: `${sourceSong.title} - ${b.title || b.type}`,

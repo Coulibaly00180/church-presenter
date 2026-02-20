@@ -111,6 +111,7 @@ const cpApi: CpApi = {
     }) => ipcRenderer.invoke("songs:replaceBlocks", payload),
     delete: (id: string) => ipcRenderer.invoke("songs:delete", id),
     exportWord: (id: string) => ipcRenderer.invoke("songs:exportWord", id),
+    exportWordPack: (payload?: { songIds?: string[] }) => ipcRenderer.invoke("songs:exportWordPack", payload),
     importWord: () => ipcRenderer.invoke("songs:importWord"),
     importJson: () => ipcRenderer.invoke("songs:importJson"),
     importWordBatch: () => ipcRenderer.invoke("songs:importWordBatch"),

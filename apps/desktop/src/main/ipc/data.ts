@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { databasePathFromUrl, getPrisma } from "../db";
 import { copyFile, mkdir, readFile, stat, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
-import type { CpDataImportError } from "../../shared/ipc";
+import type { CpDataFileV2, CpDataImportError } from "../../shared/ipc";
 import type { CpPlanItemKind } from "../../shared/planKinds";
 import { isCpPlanItemKind, normalizeCpPlanItemKind } from "../../shared/planKinds";
 import { parseDataImportPayload } from "./runtimeValidation";
@@ -45,6 +45,16 @@ type ImportedDataPayload = {
   songs?: unknown;
   plans?: unknown;
 };
+
+type MigratedDataPayload = {
+  songs: unknown;
+  plans: unknown;
+  schemaVersion: number;
+  warnings: string[];
+};
+
+const DATA_EXPORT_KIND = "CHURCH_PRESENTER_EXPORT" as const;
+const DATA_EXPORT_SCHEMA_VERSION = 2 as const;
 
 type NormalizedSongBlock = {
   order: number;
@@ -379,6 +389,61 @@ function normalizeDateToMidnight(dateIso?: string | Date) {
   return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate(), 0, 0, 0, 0));
 }
 
+export function migrateImportedDataPayload(raw: unknown): MigratedDataPayload {
+  if (!isRecord(raw)) {
+    throw new Error("Invalid JSON structure (object expected)");
+  }
+
+  const kind = asStringLike(raw.kind);
+  const schemaVersionRaw = raw.schemaVersion;
+  const schemaVersion =
+    typeof schemaVersionRaw === "number" && Number.isFinite(schemaVersionRaw)
+      ? Math.trunc(schemaVersionRaw)
+      : undefined;
+
+  if (schemaVersion != null || kind != null || "payload" in raw) {
+    if (kind != null && kind !== DATA_EXPORT_KIND) {
+      throw new Error(`Unsupported export kind: ${kind}`);
+    }
+    const detectedVersion = schemaVersion ?? 1;
+    if (detectedVersion > DATA_EXPORT_SCHEMA_VERSION) {
+      throw new Error(`Unsupported export schema version: ${detectedVersion}`);
+    }
+
+    if (detectedVersion >= 2) {
+      if (!isRecord(raw.payload)) {
+        throw new Error("Invalid JSON structure (payload object expected)");
+      }
+      return {
+        songs: raw.payload.songs,
+        plans: raw.payload.plans,
+        schemaVersion: detectedVersion,
+        warnings: [],
+      };
+    }
+
+    const payload = isRecord(raw.payload) ? raw.payload : raw;
+    return {
+      songs: payload.songs,
+      plans: payload.plans,
+      schemaVersion: detectedVersion,
+      warnings: [
+        "Legacy schema detected (v1). Migration applied automatically.",
+      ],
+    };
+  }
+
+  // Legacy payload without kind/schemaVersion metadata.
+  return {
+    songs: raw.songs,
+    plans: raw.plans,
+    schemaVersion: 1,
+    warnings: [
+      "Legacy JSON detected (missing schema metadata). Migration applied automatically.",
+    ],
+  };
+}
+
 export function registerDataIpc() {
   ipcMain.handle("data:exportAll", async () => {
     const prisma = getPrisma();
@@ -386,16 +451,20 @@ export function registerDataIpc() {
       where: { deletedAt: null },
       include: { items: { orderBy: { order: "asc" } } },
     });
-    const payload = {
-      songs: await prisma.song.findMany({ where: { deletedAt: null }, include: { blocks: { orderBy: { order: "asc" } } } }),
-      plans: plansRaw.map((plan) => ({
-        ...plan,
-        items: plan.items.map((item) => ({
-          ...item,
-          kind: normalizeCpPlanItemKind(item.kind),
-        })),
-      })),
+    const payload: CpDataFileV2 = {
+      kind: DATA_EXPORT_KIND,
+      schemaVersion: DATA_EXPORT_SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
+      payload: {
+        songs: await prisma.song.findMany({ where: { deletedAt: null }, include: { blocks: { orderBy: { order: "asc" } } } }),
+        plans: plansRaw.map((plan) => ({
+          ...plan,
+          items: plan.items.map((item) => ({
+            ...item,
+            kind: normalizeCpPlanItemKind(item.kind),
+          })),
+        })),
+      },
     };
 
     const res = await dialog.showSaveDialog({
@@ -421,17 +490,20 @@ export function registerDataIpc() {
     const path = res.filePaths[0];
     const raw = await readFile(path, "utf-8");
     let data: ImportedDataPayload;
+    const migrationWarnings: string[] = [];
     try {
       const parsed = JSON.parse(raw) as unknown;
-      if (!isRecord(parsed)) return { ok: false, error: "Invalid JSON structure (object expected)" };
-      data = parsed as ImportedDataPayload;
-    } catch {
-      return { ok: false, error: "Invalid JSON file" };
+      const migrated = migrateImportedDataPayload(parsed);
+      data = { songs: migrated.songs, plans: migrated.plans };
+      migrationWarnings.push(...migrated.warnings);
+    } catch (e: unknown) {
+      return { ok: false, error: getErrorMessage(e) || "Invalid JSON file" };
     }
 
     const mode = payload.mode || "MERGE";
     const atomicity = payload.atomicity;
     const validationErrors: CpDataImportError[] = [];
+    migrationWarnings.forEach((warning) => pushValidationError(validationErrors, warning));
     const songs = normalizeSongs(data.songs, validationErrors);
     const plans = normalizePlans(data.plans, validationErrors);
 

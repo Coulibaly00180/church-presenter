@@ -110,6 +110,7 @@ export function createCpMock() {
       replaceBlocks: vi.fn(async () => null),
       delete: vi.fn(async () => ({ ok: true })),
       exportWord: vi.fn(async () => ({ ok: false, canceled: true })),
+      exportWordPack: vi.fn(async () => ({ ok: false, canceled: true })),
       importWord: vi.fn(async () => ({ ok: false, canceled: true })),
       importJson: vi.fn(async () => ({ ok: false, canceled: true })),
       importWordBatch: vi.fn(async () => ({ ok: false, canceled: true })),

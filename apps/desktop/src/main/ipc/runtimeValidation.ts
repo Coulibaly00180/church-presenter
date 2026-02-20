@@ -349,6 +349,16 @@ export function parseSongReplaceBlocksPayload(value: unknown): { songId: string;
   };
 }
 
+export function parseSongExportWordPackPayload(value: unknown): { songIds?: string[] } {
+  if (value == null) return {};
+  const rec = expectRecord(value, "songs:exportWordPack payload");
+  if (rec.songIds == null) return {};
+  const songIds = expectArray(rec.songIds, "songs:exportWordPack.songIds").map((id, idx) =>
+    expectString(id, `songs:exportWordPack.songIds[${idx}]`)
+  );
+  return { songIds };
+}
+
 export function parsePlanDuplicatePayload(value: unknown): CpPlanDuplicatePayload {
   const rec = expectRecord(value, "plans:duplicate payload");
   return {

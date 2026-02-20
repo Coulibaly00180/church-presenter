@@ -100,21 +100,40 @@ export type CpSongDetail = {
 };
 
 export type CpSongDeleteResult = { ok: true };
-export type CpSongExportWordResult = { ok: true; path: string } | { ok: false; canceled: true };
-export type CpSongImportWordResult = { ok: true; song: CpSongDetail } | { ok: false; canceled: true };
+export type CpSongImportReportEntry = {
+  path: string;
+  status: "SUCCESS" | "ERROR";
+  title?: string;
+  message?: string;
+  warnings?: string[];
+  normalized?: {
+    title: string;
+    artist?: string;
+    album?: string;
+    year?: string;
+    language?: string;
+  };
+};
+export type CpSongExportWordResult = { ok: true; path: string; format: "SINGLE_DOCX" } | { ok: false; canceled: true };
+export type CpSongExportWordPackResult =
+  | { ok: true; path: string; count: number; format: "PACK_ZIP_DOCX" }
+  | { ok: false; canceled: true };
+export type CpSongImportWordResult =
+  | { ok: true; song: CpSongDetail; report: CpSongImportReportEntry[] }
+  | { ok: false; canceled: true };
 export type CpSongImportJsonError = { path: string; title?: string; message: string };
 export type CpSongImportJsonResult =
-  | { ok: true; imported: number; errors: CpSongImportJsonError[]; path: string }
+  | { ok: true; imported: number; errors: CpSongImportJsonError[]; path: string; report: CpSongImportReportEntry[] }
   | { ok: false; canceled: true }
   | { ok: false; error: string };
 
 export type CpSongImportDocError = { path: string; message: string };
 export type CpSongImportWordBatchResult =
-  | { ok: true; imported: number; errors: CpSongImportDocError[]; files: string[] }
+  | { ok: true; imported: number; errors: CpSongImportDocError[]; files: string[]; report: CpSongImportReportEntry[] }
   | { ok: false; canceled: true };
 
 export type CpSongImportAutoResult =
-  | { ok: true; imported: number; docFiles: number; jsonFiles: number; errors: CpSongImportDocError[]; files: string[] }
+  | { ok: true; imported: number; docFiles: number; jsonFiles: number; errors: CpSongImportDocError[]; files: string[]; report: CpSongImportReportEntry[] }
   | { ok: false; canceled: true };
 
 export type CpPlanItem = {
@@ -216,6 +235,16 @@ export type CpPlanTemplate = {
   name: string;
   items: CpTemplateItem[];
   createdAt: string;
+};
+export type CpJsonSchemaVersion = 2;
+export type CpDataFileV2 = {
+  kind: "CHURCH_PRESENTER_EXPORT";
+  schemaVersion: CpJsonSchemaVersion;
+  exportedAt: string;
+  payload: {
+    songs: unknown[];
+    plans: unknown[];
+  };
 };
 export type CpFilesPickMediaResult =
   | { ok: true; path: string; mediaType: CpMediaType }
@@ -374,6 +403,7 @@ export interface CpApi {
     replaceBlocks: (payload: { songId: string; blocks: Array<{ order: number; type: CpSongBlockType; title?: string; content: string }> }) => Promise<CpSongDetail | null>;
     delete: (id: string) => Promise<CpSongDeleteResult>;
     exportWord: (id: string) => Promise<CpSongExportWordResult>;
+    exportWordPack: (payload?: { songIds?: string[] }) => Promise<CpSongExportWordPackResult>;
     importWord: () => Promise<CpSongImportWordResult>;
     importJson: () => Promise<CpSongImportJsonResult>;
     importWordBatch: () => Promise<CpSongImportWordBatchResult>;

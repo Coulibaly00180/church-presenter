@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parsePlanAddItemPayload,
+  parseSongExportWordPackPayload,
   parseFilesRenameMediaPayload,
   parseDataImportPayload,
   parseLiveSetPayload,
@@ -51,6 +52,12 @@ describe("runtime validation", () => {
       mediaPath: undefined,
     });
     expect(() => parsePlanAddItemPayload({ planId: "p1", kind: "LEGACY_KIND" })).toThrow("must be one of");
+  });
+
+  it("parses songs:exportWordPack payload", () => {
+    expect(parseSongExportWordPackPayload(undefined)).toEqual({});
+    expect(parseSongExportWordPackPayload({ songIds: ["s1", "s2"] })).toEqual({ songIds: ["s1", "s2"] });
+    expect(() => parseSongExportWordPackPayload({ songIds: ["", "s2"] })).toThrow("must not be empty");
   });
 
   it("validates projection media payload", () => {
