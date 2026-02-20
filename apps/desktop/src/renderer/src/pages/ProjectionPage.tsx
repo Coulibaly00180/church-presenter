@@ -331,24 +331,29 @@ export function ProjectionPage() {
     alignItems: lowerThird ? "flex-end" : "center",
     justifyContent: "center",
     overflow: "hidden",
-    paddingBottom: lowerThird ? "6vh" : 0,
+    padding: lowerThird ? "0 4vw 5vh" : "4vh 4vw",
   };
 
   const cardStyle: React.CSSProperties = {
-    width: "92%",
-    maxWidth: 1600,
+    width: lowerThird ? "min(96vw,1780px)" : "min(92vw,1780px)",
+    maxWidth: 1780,
     textAlign: lowerThird ? "left" : "center",
     fontFamily: textFont,
-    padding: lowerThird ? "10px 24px 12px" : 24,
-    background: lowerThird ? "rgba(0,0,0,0.35)" : "transparent",
-    borderRadius: lowerThird ? 16 : 0,
+    padding: lowerThird ? "14px 28px 18px" : "clamp(24px, 4.5vw, 72px) clamp(22px, 4.2vw, 76px)",
+    background: lowerThird ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.06)",
+    backdropFilter: lowerThird ? "blur(2px)" : undefined,
+    borderRadius: lowerThird ? 18 : 24,
   };
 
   const bodyStyle: React.CSSProperties = {
-    fontSize: (lowerThird ? 40 : 56) * textScale,
+    fontSize: (lowerThird ? 36 : 60) * textScale,
     fontWeight: 800,
-    lineHeight: lowerThird ? 1.1 : 1.15,
+    lineHeight: lowerThird ? 1.14 : 1.2,
+    letterSpacing: lowerThird ? "0.01em" : "0.005em",
+    textShadow: mode === "WHITE" ? "0 1px 2px rgba(255,255,255,0.2)" : "0 3px 22px rgba(0,0,0,0.45)",
     whiteSpace: "pre-wrap",
+    maxWidth: lowerThird ? "90vw" : "88vw",
+    margin: "0 auto",
   };
 
   return (
@@ -376,11 +381,11 @@ export function ProjectionPage() {
 
       {/* Top overlays: title (left) + logo (right) */}
       {(overlayTitle || logoPath) && (
-        <div className="absolute top-4 left-5 right-5 z-[3] pointer-events-none flex items-start justify-between gap-4">
+        <div className="absolute top-6 left-8 right-8 z-[3] pointer-events-none flex items-start justify-between gap-5">
           <div className="min-w-0">
             {overlayTitle && (
               <div
-                className="inline-block max-w-[70vw] truncate bg-black/55 px-4 py-2 rounded-md font-semibold text-[clamp(14px,2.2vw,28px)]"
+                className="inline-flex max-w-[72vw] truncate rounded-lg border border-white/20 bg-black/55 px-5 py-2.5 font-extrabold tracking-wide text-[clamp(16px,2.1vw,32px)] shadow-[0_8px_28px_rgba(0,0,0,0.35)] backdrop-blur-[2px]"
                 style={{ ...textFillStyle, fontFamily: textFont }}
               >
                 {overlayTitle}
@@ -391,7 +396,7 @@ export function ProjectionPage() {
             <img
               src={toFileUrl(logoPath)}
               alt="Logo"
-              className="max-h-[11vh] max-w-[18vw] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,0.55)]"
+              className="max-h-[12vh] max-w-[20vw] min-w-[72px] object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.55)]"
               onError={() => setLogoFailed(true)}
             />
           )}
@@ -441,7 +446,7 @@ export function ProjectionPage() {
                 <>
                   <img
                     src={pdfImage}
-                    className="w-full max-h-[92vh] object-contain rounded-lg"
+                    className="w-full max-h-[90vh] object-contain rounded-lg"
                     alt="PDF"
                   />
                   <div className="absolute bottom-6 right-7 bg-black/60 text-white px-4 py-2 rounded-md font-extrabold text-base">
@@ -457,7 +462,7 @@ export function ProjectionPage() {
               <>
                 <img
                   src={toFileUrl(current.mediaPath)}
-                  className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                  className="max-w-full max-h-[86vh] object-contain rounded-lg"
                   alt={current.title || "Media"}
                 />
               </>
@@ -465,9 +470,11 @@ export function ProjectionPage() {
           </>
         ) : (
           <>
-            <div style={{ ...bodyStyle, ...textFillStyle }}>{projectedBody}</div>
+            <div className={cn("mx-auto", lowerThird ? "max-w-[90vw]" : "max-w-[86vw]")} style={{ ...bodyStyle, ...textFillStyle }}>
+              {projectedBody}
+            </div>
             {metaLine ? (
-              <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-black/60 text-white px-6 py-3 rounded-full flex items-center gap-3 text-sm font-semibold max-w-[95%] flex-wrap justify-center text-center">
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/62 border border-white/15 text-white px-6 py-3 rounded-full flex items-center gap-3 text-sm font-semibold max-w-[95%] flex-wrap justify-center text-center shadow-[0_6px_18px_rgba(0,0,0,0.4)]">
                 <span>{metaLine}</span>
               </div>
             ) : null}

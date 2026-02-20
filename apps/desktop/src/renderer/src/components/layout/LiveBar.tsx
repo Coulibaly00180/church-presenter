@@ -308,6 +308,8 @@ export function LiveBar() {
   const isTargetLocked = !!locked[target];
   const targetState = screenStates[target];
   const lowerThirdEnabled = !!targetState?.lowerThirdEnabled;
+  const liveMode: CpProjectionMode = live?.black ? "BLACK" : live?.white ? "WHITE" : (targetState?.mode ?? "NORMAL");
+  const liveStatus = live?.enabled ? "ON" : "OFF";
 
   const openScreen = async (key: ScreenKey) => {
     if (locked[key]) return;
@@ -343,28 +345,39 @@ export function LiveBar() {
   };
 
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 border-t border-border/60 bg-muted/50 dark:bg-secondary/30 shrink-0 flex-wrap">
+    <div className="flex items-center gap-2 px-3 py-2 border-t border-border/60 bg-muted/50 dark:bg-secondary/30 shrink-0 flex-wrap">
+      <div className="flex items-center gap-1.5 rounded-md border border-border/70 bg-background/70 px-2 py-1">
+        <Badge variant={live?.enabled ? "default" : "secondary"} className="h-7 px-2 font-semibold">
+          LIVE {liveStatus}
+        </Badge>
+        <Badge variant="outline" className="h-7 px-2 font-semibold">
+          TARGET {target}
+        </Badge>
+        <Badge variant={liveMode === "NORMAL" ? "secondary" : "outline"} className="h-7 px-2 font-semibold">
+          MODE {modeLabel(liveMode).toUpperCase()}
+        </Badge>
+      </div>
       {/* Transport */}
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => window.cp.live?.prev()}>
+          <Button variant="outline" size="icon-sm" className="h-9 w-9" onClick={() => window.cp.live?.prev()}>
             <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Precedent (Q / ←)</TooltipContent>
+        <TooltipContent>Precedent (Q / Left)</TooltipContent>
       </Tooltip>
 
-      <Badge variant="outline" className="font-mono text-xs min-w-[2.5rem] h-7 justify-center">
+      <Badge variant="outline" className="font-mono text-sm min-w-[3.2rem] h-9 justify-center">
         {live?.cursor ?? 0}
       </Badge>
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => window.cp.live?.next()}>
+          <Button variant="outline" size="icon-sm" className="h-9 w-9" onClick={() => window.cp.live?.next()}>
             <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Suivant (D / → / Espace)</TooltipContent>
+        <TooltipContent>Suivant (D / Right / Space)</TooltipContent>
       </Tooltip>
 
       <Separator orientation="vertical" className="h-5 mx-0.5" />
@@ -378,8 +391,8 @@ export function LiveBar() {
             <TooltipTrigger asChild>
               <Button
                 variant={target === k ? "default" : "outline"}
-                size="xs"
-                className={cn(!isOpen && "opacity-50")}
+                size="sm"
+                className={cn("h-9 px-3 text-xs font-semibold", !isOpen && "opacity-50")}
                 onClick={() => { void setTarget(k); }}
                 onDoubleClick={() => { void openScreen(k); }}
                 disabled={!!locked[k]}
@@ -389,7 +402,7 @@ export function LiveBar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              Ecran {k} {isOpen ? "(ouvert)" : "(ferme)"} — dbl-clic pour ouvrir/fermer
+              Ecran {k} {isOpen ? "(ouvert)" : "(ferme)"} - dbl-clic pour ouvrir/fermer
             </TooltipContent>
           </Tooltip>
         );
@@ -418,7 +431,7 @@ export function LiveBar() {
 
       <div className="flex items-center gap-1">
         {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-          <Badge key={`lock-badge-${k}`} variant={locked[k] ? "destructive" : "secondary"} className="text-[10px] px-1.5 h-6">
+          <Badge key={`lock-badge-${k}`} variant={locked[k] ? "destructive" : "secondary"} className="text-xs px-2 h-7">
             {k}:{locked[k] ? "LOCK" : "LIVE"}
           </Badge>
         ))}
@@ -431,7 +444,8 @@ export function LiveBar() {
         <TooltipTrigger asChild>
           <Button
             variant={live?.black ? "destructive" : "outline"}
-            size="xs"
+            size="sm"
+            className="h-9 px-4 font-semibold"
             onClick={() => window.cp.live?.toggleBlack()}
             disabled={isTargetLocked}
           >
@@ -445,7 +459,8 @@ export function LiveBar() {
         <TooltipTrigger asChild>
           <Button
             variant={live?.white ? "secondary" : "outline"}
-            size="xs"
+            size="sm"
+            className="h-9 px-4 font-semibold"
             onClick={() => window.cp.live?.toggleWhite()}
             disabled={isTargetLocked}
           >
@@ -457,7 +472,7 @@ export function LiveBar() {
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="xs" onClick={() => window.cp.live?.resume()} disabled={isTargetLocked}>
+          <Button variant="outline" size="sm" className="h-9 px-4 font-semibold" onClick={() => window.cp.live?.resume()} disabled={isTargetLocked}>
             Normal
           </Button>
         </TooltipTrigger>
@@ -466,7 +481,7 @@ export function LiveBar() {
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant={lowerThirdEnabled ? "default" : "outline"} size="xs" onClick={toggleLowerThird} disabled={isTargetLocked}>
+          <Button variant={lowerThirdEnabled ? "default" : "outline"} size="sm" className="h-9 px-3" onClick={toggleLowerThird} disabled={isTargetLocked}>
             Lower-third
           </Button>
         </TooltipTrigger>
@@ -475,7 +490,7 @@ export function LiveBar() {
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="xs" onClick={() => window.cp.live?.setCursor(live?.cursor ?? 0)} disabled={isTargetLocked}>
+          <Button variant="outline" size="sm" className="h-9 px-3" onClick={() => window.cp.live?.setCursor(live?.cursor ?? 0)} disabled={isTargetLocked}>
             <RotateCcw className="h-3 w-3" />
             Reprojeter
           </Button>
@@ -488,7 +503,7 @@ export function LiveBar() {
       {/* Appearance popover */}
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="xs">
+          <Button variant="outline" size="sm" className="h-9 px-3">
             <Palette className="h-3 w-3" />
             Style
           </Button>
@@ -557,7 +572,7 @@ export function LiveBar() {
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
-              size="icon-xs"
+              size="icon-sm"
               onClick={() => window.cp.live?.setLocked(k, !locked[k])}
             >
               {locked[k]
@@ -573,7 +588,7 @@ export function LiveBar() {
 
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="outline" size="xs" onClick={() => setQuickOpen(true)}>
+          <Button variant="outline" size="sm" className="h-9 px-3" onClick={() => setQuickOpen(true)}>
             <MessageSquarePlus className="h-3 w-3" />
             Rapide
           </Button>
@@ -588,7 +603,8 @@ export function LiveBar() {
         <PopoverTrigger asChild>
           <Button
             variant={syncStatus?.running ? "default" : "outline"}
-            size="xs"
+            size="sm"
+            className="h-9 px-3"
           >
             {syncStatus?.running
               ? <><Wifi className="h-3 w-3" /> Sync ({syncStatus.clients})</>
@@ -658,7 +674,7 @@ export function LiveBar() {
       <div className="flex-1" />
 
       <span className="text-[10px] text-muted-foreground hidden sm:inline">
-        1/2/3=ecran B/W/R=modes ←/→=nav
+        1/2/3=ecrans  B/W/R=modes  fleches=nav
       </span>
 
       <QuickProjectDialog open={quickOpen} onOpenChange={setQuickOpen} />

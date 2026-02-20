@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Pencil } from "lucide-react";
+import { CalendarClock, Clock3, Monitor, MonitorOff, Pencil, PlayCircle, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { PlanEditor } from "@/components/plan/PlanEditor";
 import { PlanToolbar } from "@/components/plan/PlanToolbar";
@@ -18,6 +20,23 @@ type MainPageContext = {
   planId: string | null;
   setPlanId: (id: string | null) => void;
 };
+
+type DashboardPlanItem = {
+  id: string;
+  date: string | Date;
+  title?: string | null;
+};
+
+function dateValue(value: string | Date) {
+  const parsed = typeof value === "string" ? new Date(value) : value;
+  const ts = parsed.getTime();
+  return Number.isNaN(ts) ? 0 : ts;
+}
+
+function planSummary(planItem: DashboardPlanItem | null) {
+  if (!planItem) return "Aucun plan";
+  return `${isoToYmd(planItem.date)} - ${planItem.title || "Culte"}`;
+}
 
 export function MainPage() {
   const { planId, setPlanId } = useOutletContext<MainPageContext>();
@@ -36,6 +55,24 @@ export function MainPage() {
   const loopRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastAutoProjectionRef = useRef("");
   const prevLiveRef = useRef<CpLiveState | null>(null);
+  const [allPlans, setAllPlans] = useState<DashboardPlanItem[]>([]);
+  const [projectionOpen, setProjectionOpen] = useState(false);
+  const [screenModes, setScreenModes] = useState<Record<ScreenKey, CpProjectionMode>>({
+    A: "NORMAL",
+    B: "NORMAL",
+    C: "NORMAL",
+  });
+
+  const refreshPlansCatalog = useCallback(() => {
+    window.cp.plans
+      .list()
+      .then((rows) => setAllPlans(rows as DashboardPlanItem[]))
+      .catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    refreshPlansCatalog();
+  }, [refreshPlansCatalog]);
 
   // Load plan
   useEffect(() => {
@@ -55,6 +92,46 @@ export function MainPage() {
     window.cp.live.get().then(setLive).catch(() => null);
     const off = window.cp.live.onUpdate(setLive);
     return () => off?.();
+  }, []);
+
+  useEffect(() => {
+    if (!window.cp.projectionWindow) return;
+    window.cp.projectionWindow.isOpen().then((p) => setProjectionOpen(!!p?.isOpen)).catch(() => null);
+    const off = window.cp.projectionWindow.onWindowState((p) => setProjectionOpen(!!p?.isOpen));
+    return () => off?.();
+  }, []);
+
+  useEffect(() => {
+    if (!window.cp.screens) return;
+    const keys: ScreenKey[] = ["A", "B", "C"];
+    let cancelled = false;
+
+    void Promise.all(
+      keys.map(async (key) => {
+        const state = await window.cp.screens.getState(key);
+        return { key, mode: (state.mode ?? "NORMAL") as CpProjectionMode };
+      })
+    )
+      .then((rows) => {
+        if (cancelled) return;
+        setScreenModes((prev) => {
+          const next = { ...prev };
+          for (const row of rows) next[row.key] = row.mode;
+          return next;
+        });
+      })
+      .catch(() => null);
+
+    const offs = keys.map((key) =>
+      window.cp.screens.onState(key, (state) => {
+        setScreenModes((prev) => ({ ...prev, [key]: state.mode ?? "NORMAL" }));
+      })
+    );
+
+    return () => {
+      cancelled = true;
+      offs.forEach((off) => off?.());
+    };
   }, []);
 
   // Keep live planId in sync
@@ -159,7 +236,8 @@ export function MainPage() {
     window.cp.plans.get(planId).then((p) => {
       if (p) setPlan(p as Plan);
     });
-  }, [planId]);
+    refreshPlansCatalog();
+  }, [planId, refreshPlansCatalog]);
 
   const handleProject = useCallback(async (item: PlanItem) => {
     const target = live?.target ?? "A";
@@ -228,20 +306,90 @@ export function MainPage() {
     await window.cp.plans.update({ planId, title: trimmed || "Culte" });
     setPlan({ ...plan, title: trimmed || "Culte" });
     toast.success("Plan renomme");
+    refreshPlansCatalog();
   };
+
+  const sortedPlans = useMemo(
+    () => [...allPlans].sort((a, b) => dateValue(a.date) - dateValue(b.date)),
+    [allPlans]
+  );
+
+  const todayValue = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  const nextPlan = useMemo(() => {
+    const upcoming = sortedPlans.filter((p) => dateValue(p.date) >= todayValue);
+    return upcoming.find((p) => p.id !== planId) ?? upcoming[0] ?? null;
+  }, [sortedPlans, todayValue, planId]);
+
+  const lastPlan = useMemo(() => {
+    const past = sortedPlans.filter((p) => dateValue(p.date) < todayValue);
+    return past.at(-1) ?? null;
+  }, [sortedPlans, todayValue]);
+
+  const liveTarget: ScreenKey = live?.target ?? "A";
+  const liveMode: CpProjectionMode =
+    live?.black ? "BLACK" : live?.white ? "WHITE" : (screenModes[liveTarget] ?? "NORMAL");
+  const liveModeLabel = liveMode === "BLACK" ? "NOIR" : liveMode === "WHITE" ? "BLANC" : "NORMAL";
+
+  const toggleProjectionWindow = useCallback(async () => {
+    if (!window.cp.projectionWindow) return;
+    const result = projectionOpen ? await window.cp.projectionWindow.close() : await window.cp.projectionWindow.open();
+    setProjectionOpen(!!result?.isOpen);
+  }, [projectionOpen]);
 
   if (!planId || !plan) {
     return (
       <div className="flex items-center justify-center h-full">
-        <Card className="max-w-md">
+        <Card className="max-w-3xl w-full">
           <CardHeader>
-            <CardTitle>Bienvenue</CardTitle>
+            <CardTitle>Dashboard regie</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <p className="text-muted-foreground">
               Selectionnez un plan dans le menu en haut pour commencer,
               ou utilisez l'onglet Calendrier dans le panneau de gauche pour en creer un nouveau.
             </p>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border p-3 space-y-2">
+                <p className="text-xs font-semibold flex items-center gap-2">
+                  <CalendarClock className="h-3.5 w-3.5 text-primary" />
+                  Prochain culte
+                </p>
+                <p className="text-sm">{planSummary(nextPlan)}</p>
+                <Button
+                  size="sm"
+                  className="h-9"
+                  disabled={!nextPlan}
+                  onClick={() => {
+                    if (nextPlan) setPlanId(nextPlan.id);
+                  }}
+                >
+                  Ouvrir ce plan
+                </Button>
+              </div>
+              <div className="rounded-lg border p-3 space-y-2">
+                <p className="text-xs font-semibold flex items-center gap-2">
+                  <Clock3 className="h-3.5 w-3.5 text-primary" />
+                  Dernier plan
+                </p>
+                <p className="text-sm">{planSummary(lastPlan)}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9"
+                  disabled={!lastPlan}
+                  onClick={() => {
+                    if (lastPlan) setPlanId(lastPlan.id);
+                  }}
+                >
+                  Reouvrir
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -249,6 +397,7 @@ export function MainPage() {
   }
 
   const dateStr = isoToYmd(plan.date);
+  const currentItem = plan.items.find((i) => i.order === (live?.cursor ?? 0)) ?? plan.items[0] ?? null;
 
   return (
     <div className="flex flex-col h-full gap-3">
@@ -302,6 +451,95 @@ export function MainPage() {
           }}
         />
       </div>
+
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/10 via-background to-background">
+        <CardContent className="pt-4 space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={live?.enabled ? "default" : "secondary"} className="h-7 px-3 font-semibold">
+              {live?.enabled ? "LIVE ON" : "LIVE OFF"}
+            </Badge>
+            <Badge variant="outline" className="h-7 px-3 font-semibold">
+              TARGET {liveTarget}
+            </Badge>
+            <Badge variant={liveMode === "NORMAL" ? "secondary" : "outline"} className="h-7 px-3 font-semibold">
+              MODE {liveModeLabel}
+            </Badge>
+            {(["A", "B", "C"] as ScreenKey[]).map((key) => (
+              <Badge key={`main-lock-${key}`} variant={live?.lockedScreens?.[key] ? "destructive" : "secondary"} className="h-7 px-2">
+                {key}: {live?.lockedScreens?.[key] ? "LOCK" : "LIVE"}
+              </Badge>
+            ))}
+          </div>
+
+          <div className="grid gap-3 xl:grid-cols-3">
+            <div className="rounded-lg border bg-background/70 p-3 space-y-2">
+              <p className="text-xs font-semibold flex items-center gap-2">
+                <CalendarClock className="h-3.5 w-3.5 text-primary" />
+                Prochain culte
+              </p>
+              <p className="text-sm">{planSummary(nextPlan)}</p>
+              <Button
+                variant="outline"
+                className="h-10 w-full justify-start"
+                disabled={!nextPlan}
+                onClick={() => {
+                  if (nextPlan) setPlanId(nextPlan.id);
+                }}
+              >
+                Ouvrir
+              </Button>
+            </div>
+
+            <div className="rounded-lg border bg-background/70 p-3 space-y-2">
+              <p className="text-xs font-semibold flex items-center gap-2">
+                <Clock3 className="h-3.5 w-3.5 text-primary" />
+                Dernier plan
+              </p>
+              <p className="text-sm">{planSummary(lastPlan)}</p>
+              <Button
+                variant="outline"
+                className="h-10 w-full justify-start"
+                disabled={!lastPlan}
+                onClick={() => {
+                  if (lastPlan) setPlanId(lastPlan.id);
+                }}
+              >
+                Reouvrir
+              </Button>
+            </div>
+
+            <div className="rounded-lg border bg-background/70 p-3 space-y-2">
+              <p className="text-xs font-semibold">Actions rapides</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button size="lg" className="h-11 justify-start" onClick={() => setAddItemOpen(true)}>
+                  <PlusCircle className="h-4 w-4" />
+                  Ajouter un item
+                </Button>
+                <Button size="lg" variant="outline" className="h-11 justify-start" onClick={toggleProjectionWindow}>
+                  {projectionOpen ? <MonitorOff className="h-4 w-4" /> : <Monitor className="h-4 w-4" />}
+                  {projectionOpen ? "Fermer projection" : "Ouvrir projection"}
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-11 justify-start"
+                  disabled={!currentItem}
+                  onClick={() => {
+                    if (currentItem) void handleProject(currentItem);
+                  }}
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  Projeter l'item live
+                </Button>
+                <Button size="lg" variant="outline" className="h-11 justify-start" onClick={() => setHistoryOpen(true)}>
+                  <Clock3 className="h-4 w-4" />
+                  Historique projection
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <PlanEditor
         items={plan.items}
