@@ -289,36 +289,67 @@ function classifyMetadataLabel(labelRaw: string):
   return null;
 }
 
+type ParsedSectionHeading = {
+  type: "VERSE" | "CHORUS" | "BRIDGE";
+  title: string;
+  inline: string;
+};
+
+type RepeatingChunk = {
+  length: number;
+  indices: number[];
+  lines: string[];
+  score: number;
+};
+
+function parseSectionHeading(line: string, fallbackVerseIndex: number): ParsedSectionHeading | null {
+  const match = line.match(/^(refrain|chorus|couplet|verse|pont|bridge)\s*([0-9]+)?\s*[:\-\u2013\u2014]?\s*(.*)$/i);
+  if (!match) return null;
+
+  const head = canonicalLabel(match[1] ?? "");
+  const sequence = (match[2] ?? "").trim();
+  const inline = (match[3] ?? "").trim();
+
+  if (head === "refrain" || head === "chorus") {
+    return {
+      type: "CHORUS",
+      title: sequence ? `Refrain ${sequence}` : "Refrain",
+      inline,
+    };
+  }
+
+  if (head === "pont" || head === "bridge") {
+    return {
+      type: "BRIDGE",
+      title: sequence ? `Pont ${sequence}` : "Pont",
+      inline,
+    };
+  }
+
+  return {
+    type: "VERSE",
+    title: sequence ? `Couplet ${sequence}` : `Couplet ${fallbackVerseIndex}`,
+    inline,
+  };
+}
+
 function parseParagraphToBlock(paragraph: string, idx: number): NormalizedImportSongBlock {
   const lines = paragraph.split("\n").map((line) => line.trim());
   const first = lines[0] ?? "";
-  const heading = first.match(/^(refrain|chorus|couplet|verse|pont|bridge)\s*([0-9]+)?\s*[:\-\u2013\u2014]?\s*(.*)$/i);
+  const heading = parseSectionHeading(first, idx + 1);
 
   let type = "VERSE";
   let title = `Couplet ${idx + 1}`;
   let bodyLines = [...lines];
 
   if (heading) {
-    const head = canonicalLabel(heading[1] ?? "");
-    const sequence = heading[2] ? heading[2].trim() : "";
-    const inline = heading[3] ? heading[3].trim() : "";
-
-    if (head === "refrain" || head === "chorus") {
-      type = "CHORUS";
-      title = sequence ? `Refrain ${sequence}` : "Refrain";
-    } else if (head === "pont" || head === "bridge") {
-      type = "BRIDGE";
-      title = sequence ? `Pont ${sequence}` : "Pont";
-    } else {
-      type = "VERSE";
-      title = sequence ? `Couplet ${sequence}` : `Couplet ${idx + 1}`;
-    }
-
+    type = heading.type;
+    title = heading.title;
     bodyLines = lines.slice(1);
-    if (inline.length > 0) bodyLines.unshift(inline);
+    if (heading.inline.length > 0) bodyLines.unshift(heading.inline);
   }
 
-  const content = bodyLines.join("\n").trim();
+  const content = normalizeMultiline(bodyLines.join("\n"));
   return {
     order: idx + 1,
     type,
@@ -327,15 +358,191 @@ function parseParagraphToBlock(paragraph: string, idx: number): NormalizedImport
   };
 }
 
-function parseLyricsToBlocks(lyrics: string): NormalizedImportSongBlock[] {
-  const paragraphs = splitBlocks(lyrics);
-  if (paragraphs.length === 0) {
-    return [{ order: 1, type: "VERSE", title: "Couplet 1", content: normalizeMultiline(lyrics) }];
+function parseLyricsByHeadings(lyrics: string): NormalizedImportSongBlock[] | null {
+  const lines = normalizeMultiline(lyrics).split("\n");
+  if (lines.length === 0) return null;
+
+  let headingCount = 0;
+  let verseCounter = 0;
+  let currentType: "VERSE" | "CHORUS" | "BRIDGE" = "VERSE";
+  let currentTitle = "";
+  let currentLines: string[] = [];
+  const blocks: NormalizedImportSongBlock[] = [];
+
+  const flushCurrent = () => {
+    const content = normalizeMultiline(currentLines.join("\n"));
+    if (!content) return;
+    blocks.push({
+      order: blocks.length + 1,
+      type: currentType,
+      title: currentTitle || `Couplet ${Math.max(verseCounter, 1)}`,
+      content,
+    });
+    currentLines = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      if (currentLines.length > 0) currentLines.push("");
+      continue;
+    }
+
+    const heading = parseSectionHeading(line, verseCounter + 1);
+    if (heading) {
+      headingCount += 1;
+      flushCurrent();
+
+      if (heading.type === "VERSE" && !/^couplet\s+\d+$/i.test(heading.title)) {
+        verseCounter += 1;
+      }
+
+      if (heading.type === "VERSE" && /^couplet\s+\d+$/i.test(heading.title)) {
+        const parsed = heading.title.match(/(\d+)/);
+        if (parsed?.[1]) verseCounter = Math.max(verseCounter, Number(parsed[1]));
+      }
+
+      currentType = heading.type;
+      currentTitle = heading.title;
+      currentLines = heading.inline ? [heading.inline] : [];
+      continue;
+    }
+
+    if (!currentTitle) {
+      verseCounter += 1;
+      currentType = "VERSE";
+      currentTitle = `Couplet ${verseCounter}`;
+    }
+    currentLines.push(rawLine.trim());
   }
-  const blocks = paragraphs.map((paragraph, idx) => parseParagraphToBlock(paragraph, idx));
-  const filtered = blocks.filter((block) => block.content.length > 0);
-  const base = filtered.length > 0 ? filtered : blocks;
-  return base.map((block, idx) => ({ ...block, order: idx + 1 }));
+
+  flushCurrent();
+  if (headingCount === 0 || blocks.length === 0) return null;
+  return blocks.map((block, idx) => ({ ...block, order: idx + 1 }));
+}
+
+function normalizeLineForRepeatMatch(line: string): string {
+  return canonicalLabel(line);
+}
+
+function findBestRepeatingChunk(lines: string[]): RepeatingChunk | null {
+  const maxLen = Math.min(8, Math.floor(lines.length / 2));
+  let best: RepeatingChunk | null = null;
+
+  for (let len = maxLen; len >= 2; len -= 1) {
+    const chunks = new Map<string, { lines: string[]; indices: number[] }>();
+    for (let i = 0; i <= lines.length - len; i += 1) {
+      const chunk = lines.slice(i, i + len);
+      const key = chunk.map((line) => normalizeLineForRepeatMatch(line)).join("\n");
+      if (!key || key.length < len) continue;
+      const entry = chunks.get(key);
+      if (entry) {
+        entry.indices.push(i);
+      } else {
+        chunks.set(key, { lines: chunk, indices: [i] });
+      }
+    }
+
+    for (const entry of chunks.values()) {
+      const nonOverlapping: number[] = [];
+      for (const idx of entry.indices) {
+        const previous = nonOverlapping[nonOverlapping.length - 1];
+        if (previous == null || idx >= previous + len) nonOverlapping.push(idx);
+      }
+      if (nonOverlapping.length < 2) continue;
+
+      const coverage = (nonOverlapping.length * len) / lines.length;
+      if (coverage < 0.18 && len < 4) continue;
+
+      const score = nonOverlapping.length * len;
+      if (!best || score > best.score || (score === best.score && len > best.length)) {
+        best = {
+          length: len,
+          indices: nonOverlapping,
+          lines: entry.lines,
+          score,
+        };
+      }
+    }
+  }
+
+  return best;
+}
+
+function parseLyricsByRepeatingChunk(lyrics: string): NormalizedImportSongBlock[] | null {
+  const lines = normalizeMultiline(lyrics)
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length < 6) return null;
+
+  const repeating = findBestRepeatingChunk(lines);
+  if (!repeating) return null;
+  const repeatingStarts = new Set(repeating.indices);
+
+  const blocks: NormalizedImportSongBlock[] = [];
+  let verseCounter = 0;
+  let chorusCounter = 0;
+  let cursor = 0;
+  let verseLines: string[] = [];
+
+  const flushVerse = () => {
+    if (verseLines.length === 0) return;
+    const content = normalizeMultiline(verseLines.join("\n"));
+    if (!content) return;
+    verseCounter += 1;
+    blocks.push({
+      order: blocks.length + 1,
+      type: "VERSE",
+      title: `Couplet ${verseCounter}`,
+      content,
+    });
+    verseLines = [];
+  };
+
+  while (cursor < lines.length) {
+    if (repeatingStarts.has(cursor)) {
+      flushVerse();
+      chorusCounter += 1;
+      blocks.push({
+        order: blocks.length + 1,
+        type: "CHORUS",
+        title: chorusCounter > 1 ? `Refrain ${chorusCounter}` : "Refrain",
+        content: normalizeMultiline(repeating.lines.join("\n")),
+      });
+      cursor += repeating.length;
+      continue;
+    }
+    verseLines.push(lines[cursor]);
+    cursor += 1;
+  }
+
+  flushVerse();
+  if (blocks.length <= 1) return null;
+  return blocks.map((block, idx) => ({ ...block, order: idx + 1 }));
+}
+
+function parseLyricsToBlocks(lyrics: string): NormalizedImportSongBlock[] {
+  const normalizedLyrics = normalizeMultiline(lyrics);
+  if (!normalizedLyrics) {
+    return [{ order: 1, type: "VERSE", title: "Couplet 1", content: "" }];
+  }
+
+  const explicitHeadingBlocks = parseLyricsByHeadings(normalizedLyrics);
+  if (explicitHeadingBlocks && explicitHeadingBlocks.length > 0) return explicitHeadingBlocks;
+
+  const paragraphs = splitBlocks(lyrics);
+  if (paragraphs.length > 1) {
+    const blocks = paragraphs.map((paragraph, idx) => parseParagraphToBlock(paragraph, idx));
+    const filtered = blocks.filter((block) => block.content.length > 0);
+    const base = filtered.length > 0 ? filtered : blocks;
+    return base.map((block, idx) => ({ ...block, order: idx + 1 }));
+  }
+
+  const repeatingChunkBlocks = parseLyricsByRepeatingChunk(normalizedLyrics);
+  if (repeatingChunkBlocks && repeatingChunkBlocks.length > 0) return repeatingChunkBlocks;
+
+  return [{ order: 1, type: "VERSE", title: "Couplet 1", content: normalizedLyrics }];
 }
 
 function buildCanonicalMap(record: Record<string, unknown>): Map<string, unknown> {

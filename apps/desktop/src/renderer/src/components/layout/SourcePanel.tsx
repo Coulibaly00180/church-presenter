@@ -66,7 +66,7 @@ export function SourcePanel({ planId, onSelectPlan }: SourcePanelProps) {
       </div>
 
       <Tabs defaultValue="bible" className="flex-1 flex flex-col min-h-0">
-        {/* Tab triggers — compact, wrappable */}
+        {/* Tab triggers - compact, wrappable */}
         <TabsList className="mx-2 mt-2 shrink-0 flex flex-wrap h-auto gap-0.5 justify-start">
           <TabsTrigger value="bible" className="gap-1 text-xs px-2 py-1">
             <Book className="h-3 w-3" /> Bible
@@ -85,22 +85,32 @@ export function SourcePanel({ planId, onSelectPlan }: SourcePanelProps) {
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab content — scrollable area */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-3">
-          <TabsContent value="bible" className="mt-0">
-            <BibleTab planId={planId} />
+        {/* Tab content - scrollable area */}
+        <div className="flex-1 min-h-0 overflow-hidden p-3">
+          <TabsContent value="bible" className="mt-0 h-full min-h-0">
+            <div className="h-full min-h-0 overflow-y-auto pr-1">
+              <BibleTab planId={planId} />
+            </div>
           </TabsContent>
-          <TabsContent value="songs" className="mt-0">
-            <SongsTab planId={planId} />
+          <TabsContent value="songs" className="mt-0 h-full min-h-0">
+            <div className="h-full min-h-0 overflow-hidden">
+              <SongsTab planId={planId} />
+            </div>
           </TabsContent>
-          <TabsContent value="announcements" className="mt-0">
-            <AnnouncementsTab planId={planId} />
+          <TabsContent value="announcements" className="mt-0 h-full min-h-0">
+            <div className="h-full min-h-0 overflow-y-auto pr-1">
+              <AnnouncementsTab planId={planId} />
+            </div>
           </TabsContent>
-          <TabsContent value="media" className="mt-0">
-            <MediaTab planId={planId} />
+          <TabsContent value="media" className="mt-0 h-full min-h-0">
+            <div className="h-full min-h-0 overflow-y-auto pr-1">
+              <MediaTab planId={planId} />
+            </div>
           </TabsContent>
-          <TabsContent value="calendar" className="mt-0">
-            <CalendarTab planId={planId} onSelectPlan={onSelectPlan ?? (() => {})} />
+          <TabsContent value="calendar" className="mt-0 h-full min-h-0">
+            <div className="h-full min-h-0 overflow-y-auto pr-1">
+              <CalendarTab planId={planId} onSelectPlan={onSelectPlan ?? (() => {})} />
+            </div>
           </TabsContent>
         </div>
       </Tabs>

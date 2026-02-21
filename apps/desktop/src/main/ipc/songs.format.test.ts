@@ -34,6 +34,49 @@ describe("song import format parsing", () => {
     expect(parsed.title).toBe("grace");
     expect(parsed.warnings.some((w) => w.includes("Titre absent"))).toBe(true);
   });
+
+  it("parses section headings even without blank lines", () => {
+    const parsed = parseSongText(
+      [
+        "Titre: Test heading",
+        "Paroles:",
+        "Couplet 1",
+        "Ligne A",
+        "Ligne B",
+        "Refrain",
+        "Alleluia alleluia",
+        "Pont",
+        "Je te loue",
+      ].join("\n"),
+      "heading.docx",
+    );
+
+    expect(parsed.blocks).toHaveLength(3);
+    expect(parsed.blocks[0]).toMatchObject({ type: "VERSE", title: "Couplet 1" });
+    expect(parsed.blocks[1]).toMatchObject({ type: "CHORUS", title: "Refrain" });
+    expect(parsed.blocks[2]).toMatchObject({ type: "BRIDGE", title: "Pont" });
+  });
+
+  it("infers a repeated chorus when lyrics have no explicit separators", () => {
+    const parsed = parseSongText(
+      [
+        "Titre: Repetition",
+        "Paroles:",
+        "Mon Dieu est grand",
+        "Je chante sa bonté",
+        "Yahwe tu regnes",
+        "Yahwe tu sauves",
+        "Quand je doute tu es la",
+        "Ta paix m'accompagne",
+        "Yahwe tu regnes",
+        "Yahwe tu sauves",
+      ].join("\n"),
+      "repeat.docx",
+    );
+
+    expect(parsed.blocks.length).toBeGreaterThan(1);
+    expect(parsed.blocks.some((b) => b.type === "CHORUS")).toBe(true);
+  });
 });
 
 describe("songs JSON versioning", () => {
@@ -115,5 +158,29 @@ describe("songs JSON content mapping", () => {
     if (!normalized.ok) return;
     expect(normalized.song.artist).toBe(artist);
     expect(normalized.song.blocks[0]?.content).toContain(lyric);
+  });
+
+  it("supports explicit blocks format as robust JSON contract", () => {
+    const normalized = normalizeSongFromJson(
+      {
+        meta: {
+          titre: "Format blocks",
+          auteur: "Equipe",
+          annee_de_parution: "2025",
+        },
+        blocks: [
+          { type: "VERSE", title: "Couplet 1", content: "Ligne 1\nLigne 2" },
+          { type: "CHORUS", title: "Refrain", content: "Alleluia" },
+        ],
+      },
+      0,
+      "format_blocks.json",
+    );
+
+    expect(normalized.ok).toBe(true);
+    if (!normalized.ok) return;
+    expect(normalized.song.title).toBe("Format blocks");
+    expect(normalized.song.blocks).toHaveLength(2);
+    expect(normalized.song.blocks[1]).toMatchObject({ type: "CHORUS", title: "Refrain" });
   });
 });

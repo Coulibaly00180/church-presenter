@@ -2,7 +2,6 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -79,14 +78,14 @@ export function SongEditorDialog({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[450px] sm:max-w-[500px] flex flex-col overflow-hidden">
+      <SheetContent className="w-[450px] sm:max-w-[500px] flex flex-col min-h-0 overflow-hidden">
         <SheetHeader>
           <SheetTitle>Edition du chant</SheetTitle>
           <SheetDescription>{song.title}</SheetDescription>
         </SheetHeader>
 
-        <ScrollArea className="flex-1 pr-2">
-          <div className="flex flex-col gap-4 pb-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+          <div className="flex flex-col gap-4 pb-6">
             {/* Meta form */}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
@@ -192,7 +191,7 @@ export function SongEditorDialog({
               )}
             </div>
           </div>
-        </ScrollArea>
+        </div>
       </SheetContent>
     </Sheet>
   );
