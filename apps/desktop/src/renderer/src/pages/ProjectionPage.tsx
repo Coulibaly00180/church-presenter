@@ -110,14 +110,19 @@ export function ProjectionPage() {
       const isPrev = e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "PageUp" || e.key.toLowerCase() === "q";
 
       if (isText && (isNext || isPrev)) {
-        e.preventDefault();
         const parts = String(state?.current?.body || "")
           .split(/\n\s*\n/g)
           .map((part: string) => part.trim())
           .filter(Boolean);
         const max = Math.max(parts.length - 1, 0);
-        setBlockCursor((idx) => Math.min(Math.max(idx + (isNext ? 1 : -1), 0), max));
-        return;
+        const canMoveInsideText =
+          max > 0 && ((isNext && blockCursor < max) || (isPrev && blockCursor > 0));
+
+        if (canMoveInsideText) {
+          e.preventDefault();
+          setBlockCursor((idx) => Math.min(Math.max(idx + (isNext ? 1 : -1), 0), max));
+          return;
+        }
       }
 
       if (isNext) { e.preventDefault(); window.cp.live?.next?.(); }
@@ -125,7 +130,7 @@ export function ProjectionPage() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [state?.current?.kind, state?.current?.mediaType, state?.current?.body]);
+  }, [state?.current?.kind, state?.current?.mediaType, state?.current?.body, blockCursor]);
 
   useEffect(() => {
     const hasScreens = !!window.cp?.screens?.getState && !!window.cp?.screens?.onState;

@@ -100,6 +100,72 @@ export function useSongsState() {
     }
   }
 
+  async function onImportWord() {
+    setImporting(true);
+    setErr(null);
+    setInfo(null);
+    try {
+      const result = await window.cp.songs.importWordBatch();
+      if ("canceled" in result && result.canceled) return;
+      if (result.ok) {
+        await refresh(q);
+        if (result.imported > 0) {
+          setInfo({
+            kind: "success",
+            text: `Import Word termine: ${result.imported} chant(s).`,
+          });
+        } else {
+          setInfo({
+            kind: "info",
+            text: "Import Word termine: aucun chant importe.",
+          });
+        }
+        if (result.errors.length > 0) {
+          setErr(`${result.errors.length} erreur(s) detectee(s) pendant l'import Word.`);
+        }
+      }
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function onImportJson() {
+    setImporting(true);
+    setErr(null);
+    setInfo(null);
+    try {
+      const result = await window.cp.songs.importJson();
+      if ("canceled" in result && result.canceled) return;
+      if ("error" in result) {
+        setErr(result.error);
+        return;
+      }
+      if (result.ok) {
+        await refresh(q);
+        if (result.imported > 0) {
+          setInfo({
+            kind: "success",
+            text: `Import JSON termine: ${result.imported} chant(s).`,
+          });
+        } else {
+          setInfo({
+            kind: "info",
+            text: "Import JSON termine: aucun chant importe.",
+          });
+        }
+        if (result.errors.length > 0) {
+          setErr(`${result.errors.length} erreur(s) detectee(s) pendant l'import JSON.`);
+        }
+      }
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setImporting(false);
+    }
+  }
+
   async function onDelete() {
     if (!selectedId) return;
     if (!confirm("Supprimer ce chant ?")) return;
@@ -253,7 +319,7 @@ export function useSongsState() {
     // actions
     err, setErr, saving, info, setInfo, importing, setImporting,
     newSongTitle, setNewSongTitle,
-    onCreate, onDelete, onSaveMeta, onSaveBlocks,
+    onCreate, onImportWord, onImportJson, onDelete, onSaveMeta, onSaveBlocks,
     addBlock, removeBlock, updateBlock,
     addBlockToPlan, addAllBlocksToPlan,
     // plan / target

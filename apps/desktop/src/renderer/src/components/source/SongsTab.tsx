@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Play, Search, Trash2, Music, ChevronRight, Pencil } from "lucide-react";
+import { Plus, Play, Search, Trash2, Music, ChevronRight, Pencil, FileJson, FileUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSongsState } from "../../pages/songs/useSongsState";
 import { projectTextToScreen } from "../../projection/target";
@@ -46,6 +46,29 @@ export function SongsTab({ planId }: SongsTabProps) {
         />
         <Button size="sm" className="h-7 text-xs px-2" onClick={state.onCreate}>
           <Plus className="h-3 w-3" />
+        </Button>
+      </div>
+
+      <div className="flex gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs flex-1"
+          onClick={state.onImportWord}
+          disabled={state.importing}
+        >
+          {state.importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileUp className="h-3 w-3 mr-1" />}
+          Import Word
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs flex-1"
+          onClick={state.onImportJson}
+          disabled={state.importing}
+        >
+          {state.importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileJson className="h-3 w-3 mr-1" />}
+          Import JSON
         </Button>
       </div>
 

@@ -82,9 +82,117 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+const CP1252_UNICODE_TO_BYTE: Record<string, number> = {
+  "\u20AC": 0x80,
+  "\u201A": 0x82,
+  "\u0192": 0x83,
+  "\u201E": 0x84,
+  "\u2026": 0x85,
+  "\u2020": 0x86,
+  "\u2021": 0x87,
+  "\u02C6": 0x88,
+  "\u2030": 0x89,
+  "\u0160": 0x8a,
+  "\u2039": 0x8b,
+  "\u0152": 0x8c,
+  "\u017D": 0x8e,
+  "\u2018": 0x91,
+  "\u2019": 0x92,
+  "\u201C": 0x93,
+  "\u201D": 0x94,
+  "\u2022": 0x95,
+  "\u2013": 0x96,
+  "\u2014": 0x97,
+  "\u02DC": 0x98,
+  "\u2122": 0x99,
+  "\u0161": 0x9a,
+  "\u203A": 0x9b,
+  "\u0153": 0x9c,
+  "\u017E": 0x9e,
+  "\u0178": 0x9f,
+};
+
+const MOJIBAKE_TOKENS = [
+  "\u00C3",
+  "\u00C2",
+  "\u00E2\u0080",
+  "\u00E2\u20AC",
+  "\u00EF\u00BF\u00BD",
+  "\uFFFD",
+] as const;
+
+function countOccurrences(value: string, token: string): number {
+  let count = 0;
+  let fromIndex = 0;
+  while (fromIndex < value.length) {
+    const foundIndex = value.indexOf(token, fromIndex);
+    if (foundIndex === -1) break;
+    count += 1;
+    fromIndex = foundIndex + token.length;
+  }
+  return count;
+}
+
+function countMojibakeMarkers(value: string): number {
+  let markers = 0;
+  for (const token of MOJIBAKE_TOKENS) {
+    markers += countOccurrences(value, token);
+  }
+  const controls = value.match(/[\u0080-\u009F]/g);
+  if (controls) markers += controls.length;
+  return markers;
+}
+
+function toLikelyLatin1Bytes(value: string): number[] | null {
+  const bytes: number[] = [];
+  for (const char of value) {
+    const codepoint = char.codePointAt(0);
+    if (codepoint == null) continue;
+
+    if (codepoint <= 0xff) {
+      bytes.push(codepoint);
+      continue;
+    }
+
+    const cp1252Byte = CP1252_UNICODE_TO_BYTE[char];
+    if (cp1252Byte != null) {
+      bytes.push(cp1252Byte);
+      continue;
+    }
+
+    return null;
+  }
+  return bytes;
+}
+
+function maybeRepairMojibake(value: string): string {
+  const source = value.replace(/\uFEFF/g, "");
+  const sourceScore = countMojibakeMarkers(source);
+  if (sourceScore === 0) return source;
+
+  const bytes = toLikelyLatin1Bytes(source);
+  if (!bytes) return source;
+
+  let repaired: string;
+  try {
+    repaired = Buffer.from(bytes).toString("utf8");
+  } catch {
+    return source;
+  }
+
+  if (!repaired) return source;
+  const repairedScore = countMojibakeMarkers(repaired);
+  const sourceReplacement = (source.match(/\uFFFD/g) || []).length;
+  const repairedReplacement = (repaired.match(/\uFFFD/g) || []).length;
+
+  if (repairedReplacement > sourceReplacement + 1) return source;
+  if (repairedScore < sourceScore) return repaired;
+  if (repairedScore === sourceScore && repairedReplacement < sourceReplacement) return repaired;
+  return source;
+}
 function asString(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
-  const trimmed = value.trim();
+  const trimmed = maybeRepairMojibake(value).trim();
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
@@ -244,17 +352,23 @@ function pickFromMaps(
   primary: Map<string, unknown>,
   secondary: Map<string, unknown>,
   keys: string[],
+  normalizer: (value: string) => string = normalizeWhitespace,
 ): string | undefined {
   for (const key of keys) {
     const canonical = canonicalLabel(key);
     const primaryValue = asStringLike(primary.get(canonical));
-    if (primaryValue) return normalizeWhitespace(primaryValue);
+    if (primaryValue) {
+      const normalized = normalizer(primaryValue);
+      if (normalized) return normalized;
+    }
     const secondaryValue = asStringLike(secondary.get(canonical));
-    if (secondaryValue) return normalizeWhitespace(secondaryValue);
+    if (secondaryValue) {
+      const normalized = normalizer(secondaryValue);
+      if (normalized) return normalized;
+    }
   }
   return undefined;
 }
-
 export function parseSongText(raw: string, filename?: string): ParsedSongTextResult {
   const warnings: string[] = [];
   const rawLines = raw.replace(/\r\n?/g, "\n").split("\n");
@@ -368,7 +482,7 @@ function normalizeBlock(rawBlock: unknown, idx: number): NormalizedImportSongBlo
   };
 }
 
-function normalizeSongFromJson(rawSong: unknown, songIdx: number, filePath: string):
+export function normalizeSongFromJson(rawSong: unknown, songIdx: number, filePath: string):
   | { ok: true; song: NormalizedImportSong; warnings: string[] }
   | { ok: false; error: CpSongImportJsonError; report: CpSongImportReportEntry } {
   if (!isRecord(rawSong)) {
@@ -407,8 +521,8 @@ function normalizeSongFromJson(rawSong: unknown, songIdx: number, filePath: stri
   if (yearRaw && !year) warnings.push(`Annee ignoree (format invalide): "${yearRaw}"`);
 
   const language = pickFromMaps(topMap, metaMap, ["language", "lang", "langue"]);
-  const tags = pickFromMaps(topMap, metaMap, ["tags", "tag"]);
-  const lyrics = pickFromMaps(topMap, metaMap, ["lyrics", "paroles", "texte"]);
+  const tags = pickFromMaps(topMap, metaMap, ["tags", "tag"]) || pickFromMaps(topMap, metaMap, ["notes", "note"]);
+  const lyrics = pickFromMaps(topMap, metaMap, ["lyrics", "paroles", "texte"], normalizeMultiline);
 
   let blocks: NormalizedImportSongBlock[] = [];
   if (Array.isArray(rawSong.blocks)) {
@@ -976,3 +1090,4 @@ export function registerSongsIpc() {
     };
   });
 }
+
