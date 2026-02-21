@@ -374,13 +374,13 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(94vw,760px)] max-w-[760px]">
+      <DialogContent className="w-[min(94vw,760px)] max-w-[760px] max-h-[88vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Projection appearance</DialogTitle>
           <DialogDescription>Edit colors, text size, fonts, and media branding.</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 overflow-y-auto pr-1 space-y-4">
           <div className="space-y-2 rounded-md border p-2">
             <div className="flex items-center justify-between gap-2">
               <Label className="text-xs">Assembly profile</Label>
