@@ -33,7 +33,18 @@ function isTypingTarget(el: EventTarget | null) {
   const t = el as HTMLElement | null;
   if (!t) return false;
   const tag = t.tagName?.toLowerCase();
-  return tag === "input" || tag === "textarea" || t.isContentEditable;
+  return tag === "input" || tag === "textarea" || tag === "select" || t.isContentEditable;
+}
+
+/** Return true when a keyboard shortcut should yield to native element behavior. */
+function shouldYieldToElement(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement | null;
+  if (!t) return false;
+  const tag = t.tagName?.toLowerCase();
+  const isButton = tag === "button" || tag === "a" || t.getAttribute("role") === "button";
+  // Space / Enter activate buttons natively — don't steal them
+  if (isButton && (e.key === " " || e.key === "Enter")) return true;
+  return false;
 }
 
 function toFileUrl(path?: string) {
@@ -237,6 +248,7 @@ export function LiveBar() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
+      if (shouldYieldToElement(e)) return;
       if (!window.cp.live) return;
 
       const liveLocked = live?.lockedScreens ?? { A: false, B: false, C: false };

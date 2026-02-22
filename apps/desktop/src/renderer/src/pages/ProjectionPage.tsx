@@ -414,8 +414,7 @@ export function ProjectionPage() {
         aria-label="Precedent"
         onClick={() => { if (!isPdf) window.cp.live?.prev?.(); }}
         className={cn(
-          "absolute top-0 left-0 w-1/2 h-full bg-transparent border-none p-0 m-0 appearance-none cursor-pointer",
-          "focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2",
+          "absolute top-0 left-0 w-1/2 h-full bg-transparent border-none p-0 m-0 appearance-none cursor-pointer outline-none",
           isPdf && "pointer-events-none cursor-default",
         )}
         disabled={isPdf}
@@ -425,8 +424,7 @@ export function ProjectionPage() {
         aria-label="Suivant"
         onClick={() => { if (!isPdf) window.cp.live?.next?.(); }}
         className={cn(
-          "absolute top-0 right-0 w-1/2 h-full bg-transparent border-none p-0 m-0 appearance-none cursor-pointer",
-          "focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2",
+          "absolute top-0 right-0 w-1/2 h-full bg-transparent border-none p-0 m-0 appearance-none cursor-pointer outline-none",
           isPdf && "pointer-events-none cursor-default",
         )}
         disabled={isPdf}

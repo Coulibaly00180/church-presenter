@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Plus, FileText, BookOpen, Music, ImagePlus, ChevronLeft, Type, Timer } from "lucide-react";
 import { toast } from "sonner";
@@ -286,30 +285,28 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
 
   if (song) {
     return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-1.5">
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSong(null)}>
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSong(null)}>
             <ChevronLeft className="h-3 w-3" />
           </Button>
           <span className="text-xs font-medium truncate">{song.title}</span>
           {song.artist && <span className="text-[10px] text-muted-foreground truncate">— {song.artist}</span>}
         </div>
-        <ScrollArea className="max-h-[200px]">
-          <div className="space-y-1">
-            {song.blocks.map((block) => (
-              <div key={block.id} className="flex items-start gap-1.5 p-1.5 rounded hover:bg-accent text-xs">
-                <div className="flex-1 min-w-0">
-                  <Badge variant="outline" className="text-[9px] px-1 py-0 mr-1">{block.title || block.type}</Badge>
-                  <span className="text-muted-foreground truncate">{block.content.slice(0, 60)}</span>
-                </div>
-                <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => addBlock(block)}>
-                  <Plus className="h-2.5 w-2.5" />
-                </Button>
+        <div className="overflow-y-auto max-h-[260px] pr-1 space-y-1">
+          {song.blocks.map((block) => (
+            <div key={block.id} className="flex items-start gap-1.5 p-1.5 rounded hover:bg-accent text-xs">
+              <div className="flex-1 min-w-0">
+                <Badge variant="outline" className="text-[9px] px-1 py-0 mr-1">{block.title || block.type}</Badge>
+                <span className="text-muted-foreground truncate">{block.content.slice(0, 60)}</span>
               </div>
-            ))}
-          </div>
-        </ScrollArea>
-        <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={addAll}>
+              <Button type="button" variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={() => addBlock(block)}>
+                <Plus className="h-2.5 w-2.5" />
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button type="button" size="sm" variant="outline" className="w-full h-7 text-xs shrink-0" onClick={addAll}>
           <Plus className="h-3 w-3 mr-1" /> Tout ajouter ({song.blocks.length} blocs)
         </Button>
       </div>
@@ -326,26 +323,25 @@ function SongTab({ planId, onAdded }: { planId: string; onAdded: () => void }) {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") search(); }}
         />
-        <Button size="sm" className="h-7 text-xs" onClick={search} disabled={searching}>
+        <Button type="button" size="sm" className="h-7 text-xs" onClick={search} disabled={searching}>
           {searching ? "..." : "Chercher"}
         </Button>
       </div>
       {results.length > 0 && (
-        <ScrollArea className="max-h-[200px]">
-          <div className="space-y-0.5">
-            {results.map((s) => (
-              <button
-                key={s.id}
-                className="w-full text-left px-2 py-1.5 rounded hover:bg-accent text-xs"
-                onClick={() => selectSong(s.id)}
-              >
-                <div className="font-medium">{s.title}</div>
-                {s.artist && <div className="text-muted-foreground text-[10px]">{s.artist}</div>}
-                {s.matchSnippet && <div className="text-muted-foreground/70 text-[10px] italic truncate">{s.matchSnippet}</div>}
-              </button>
-            ))}
-          </div>
-        </ScrollArea>
+        <div className="overflow-y-auto max-h-[240px] space-y-0.5">
+          {results.map((s) => (
+            <button
+              type="button"
+              key={s.id}
+              className="w-full text-left px-2 py-1.5 rounded hover:bg-accent text-xs"
+              onClick={() => selectSong(s.id)}
+            >
+              <div className="font-medium">{s.title}</div>
+              {s.artist && <div className="text-muted-foreground text-[10px]">{s.artist}</div>}
+              {s.matchSnippet && <div className="text-muted-foreground/70 text-[10px] italic truncate">{s.matchSnippet}</div>}
+            </button>
+          ))}
+        </div>
       )}
       {results.length === 0 && query.trim() && !searching && (
         <p className="text-xs text-muted-foreground text-center py-2">Aucun resultat.</p>
@@ -507,7 +503,7 @@ function TimerTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
 export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-md flex flex-col max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>Ajouter un element</DialogTitle>
         </DialogHeader>

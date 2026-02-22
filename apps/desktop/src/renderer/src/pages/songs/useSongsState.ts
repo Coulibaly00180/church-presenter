@@ -43,6 +43,15 @@ export function useSongsState() {
     setList(items);
   }
 
+  async function refreshPlans() {
+    try {
+      const ps = await window.cp.plans.list();
+      setPlans(ps || []);
+    } catch {
+      // ignore
+    }
+  }
+
   async function loadSong(id: string) {
     const s = await window.cp.songs.get(id);
     if (!s) {
@@ -280,6 +289,37 @@ export function useSongsState() {
     setInfo({ kind: "success", text: "Bloc ajoute au plan." });
   }
 
+  async function quickAddSongToPlan(songId: string) {
+    if (!planId) {
+      setInfo({ kind: "info", text: "Aucun plan selectionne." });
+      return;
+    }
+    try {
+      const s = await window.cp.songs.get(songId);
+      if (!s) { setErr("Chant introuvable."); return; }
+      const plan = await loadPlanItems(planId);
+      let added = 0;
+      for (const b of s.blocks) {
+        if (isDuplicate(plan, s.id, b.id)) continue;
+        await window.cp.plans.addItem({
+          planId,
+          kind: "SONG_BLOCK",
+          title: `${s.title} - ${b.title || b.type}`,
+          content: b.content || "",
+          refId: s.id,
+          refSubId: b.id,
+        });
+        added += 1;
+      }
+      setInfo({
+        kind: added > 0 ? "success" : "info",
+        text: added > 0 ? `"${s.title}" ajoute au plan.` : "Tous les blocs etaient deja presents.",
+      });
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
   async function addAllBlocksToPlan() {
     if (!song || !planId) return;
     await onSaveBlocks();
@@ -321,8 +361,8 @@ export function useSongsState() {
     newSongTitle, setNewSongTitle,
     onCreate, onImportWord, onImportJson, onDelete, onSaveMeta, onSaveBlocks,
     addBlock, removeBlock, updateBlock,
-    addBlockToPlan, addAllBlocksToPlan,
+    addBlockToPlan, addAllBlocksToPlan, quickAddSongToPlan,
     // plan / target
-    target, setTarget, plans, planId, setPlanId, formatPlanDate,
+    target, setTarget, plans, planId, setPlanId, formatPlanDate, refreshPlans,
   };
 }

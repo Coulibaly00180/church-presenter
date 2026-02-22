@@ -3,8 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Play, Search, Trash2, Music, ChevronRight, Pencil, FileJson, FileUp, Loader2 } from "lucide-react";
+import { Plus, Play, Search, Trash2, Music, Pencil, FileJson, FileUp, Loader2, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { localNowYmd } from "@/lib/date";
 import { useSongsState } from "../../pages/songs/useSongsState";
 import { projectTextToScreen } from "../../projection/target";
 import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
@@ -13,14 +14,42 @@ type SongsTabProps = {
   planId: string | null;
 };
 
+function formatPlanOption(p: { id: string; date?: string | Date; title?: string | null }) {
+  if (!p.date) return p.title || "Culte";
+  const d = p.date instanceof Date ? p.date : new Date(p.date);
+  if (isNaN(d.getTime())) return p.title || "Culte";
+  const dateStr = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  return `${dateStr} — ${p.title || "Culte"}`;
+}
+
 export function SongsTab({ planId }: SongsTabProps) {
   const state = useSongsState();
   const [editorOpen, setEditorOpen] = useState(false);
+  const [showNewPlan, setShowNewPlan] = useState(false);
+  const [newPlanDate, setNewPlanDate] = useState(localNowYmd());
+  const [creatingPlan, setCreatingPlan] = useState(false);
 
   // Override planId from parent
   React.useEffect(() => {
     if (planId) state.setPlanId(planId);
   }, [planId]);
+
+  const createPlanForDate = async () => {
+    if (!newPlanDate) return;
+    setCreatingPlan(true);
+    try {
+      const created = await window.cp.plans.create({ dateIso: newPlanDate, title: "Culte" });
+      if (created?.id) {
+        await state.refreshPlans();
+        state.setPlanId(created.id);
+        setShowNewPlan(false);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setCreatingPlan(false);
+    }
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -31,6 +60,7 @@ export function SongsTab({ planId }: SongsTabProps) {
           placeholder="Rechercher par titre, artiste ou paroles..."
           value={state.q}
           onChange={(e) => state.setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
         />
       </div>
 
@@ -70,28 +100,80 @@ export function SongsTab({ planId }: SongsTabProps) {
         </Button>
       </div>
 
+      {/* Plan selector */}
+      <div className="shrink-0 space-y-1">
+        <div className="flex items-center gap-1.5">
+          <CalendarDays className="h-3 w-3 text-muted-foreground shrink-0" />
+          {state.plans.length > 0 ? (
+            <select
+              value={state.planId}
+              onChange={(e) => state.setPlanId(e.target.value)}
+              className="flex-1 h-7 text-xs rounded-md border border-input bg-background px-2 cursor-pointer"
+              title="Plan actif"
+            >
+              {state.plans.map((p) => (
+                <option key={p.id} value={p.id}>{formatPlanOption(p)}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="flex-1 text-xs text-muted-foreground italic">Aucun plan</span>
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={() => setShowNewPlan((v) => !v)}
+            title="Nouveau plan"
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+        </div>
+        {showNewPlan && (
+          <div className="flex items-center gap-1.5 pl-5">
+            <input
+              type="date"
+              title="Date du nouveau plan"
+              value={newPlanDate}
+              onChange={(e) => setNewPlanDate(e.target.value)}
+              className="flex-1 h-7 text-xs rounded-md border border-input bg-background px-2"
+            />
+            <Button size="sm" className="h-7 text-xs px-2" onClick={createPlanForDate} disabled={creatingPlan}>
+              {creatingPlan ? <Loader2 className="h-3 w-3 animate-spin" /> : "Creer"}
+            </Button>
+          </div>
+        )}
+      </div>
+
       <Separator className="shrink-0" />
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
         <div className="space-y-0.5">
           {state.filtered.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => state.loadSong(s.id)}
-              className={cn(
-                "w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
-                state.selectedId === s.id ? "bg-primary/15 text-primary" : "hover:bg-accent",
-              )}
-            >
-              <Music className="h-3 w-3 shrink-0 text-muted-foreground" />
-              <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{s.title}</div>
-                {s.artist && <div className="text-[10px] text-muted-foreground truncate">{s.artist}</div>}
-                {s.matchSnippet && <div className="text-[10px] text-muted-foreground/70 truncate italic">&#9835; {s.matchSnippet}</div>}
-              </div>
-              <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-            </button>
+            <div key={s.id} className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => state.loadSong(s.id)}
+                className={cn(
+                  "flex-1 min-w-0 text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
+                  state.selectedId === s.id ? "bg-primary/15 text-primary" : "hover:bg-accent",
+                )}
+              >
+                <Music className="h-3 w-3 shrink-0 text-muted-foreground" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{s.title}</div>
+                  {s.artist && <div className="text-[10px] text-muted-foreground truncate">{s.artist}</div>}
+                  {s.matchSnippet && <div className="text-[10px] text-muted-foreground/70 truncate italic">&#9835; {s.matchSnippet}</div>}
+                </div>
+              </button>
+              <button
+                type="button"
+                title="Ajouter au plan"
+                onClick={() => { void state.quickAddSongToPlan(s.id); }}
+                className="shrink-0 h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-primary hover:bg-accent transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+              </button>
+            </div>
           ))}
           {state.filtered.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-4">Aucun chant trouve.</p>
@@ -143,7 +225,8 @@ export function SongsTab({ planId }: SongsTabProps) {
                         {block.content.slice(0, 100)}{block.content.length > 100 ? "..." : ""}
                       </p>
                     </div>
-                    <div className="flex flex-col gap-0.5 shrink-0">
+                    {/* draggable={false} + onMouseDown stop prevent drag from stealing clicks */}
+                    <div className="flex flex-col gap-0.5 shrink-0" draggable={false} onMouseDown={(e) => e.stopPropagation()}>
                       <Button
                         variant="ghost"
                         size="icon"
