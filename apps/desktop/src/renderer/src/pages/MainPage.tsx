@@ -585,11 +585,19 @@ export function MainPage() {
         }}
       />
 
-      <NextPreview
-        prevItem={plan.items.find((i) => i.order === (live?.cursor ?? 0) - 1) ?? null}
-        currentItem={plan.items.find((i) => i.order === (live?.cursor ?? 0)) ?? null}
-        nextItem={plan.items.find((i) => i.order === (live?.cursor ?? 0) + 1) ?? null}
-      />
+      {(() => {
+        const sortedItems = [...plan.items].sort((a, b) => a.order - b.order);
+        const cursorOrder = live?.cursor ?? 0;
+        const curIdx = sortedItems.findIndex((i) => i.order === cursorOrder);
+        const resolvedIdx = curIdx === -1 ? 0 : curIdx;
+        return (
+          <NextPreview
+            prevItem={sortedItems[resolvedIdx - 1] ?? null}
+            currentItem={sortedItems[resolvedIdx] ?? null}
+            nextItem={sortedItems[resolvedIdx + 1] ?? null}
+          />
+        );
+      })()}
 
       <AddItemDialog
         open={addItemOpen}

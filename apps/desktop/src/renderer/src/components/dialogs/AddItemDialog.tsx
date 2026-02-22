@@ -501,6 +501,8 @@ function TimerTab({ planId, onAdded }: { planId: string; onAdded: () => void }) 
 
 /* ─────────── Main dialog ─────────── */
 export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
+  const handleAdded = () => { onAdded(); onOpenChange(false); };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md flex flex-col max-h-[85vh]">
@@ -529,22 +531,22 @@ export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="text">
-            <FreeTextTab planId={planId} onAdded={onAdded} />
+            <FreeTextTab planId={planId} onAdded={handleAdded} />
           </TabsContent>
           <TabsContent value="announce">
-            <TextTab planId={planId} onAdded={onAdded} />
+            <TextTab planId={planId} onAdded={handleAdded} />
           </TabsContent>
           <TabsContent value="bible">
-            <BibleTab planId={planId} onAdded={onAdded} />
+            <BibleTab planId={planId} onAdded={handleAdded} />
           </TabsContent>
           <TabsContent value="song">
-            <SongTab planId={planId} onAdded={onAdded} />
+            <SongTab planId={planId} onAdded={handleAdded} />
           </TabsContent>
           <TabsContent value="media">
-            <MediaTab planId={planId} onAdded={onAdded} />
+            <MediaTab planId={planId} onAdded={handleAdded} />
           </TabsContent>
           <TabsContent value="timer">
-            <TimerTab planId={planId} onAdded={onAdded} />
+            <TimerTab planId={planId} onAdded={handleAdded} />
           </TabsContent>
         </Tabs>
       </DialogContent>

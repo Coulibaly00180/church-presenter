@@ -14,8 +14,17 @@ type SourcePanelProps = {
   onSelectPlan?: (id: string) => void;
 };
 
+const TABS = [
+  { icon: Book, label: "Bible", tab: "bible" },
+  { icon: Music, label: "Chants", tab: "songs" },
+  { icon: Megaphone, label: "Annonces", tab: "announcements" },
+  { icon: Image, label: "Medias", tab: "media" },
+  { icon: Calendar, label: "Calendrier", tab: "calendar" },
+] as const;
+
 export function SourcePanel({ planId, onSelectPlan }: SourcePanelProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState("bible");
 
   if (collapsed) {
     return (
@@ -29,20 +38,14 @@ export function SourcePanel({ planId, onSelectPlan }: SourcePanelProps) {
           <TooltipContent side="right">Ouvrir le panneau</TooltipContent>
         </Tooltip>
         <div className="flex flex-col gap-1 mt-2">
-          {[
-            { icon: Book, label: "Bible", tab: "bible" },
-            { icon: Music, label: "Chants", tab: "songs" },
-            { icon: Megaphone, label: "Annonces", tab: "announcements" },
-            { icon: Image, label: "Medias", tab: "media" },
-            { icon: Calendar, label: "Calendrier", tab: "calendar" },
-          ].map(({ icon: Icon, label, tab }) => (
+          {TABS.map(({ icon: Icon, label, tab }) => (
             <Tooltip key={tab}>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => setCollapsed(false)}
+                  onClick={() => { setActiveTab(tab); setCollapsed(false); }}
                 >
                   <Icon className="h-4 w-4" />
                 </Button>
@@ -65,7 +68,7 @@ export function SourcePanel({ planId, onSelectPlan }: SourcePanelProps) {
         </Button>
       </div>
 
-      <Tabs defaultValue="bible" className="flex-1 flex flex-col min-h-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
         {/* Tab triggers - compact, wrappable */}
         <TabsList className="mx-2 mt-2 shrink-0 flex flex-wrap h-auto gap-0.5 justify-start">
           <TabsTrigger value="bible" className="gap-1 text-xs px-2 py-1">

@@ -46,12 +46,14 @@ export function QuickProjectDialog({ open, onOpenChange }: Props) {
     if (!text.trim()) return;
     const { target, lockedScreens } = await getLiveTarget();
     await projectTextToScreen({ target, lockedScreens, body: text.trim() });
+    onOpenChange(false);
   };
 
   const projectImage = async () => {
     if (!imagePath) return;
     const { target, lockedScreens } = await getLiveTarget();
     await projectMediaToScreen({ target, lockedScreens, mediaPath: imagePath, mediaType: "IMAGE" });
+    onOpenChange(false);
   };
 
   const pickImage = async () => {
