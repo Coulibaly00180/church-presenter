@@ -1,6 +1,10 @@
 # Church Presenter
 
-Application de bureau pour la projection lors de cultes et la gestion de déroulés de service. Conçue pour fonctionner entièrement hors-ligne.
+**Church Presenter** est une application de bureau open-source destinée aux techniciens son/lumière et aux responsables de culte. Elle centralise la gestion et la projection du contenu visuel pendant les services religieux : chants, passages bibliques, annonces, médias et minuteries.
+
+L'application tourne entièrement **hors-ligne** (Bible LSG 1910 embarquée, base de données locale SQLite) et prend en charge jusqu'à **trois écrans de projection indépendants** (A, B, C) avec un pilotage clavier complet.
+
+> Conçue pour les équipes techniques d'église qui ont besoin d'un outil fiable, rapide et sans dépendance réseau le dimanche matin.
 
 ## Fonctionnalités
 

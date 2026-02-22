@@ -232,11 +232,11 @@ export function registerPlansIpc() {
       where: { id: payload.itemId },
       select: { id: true, planId: true },
     });
-    if (!item) throw new Error("Plan item not found");
+    if (!item) return { ok: true }; // already deleted — idempotent
     if (item.planId !== payload.planId) throw new Error("Item does not belong to this plan");
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.serviceItem.delete({ where: { id: payload.itemId } });
+      await tx.serviceItem.deleteMany({ where: { id: payload.itemId } }); // no-op if already gone
 
       const items = await tx.serviceItem.findMany({
         where: { planId: payload.planId },
