@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Play, Search, Trash2, Music, Pencil, FileJson, FileUp, Loader2, CalendarDays } from "lucide-react";
+import { Plus, Play, Search, Trash2, Music, Pencil, FileJson, FileUp, FileDown, Loader2, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { localNowYmd } from "@/lib/date";
 import { useSongsState } from "../../pages/songs/useSongsState";
@@ -97,6 +97,18 @@ export function SongsTab({ planId }: SongsTabProps) {
         >
           {state.importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileJson className="h-3 w-3 mr-1" />}
           Import JSON
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs shrink-0"
+          title="Exporter tous les chants en Word (ZIP)"
+          onClick={async () => {
+            const r = await window.cp.songs.exportWordPack();
+            if (r.ok) { /* toast shown by ipc */ }
+          }}
+        >
+          <FileDown className="h-3 w-3" />
         </Button>
       </div>
 
@@ -207,6 +219,15 @@ export function SongsTab({ planId }: SongsTabProps) {
                 </Button>
                 <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => state.addAllBlocksToPlan()}>
                   <Plus className="h-2.5 w-2.5 mr-0.5" /> Tout ajouter
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  title="Exporter ce chant en Word"
+                  onClick={() => { void window.cp.songs.exportWord(state.song!.id); }}
+                >
+                  <FileDown className="h-2.5 w-2.5" />
                 </Button>
                 <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive" onClick={state.onDelete}>
                   <Trash2 className="h-2.5 w-2.5" />

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Upload, Trash2, Image as ImageIcon, FileText, FolderOpen, RefreshCw } from "lucide-react";
+import { Plus, Upload, Trash2, Image as ImageIcon, FileText, FolderOpen, RefreshCw, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import * as pdfjsLib from "pdfjs-dist";
@@ -30,6 +30,8 @@ export function MediaTab({ planId }: MediaTabProps) {
   const [pdfPreviewImage, setPdfPreviewImage] = useState<string | null>(null);
   const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
   const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const loadMedia = async () => {
     const result = await window.cp.files.listMedia();
@@ -96,6 +98,22 @@ export function MediaTab({ planId }: MediaTabProps) {
     }
     await loadMedia();
     toast.success("Fichier supprime.");
+  };
+
+  const startRename = (file: CpMediaFile) => {
+    setRenamingPath(file.path);
+    setRenameValue(file.name);
+  };
+
+  const commitRename = async () => {
+    if (!renamingPath || !renameValue.trim()) { setRenamingPath(null); return; }
+    const result = await window.cp.files.renameMedia({ path: renamingPath, name: renameValue.trim() });
+    if (!result.ok) {
+      toast.error("error" in result ? result.error : "Renommage echoue.");
+    } else {
+      await loadMedia();
+    }
+    setRenamingPath(null);
   };
 
   const selectedFile = mediaFiles.find((file) => file.path === selectedPath) ?? null;
@@ -226,53 +244,94 @@ export function MediaTab({ planId }: MediaTabProps) {
 
       <ScrollArea className="max-h-[400px]">
         <div className="space-y-1">
-          {mediaFiles.map((file) => (
-            <div
-              key={file.path}
-              onClick={() => setSelectedPath(file.path)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setSelectedPath(file.path);
-                }
-              }}
-              className={cn(
-                "flex items-center gap-2 px-2 py-1.5 rounded-md border text-xs bg-card cursor-pointer",
-                selectedPath === file.path && "border-primary/50 bg-accent/40",
-              )}
-            >
-              {file.kind === "PDF" || file.kind === "DOCUMENT" || file.kind === "FONT" ? (
-                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              ) : (
-                <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="truncate font-medium" title={file.name}>{file.name}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {file.kind === "PDF" ? "PDF" : file.kind === "IMAGE" ? "Image" : file.kind === "FONT" ? "Police" : "Document"} - {file.folder}
-                </p>
+          {mediaFiles.map((file) => {
+            const isRenaming = renamingPath === file.path;
+            const kindLabel = file.kind === "PDF" ? "PDF" : file.kind === "IMAGE" ? "Image" : file.kind === "FONT" ? "Police" : "Document";
+            const icon = file.kind === "PDF" || file.kind === "DOCUMENT" || file.kind === "FONT"
+              ? <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              : <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
+
+            if (isRenaming) {
+              return (
+                <div
+                  key={file.path}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 rounded-md border text-xs bg-card",
+                    selectedPath === file.path && "border-primary/50 bg-accent/40",
+                  )}
+                >
+                  {icon}
+                  <div className="flex-1 min-w-0">
+                    <input
+                      type="text"
+                      autoFocus
+                      title="Nouveau nom du fichier"
+                      placeholder="Nouveau nom..."
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
+                        if (e.key === "Escape") setRenamingPath(null);
+                      }}
+                      className="w-full h-5 text-xs rounded border border-primary bg-background px-1 focus:outline-none"
+                    />
+                    <p className="text-[10px] text-muted-foreground">{kindLabel} - {file.folder}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-5 w-5 text-primary" onClick={() => { void commitRename(); }}>
+                    <Check className="h-2.5 w-2.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setRenamingPath(null)}>
+                    <X className="h-2.5 w-2.5" />
+                  </Button>
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={file.path}
+                onClick={() => setSelectedPath(file.path)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedPath(file.path);
+                  }
+                }}
+                className={cn(
+                  "flex items-center gap-2 px-2 py-1.5 rounded-md border text-xs bg-card cursor-pointer",
+                  selectedPath === file.path && "border-primary/50 bg-accent/40",
+                )}
+              >
+                {icon}
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-medium" title={file.name}>{file.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{kindLabel} - {file.folder}</p>
+                </div>
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); startRename(file); }}>
+                  <Pencil className="h-2.5 w-2.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  disabled={file.kind === "DOCUMENT" || file.kind === "FONT"}
+                  onClick={(e) => { e.stopPropagation(); addToPlan(file); }}
+                >
+                  <Plus className="h-2.5 w-2.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-destructive"
+                  onClick={(e) => { e.stopPropagation(); deleteMedia(file); }}
+                >
+                  <Trash2 className="h-2.5 w-2.5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                disabled={file.kind === "DOCUMENT" || file.kind === "FONT"}
-                onClick={(e) => { e.stopPropagation(); addToPlan(file); }}
-              >
-                <Plus className="h-2.5 w-2.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-destructive"
-                onClick={(e) => { e.stopPropagation(); deleteMedia(file); }}
-              >
-                <Trash2 className="h-2.5 w-2.5" />
-              </Button>
-            </div>
-          ))}
+            );
+          })}
           {mediaFiles.length === 0 && (
             <p className="text-xs text-muted-foreground text-center py-4">Aucun fichier media.</p>
           )}

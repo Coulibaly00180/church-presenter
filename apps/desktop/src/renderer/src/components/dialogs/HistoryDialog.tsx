@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Download, Upload, Copy } from "lucide-react";
+import { Download, Upload, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isoToYmd, localNowYmd } from "@/lib/date";
 
@@ -81,6 +81,13 @@ export function HistoryDialog({ open, onOpenChange }: HistoryDialogProps) {
     } catch (e) {
       toast.error(`Duplication echouee: ${e instanceof Error ? e.message : String(e)}`);
     }
+  };
+
+  const handleDeletePlan = async (planId: string, title: string) => {
+    if (!confirm(`Supprimer le plan "${title || "Culte"}" ? Cette action est irreversible.`)) return;
+    await window.cp.plans.delete(planId);
+    toast.success("Plan supprime.");
+    setPlans(await window.cp.plans.list());
   };
 
   const handleExportPlan = async (planId: string) => {
@@ -181,6 +188,9 @@ export function HistoryDialog({ open, onOpenChange }: HistoryDialogProps) {
                   </Button>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleExportPlan(p.id)}>
                     <Download className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeletePlan(p.id, p.title ?? "")}>
+                    <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               ))}
