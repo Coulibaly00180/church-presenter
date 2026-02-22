@@ -359,9 +359,16 @@ export function LiveBar() {
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-t border-border/60 bg-muted/50 dark:bg-secondary/30 shrink-0 flex-wrap">
       <div className="flex items-center gap-1.5 rounded-md border border-border/70 bg-background/70 px-2 py-1">
-        <Badge variant={live?.enabled ? "default" : "secondary"} className="h-7 px-2 font-semibold">
-          LIVE {liveStatus}
-        </Badge>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" onClick={() => window.cp.live?.toggle()} className="cursor-pointer">
+              <Badge variant={live?.enabled ? "default" : "secondary"} className="h-7 px-2 font-semibold cursor-pointer hover:opacity-80 transition-opacity">
+                LIVE {liveStatus}
+              </Badge>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Activer / desactiver le live</TooltipContent>
+        </Tooltip>
         <Badge variant="outline" className="h-7 px-2 font-semibold">
           TARGET {target}
         </Badge>

@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import type { Plan } from "@/lib/types";
-import { isoToYmd } from "@/lib/date";
+import { localNowYmd } from "@/lib/date";
 import { saveAsTemplate } from "@/lib/templates";
 
 type PlanToolbarProps = {
@@ -30,10 +30,14 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loop
   };
 
   const handleDuplicate = async () => {
-    const result = await window.cp.plans.duplicate({ planId: plan.id, dateIso: isoToYmd(plan.date) });
-    if (result?.id) {
-      toast.success("Plan duplique");
-      onDuplicated(result.id);
+    try {
+      const result = await window.cp.plans.duplicate({ planId: plan.id, dateIso: localNowYmd() });
+      if (result?.id) {
+        toast.success("Plan duplique");
+        onDuplicated(result.id);
+      }
+    } catch {
+      toast.error("Impossible de dupliquer : un plan existe deja pour cette date.");
     }
   };
 
@@ -48,6 +52,7 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loop
   };
 
   const handleDelete = async () => {
+    if (!confirm(`Supprimer le plan "${plan.title || "Culte"}" ? Cette action est irreversible.`)) return;
     await window.cp.plans.delete(plan.id);
     toast.success("Plan supprime");
     onDeleted();

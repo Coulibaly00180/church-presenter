@@ -102,7 +102,7 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  });
+  }, [projOpen]);
 
   const createPlanDirect = async (ymd: string, title: string) => {
     const created = await window.cp.plans.create({ dateIso: ymd, title: title || "Culte" });
