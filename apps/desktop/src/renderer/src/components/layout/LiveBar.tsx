@@ -299,7 +299,11 @@ export function LiveBar() {
   }, []);
 
   const applyAppearance = (patch: { background?: string; foreground?: string; textScale?: number; backgroundImage?: string }) => {
-    window.cp.projection.setAppearance(patch);
+    if (target === "A") {
+      window.cp.projection.setAppearance(patch);
+    } else {
+      window.cp.screens.setAppearance(target, patch);
+    }
   };
 
   const pickBgImage = async () => {
@@ -316,6 +320,15 @@ export function LiveBar() {
   };
 
   const target = live?.target ?? "A";
+
+  // Sync appearance controls when target changes
+  useEffect(() => {
+    const s = screenStates[target];
+    setBg(s?.background || "#050505");
+    setFg(s?.foreground || "#ffffff");
+    setScale(s?.textScale || 1);
+    setBgImage(s?.backgroundImage || "");
+  }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
   const locked = live?.lockedScreens ?? { A: false, B: false, C: false };
   const isTargetLocked = !!locked[target];
   const targetState = screenStates[target];

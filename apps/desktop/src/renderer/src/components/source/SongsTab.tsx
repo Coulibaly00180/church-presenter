@@ -146,6 +146,22 @@ export function SongsTab({ planId }: SongsTabProps) {
 
       <Separator className="shrink-0" />
 
+      {/* Target screen selector */}
+      <div className="shrink-0 flex items-center gap-1.5">
+        <span className="text-[10px] text-muted-foreground">Ecran :</span>
+        {(["A", "B", "C"] as ScreenKey[]).map((k) => (
+          <Button
+            key={k}
+            variant={state.target === k ? "default" : "outline"}
+            size="sm"
+            className="h-6 w-6 p-0 text-[10px] font-semibold"
+            onClick={() => state.setTarget(k)}
+          >
+            {k}
+          </Button>
+        ))}
+      </div>
+
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
         <div className="space-y-0.5">
           {state.filtered.map((s) => (

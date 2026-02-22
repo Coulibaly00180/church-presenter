@@ -26,7 +26,7 @@ export function CalendarTab({ planId, onSelectPlan }: CalendarTabProps) {
 
   useEffect(() => {
     window.cp.plans.list().then(setPlans).catch(() => null);
-  }, []);
+  }, [planId]);
 
   const today = localNowYmd();
 

@@ -127,13 +127,31 @@ export function BibleTab({ planId }: BibleTabProps) {
             ))}
           </div>
 
-          <div className="flex gap-1.5 sticky bottom-0 bg-card pt-1">
-            <Button size="xs" className="flex-1" onClick={() => { state.addToPlan(); }}>
-              <Plus className="h-3 w-3 mr-1" /> Ajouter
-            </Button>
-            <Button variant="outline" size="xs" onClick={() => { state.projectNow(); }}>
-              <Play className="h-3 w-3 mr-1" /> Projeter
-            </Button>
+          <div className="space-y-1 sticky bottom-0 bg-card pt-1">
+            <div className="flex rounded-md overflow-hidden border text-[10px]">
+              <button
+                type="button"
+                className={cn("flex-1 px-2 py-1", state.addMode === "PASSAGE" ? "bg-primary text-primary-foreground" : "hover:bg-accent")}
+                onClick={() => state.setAddMode("PASSAGE")}
+              >
+                Passage
+              </button>
+              <button
+                type="button"
+                className={cn("flex-1 px-2 py-1 border-l", state.addMode === "VERSES" ? "bg-primary text-primary-foreground" : "hover:bg-accent")}
+                onClick={() => state.setAddMode("VERSES")}
+              >
+                Versets
+              </button>
+            </div>
+            <div className="flex gap-1.5">
+              <Button size="xs" className="flex-1" onClick={() => { state.addToPlan(); }}>
+                <Plus className="h-3 w-3 mr-1" /> Ajouter
+              </Button>
+              <Button variant="outline" size="xs" onClick={() => { state.projectNow(); }}>
+                <Play className="h-3 w-3 mr-1" /> Projeter
+              </Button>
+            </div>
           </div>
         </>
       )}

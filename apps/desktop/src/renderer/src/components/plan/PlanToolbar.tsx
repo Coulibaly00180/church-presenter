@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { BookmarkPlus, Clock, Copy, Download, Repeat, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,9 @@ type PlanToolbarProps = {
 };
 
 export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loopActive, loopInterval, onToggleLoop, onSetLoopInterval, onImportFromFile }: PlanToolbarProps) {
+  const [templateName, setTemplateName] = useState("");
+  const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
+
   const handleExport = async () => {
     const result = await window.cp.plans.export({ planId: plan.id });
     if (result?.ok) {
@@ -42,13 +45,14 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loop
   };
 
   const handleSaveTemplate = async () => {
-    const name = prompt("Nom du template :");
-    if (!name?.trim()) return;
+    if (!templateName.trim()) return;
     const items = plan.items.map(({ kind, title, content, refId, refSubId, mediaPath }) => ({
       kind, title, content, refId, refSubId, mediaPath,
     }));
-    await saveAsTemplate(name.trim(), items);
+    await saveAsTemplate(templateName.trim(), items);
     toast.success("Template sauvegarde");
+    setTemplateName("");
+    setTemplatePopoverOpen(false);
   };
 
   const handleDelete = async () => {
@@ -105,14 +109,31 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loop
         </Popover>
       )}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSaveTemplate}>
-            <BookmarkPlus className="h-4 w-4" />
+      <Popover open={templatePopoverOpen} onOpenChange={setTemplatePopoverOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <BookmarkPlus className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Sauvegarder comme template</TooltipContent>
+        </Tooltip>
+        <PopoverContent align="end" className="w-56 p-3 space-y-2">
+          <p className="text-xs font-medium">Sauvegarder comme template</p>
+          <Input
+            className="h-7 text-xs"
+            placeholder="Nom du template..."
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void handleSaveTemplate(); }}
+          />
+          <Button size="sm" className="w-full h-7 text-xs" onClick={handleSaveTemplate} disabled={!templateName.trim()}>
+            Sauvegarder
           </Button>
-        </TooltipTrigger>
-        <TooltipContent>Sauvegarder comme template</TooltipContent>
-      </Tooltip>
+        </PopoverContent>
+      </Popover>
 
       <Tooltip>
         <TooltipTrigger asChild>
