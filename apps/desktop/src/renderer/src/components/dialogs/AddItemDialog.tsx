@@ -527,7 +527,7 @@ export function AddItemDialog({ open, onOpenChange, planId, onAdded }: Props) {
               <ImagePlus className="h-3 w-3" /> Media
             </TabsTrigger>
             <TabsTrigger value="timer" className="text-xs gap-1">
-              <Timer className="h-3 w-3" /> Timer
+              <Timer className="h-3 w-3" /> Minuterie
             </TabsTrigger>
           </TabsList>
           <TabsContent value="text">

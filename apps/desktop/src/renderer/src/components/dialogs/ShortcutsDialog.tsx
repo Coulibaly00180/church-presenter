@@ -123,7 +123,7 @@ export function ShortcutsDialog({ open, onOpenChange }: Props) {
                   className="h-6 text-[10px] px-1.5"
                   onClick={() => handleReset(def.action)}
                 >
-                  Reset
+                  Défaut
                 </Button>
               </div>
             </div>

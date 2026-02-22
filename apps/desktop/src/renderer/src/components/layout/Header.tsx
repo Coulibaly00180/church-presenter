@@ -250,7 +250,7 @@ export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHisto
             <Keyboard className="h-3.5 w-3.5 mr-1.5" /> Raccourcis clavier
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onOpenHistory}>
-            Import / Export
+            Importer / Exporter
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => window.cp.devtools?.open?.("REGIE")}>
             DevTools Regie
