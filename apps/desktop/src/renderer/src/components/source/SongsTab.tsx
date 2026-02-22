@@ -86,7 +86,7 @@ export function SongsTab({ planId }: SongsTabProps) {
           disabled={state.importing}
         >
           {state.importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileUp className="h-3 w-3 mr-1" />}
-          Import Word
+          Word
         </Button>
         <Button
           variant="outline"
@@ -96,7 +96,7 @@ export function SongsTab({ planId }: SongsTabProps) {
           disabled={state.importing}
         >
           {state.importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileJson className="h-3 w-3 mr-1" />}
-          Import JSON
+          JSON
         </Button>
         <Button
           variant="outline"
@@ -114,7 +114,7 @@ export function SongsTab({ planId }: SongsTabProps) {
           variant="outline"
           size="sm"
           className="h-7 text-xs shrink-0"
-          title="Import auto (Word + JSON)"
+          title="Import auto"
           onClick={state.onImportAuto}
           disabled={state.importing}
         >

@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { FolderOpen, ImagePlus, Pencil, RefreshCw, Save, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FolderOpen, ImagePlus, Pencil, RefreshCw, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 const PROJECTION_FONT_OPTIONS = [
@@ -58,6 +60,14 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
   const [libraryDir, setLibraryDir] = useState("");
   const [profilesSnapshot, setProfilesSnapshot] = useState<CpSettingsProfilesSnapshot>({ profiles: [], activeProfileId: null });
   const [mirrors, setMirrors] = useState<Partial<Record<ScreenKey, ScreenMirrorMode>>>({});
+  const [profileCreateOpen, setProfileCreateOpen] = useState(false);
+  const [profileCreateName, setProfileCreateName] = useState("");
+  const [profileRenameOpen, setProfileRenameOpen] = useState(false);
+  const [profileRenameName, setProfileRenameName] = useState("");
+  const [profileDeleteConfirm, setProfileDeleteConfirm] = useState(false);
+  const [fontRenameOpen, setFontRenameOpen] = useState(false);
+  const [fontRenameName, setFontRenameName] = useState("");
+  const [fontDeleteConfirm, setFontDeleteConfirm] = useState(false);
 
   const loadLibraryFiles = async () => {
     const media = await window.cp.files.listMedia();
@@ -229,14 +239,9 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     toast.success("Police importee");
   };
 
-  const renameSelectedFont = async () => {
-    if (!textFontPath) return;
-    const selectedFile = fontFiles.find((file) => file.path === textFontPath);
-    const defaultName = selectedFile?.name || textFontPath.split(/[\\/]/).pop() || "";
-    const nextNameRaw = window.prompt("Nouveau nom de police", defaultName);
-    if (!nextNameRaw?.trim()) return;
-
-    const result = await window.cp.files.renameMedia({ path: textFontPath, name: nextNameRaw.trim() });
+  const renameSelectedFont = async (name: string) => {
+    if (!textFontPath || !name.trim()) return;
+    const result = await window.cp.files.renameMedia({ path: textFontPath, name: name.trim() });
     if (!result.ok) {
       toast.error(result.error || "Renommage echoue");
       return;
@@ -252,10 +257,6 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
 
   const deleteSelectedFont = async () => {
     if (!textFontPath) return;
-    const selectedFile = fontFiles.find((file) => file.path === textFontPath);
-    const confirmed = window.confirm(`Supprimer la police ${selectedFile?.name || textFontPath} ?`);
-    if (!confirmed) return;
-
     const result = await window.cp.files.deleteMedia({ path: textFontPath });
     if (!result.ok) {
       toast.error(result.error || "Suppression echouee");
@@ -291,9 +292,8 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     toast.success(`Profil sauvegarde : ${result.profile.name}`);
   };
 
-  const createProfile = async () => {
-    const name = window.prompt("Nom du profil", "Nouvelle assemblee");
-    if (!name?.trim()) return;
+  const createProfile = async (name: string) => {
+    if (!name.trim()) return;
     const result = await window.cp.settings.createProfile({ name: name.trim() });
     if (!result.ok) {
       toast.error(result.error || "Creation du profil echouee");
@@ -319,11 +319,9 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     toast.success(`Profil charge : ${result.profile.name}`);
   };
 
-  const renameActiveProfile = async () => {
+  const renameActiveProfile = async (name: string) => {
     const active = profilesSnapshot.profiles.find((profile) => profile.id === profilesSnapshot.activeProfileId);
-    if (!active) return;
-    const name = window.prompt("Renommer le profil", active.name);
-    if (!name?.trim()) return;
+    if (!active || !name.trim()) return;
     const result = await window.cp.settings.renameProfile({ profileId: active.id, name: name.trim() });
     if (!result.ok) {
       toast.error(result.error || "Renommage echoue");
@@ -336,8 +334,6 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
   const deleteActiveProfile = async () => {
     const active = profilesSnapshot.profiles.find((profile) => profile.id === profilesSnapshot.activeProfileId);
     if (!active) return;
-    const confirmed = window.confirm(`Supprimer le profil ${active.name} ?`);
-    if (!confirmed) return;
     const result = await window.cp.settings.deleteProfile({ profileId: active.id });
     if (!result.ok) {
       toast.error(result.error || "Suppression echouee");
@@ -385,13 +381,48 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
             <div className="flex items-center justify-between gap-2">
               <Label className="text-xs">Profil d'assemblee</Label>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={createProfile}>
-                  Nouveau
-                </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={renameActiveProfile} disabled={!activeProfile}>
-                  <Pencil className="h-3 w-3 mr-1" /> Renommer
-                </Button>
-                <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={deleteActiveProfile} disabled={!activeProfile}>
+                <Popover open={profileCreateOpen} onOpenChange={setProfileCreateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setProfileCreateName(""); setProfileCreateOpen(true); }}>
+                      Nouveau
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56 p-3 space-y-2">
+                    <p className="text-xs font-medium">Nom du profil</p>
+                    <Input
+                      className="h-7 text-xs"
+                      placeholder="Nouvelle assemblee..."
+                      value={profileCreateName}
+                      onChange={(e) => setProfileCreateName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && profileCreateName.trim()) { setProfileCreateOpen(false); void createProfile(profileCreateName); } }}
+                      autoFocus
+                    />
+                    <Button size="sm" className="w-full h-7 text-xs" disabled={!profileCreateName.trim()} onClick={() => { setProfileCreateOpen(false); void createProfile(profileCreateName); }}>
+                      Creer
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+                <Popover open={profileRenameOpen} onOpenChange={setProfileRenameOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" disabled={!activeProfile} onClick={() => { setProfileRenameName(activeProfile?.name ?? ""); setProfileRenameOpen(true); }}>
+                      <Pencil className="h-3 w-3 mr-1" /> Renommer
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-56 p-3 space-y-2">
+                    <p className="text-xs font-medium">Nouveau nom</p>
+                    <Input
+                      className="h-7 text-xs"
+                      value={profileRenameName}
+                      onChange={(e) => setProfileRenameName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && profileRenameName.trim()) { setProfileRenameOpen(false); void renameActiveProfile(profileRenameName); } }}
+                      autoFocus
+                    />
+                    <Button size="sm" className="w-full h-7 text-xs" disabled={!profileRenameName.trim()} onClick={() => { setProfileRenameOpen(false); void renameActiveProfile(profileRenameName); }}>
+                      Renommer
+                    </Button>
+                  </PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => setProfileDeleteConfirm(true)} disabled={!activeProfile || profileDeleteConfirm}>
                   <Trash2 className="h-3 w-3 mr-1" /> Supprimer
                 </Button>
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={saveActiveProfile} disabled={!activeProfile}>
@@ -399,6 +430,17 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 </Button>
               </div>
             </div>
+            {profileDeleteConfirm && activeProfile && (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1.5">
+                <span className="flex-1 text-[11px] text-destructive">Supprimer « {activeProfile.name} » ?</span>
+                <Button size="sm" variant="destructive" className="h-6 text-[10px] px-2" onClick={() => { setProfileDeleteConfirm(false); void deleteActiveProfile(); }}>
+                  Confirmer
+                </Button>
+                <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => setProfileDeleteConfirm(false)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 className="h-8 min-w-[220px] flex-1 rounded border bg-background px-2 text-xs"
@@ -718,15 +760,36 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={pickFont}>
                 <ImagePlus className="h-3 w-3 mr-1" /> Importer
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={renameSelectedFont}
-                disabled={!textFontPath}
-              >
-                <Pencil className="h-3 w-3 mr-1" /> Renommer
-              </Button>
+              <Popover open={fontRenameOpen} onOpenChange={setFontRenameOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    disabled={!textFontPath}
+                    onClick={() => {
+                      const f = fontFiles.find((file) => file.path === textFontPath);
+                      setFontRenameName(f?.name || textFontPath.split(/[\\/]/).pop() || "");
+                      setFontRenameOpen(true);
+                    }}
+                  >
+                    <Pencil className="h-3 w-3 mr-1" /> Renommer
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-56 p-3 space-y-2">
+                  <p className="text-xs font-medium">Nouveau nom de police</p>
+                  <Input
+                    className="h-7 text-xs"
+                    value={fontRenameName}
+                    onChange={(e) => setFontRenameName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && fontRenameName.trim()) { setFontRenameOpen(false); void renameSelectedFont(fontRenameName); } }}
+                    autoFocus
+                  />
+                  <Button size="sm" className="w-full h-7 text-xs" disabled={!fontRenameName.trim()} onClick={() => { setFontRenameOpen(false); void renameSelectedFont(fontRenameName); }}>
+                    Renommer
+                  </Button>
+                </PopoverContent>
+              </Popover>
               <Button
                 variant="ghost"
                 size="sm"
@@ -743,8 +806,8 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 variant="ghost"
                 size="sm"
                 className="h-8 text-xs text-destructive"
-                onClick={deleteSelectedFont}
-                disabled={!textFontPath}
+                onClick={() => setFontDeleteConfirm(true)}
+                disabled={!textFontPath || fontDeleteConfirm}
               >
                 <Trash2 className="h-3 w-3 mr-1" /> Supprimer
               </Button>
@@ -752,12 +815,23 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 <RefreshCw className="h-3 w-3 mr-1" /> Actualiser
               </Button>
             </div>
+            {fontDeleteConfirm && textFontPath && (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1.5">
+                <span className="flex-1 text-[11px] text-destructive">Supprimer « {fontFiles.find((f) => f.path === textFontPath)?.name ?? textFontPath.split(/[\\/]/).pop()} » ?</span>
+                <Button size="sm" variant="destructive" className="h-6 text-[10px] px-2" onClick={() => { setFontDeleteConfirm(false); void deleteSelectedFont(); }}>
+                  Confirmer
+                </Button>
+                <Button size="sm" variant="ghost" className="h-6 text-[10px] px-2" onClick={() => setFontDeleteConfirm(false)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
             <div className="rounded-md border p-2 space-y-1">
               <p className={`text-[10px] ${fontValidationError ? "text-destructive" : "text-muted-foreground"}`}>
                 {fontValidation || "Selectionnez une police pour la valider et la previsualiser."}
               </p>
               <p className="text-sm rounded border bg-muted/20 px-2 py-1.5" style={{ fontFamily: fontPreviewFamily }}>
-                Preview: ABCDEFG abcdefg 012345
+                Apercu : ABCDEFG abcdefg 012345
               </p>
             </div>
           </div>

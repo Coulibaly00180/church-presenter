@@ -24,6 +24,7 @@ type PlanToolbarProps = {
 export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loopActive, loopInterval, onToggleLoop, onSetLoopInterval, onImportFromFile }: PlanToolbarProps) {
   const [templateName, setTemplateName] = useState("");
   const [templatePopoverOpen, setTemplatePopoverOpen] = useState(false);
+  const [deletePopoverOpen, setDeletePopoverOpen] = useState(false);
 
   const handleExport = async () => {
     const result = await window.cp.plans.export({ planId: plan.id });
@@ -56,7 +57,7 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loop
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Supprimer le plan "${plan.title || "Culte"}" ? Cette action est irreversible.`)) return;
+    setDeletePopoverOpen(false);
     await window.cp.plans.delete(plan.id);
     toast.success("Plan supprime");
     onDeleted();
@@ -164,14 +165,30 @@ export function PlanToolbar({ plan, onDeleted, onDuplicated, onShowHistory, loop
         <TooltipContent>Dupliquer le plan</TooltipContent>
       </Tooltip>
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={handleDelete}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Supprimer le plan</TooltipContent>
-      </Tooltip>
+      <Popover open={deletePopoverOpen} onOpenChange={setDeletePopoverOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Supprimer le plan</TooltipContent>
+        </Tooltip>
+        <PopoverContent align="end" className="w-52 p-3 space-y-2">
+          <p className="text-xs font-medium">Supprimer « {plan.title || "Culte"} » ?</p>
+          <p className="text-[10px] text-muted-foreground">Cette action est irreversible.</p>
+          <div className="flex gap-2">
+            <Button size="sm" variant="destructive" className="flex-1 h-7 text-xs" onClick={handleDelete}>
+              Supprimer
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 h-7 text-xs" onClick={() => setDeletePopoverOpen(false)}>
+              Annuler
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Download, Upload, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { isoToYmd, localNowYmd } from "@/lib/date";
@@ -26,6 +27,7 @@ export function HistoryDialog({ open, onOpenChange }: HistoryDialogProps) {
   const [importMode, setImportMode] = useState<CpDataImportMode>("MERGE");
   const [importAtomicity, setImportAtomicity] = useState<CpDataImportAtomicity>("ENTITY");
   const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
+  const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -83,8 +85,8 @@ export function HistoryDialog({ open, onOpenChange }: HistoryDialogProps) {
     }
   };
 
-  const handleDeletePlan = async (planId: string, title: string) => {
-    if (!confirm(`Supprimer le plan "${title || "Culte"}" ? Cette action est irreversible.`)) return;
+  const handleDeletePlan = async (planId: string) => {
+    setDeletingPlanId(null);
     await window.cp.plans.delete(planId);
     toast.success("Plan supprime.");
     setPlans(await window.cp.plans.list());
@@ -189,9 +191,24 @@ export function HistoryDialog({ open, onOpenChange }: HistoryDialogProps) {
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleExportPlan(p.id)}>
                     <Download className="h-3 w-3" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => handleDeletePlan(p.id, p.title ?? "")}>
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  <Popover open={deletingPlanId === p.id} onOpenChange={(v) => { if (!v) setDeletingPlanId(null); }}>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:text-destructive" onClick={() => setDeletingPlanId(p.id)}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-48 p-3 space-y-2">
+                      <p className="text-xs font-medium">Supprimer « {p.title || "Culte"} » ?</p>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="destructive" className="flex-1 h-6 text-[10px]" onClick={() => handleDeletePlan(p.id)}>
+                          Supprimer
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 h-6 text-[10px]" onClick={() => setDeletingPlanId(null)}>
+                          Annuler
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               ))}
               {plans.length === 0 && (

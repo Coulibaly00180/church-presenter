@@ -328,7 +328,7 @@ export function LiveBar() {
     setFg(s?.foreground || "#ffffff");
     setScale(s?.textScale || 1);
     setBgImage(s?.backgroundImage || "");
-  }, [target]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [target, screenStates]);
   const locked = live?.lockedScreens ?? { A: false, B: false, C: false };
   const isTargetLocked = !!locked[target];
   const targetState = screenStates[target];
@@ -514,7 +514,7 @@ export function LiveBar() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant={lowerThirdEnabled ? "default" : "outline"} size="sm" className="h-9 px-3" onClick={toggleLowerThird} disabled={isTargetLocked}>
-            Lower-third
+            Bas de page
           </Button>
         </TooltipTrigger>
         <TooltipContent>Bas de page</TooltipContent>
