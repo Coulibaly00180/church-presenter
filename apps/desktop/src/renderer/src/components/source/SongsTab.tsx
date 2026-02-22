@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Play, Search, Trash2, Music, Pencil, FileJson, FileUp, FileDown, Loader2, CalendarDays } from "lucide-react";
+import { Plus, Play, Search, Trash2, Music, Pencil, FileJson, FileUp, FileDown, Loader2, CalendarDays, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { localNowYmd } from "@/lib/date";
 import { useSongsState } from "../../pages/songs/useSongsState";
@@ -109,6 +109,16 @@ export function SongsTab({ planId }: SongsTabProps) {
           }}
         >
           <FileDown className="h-3 w-3" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 text-xs shrink-0"
+          title="Import auto (Word + JSON)"
+          onClick={state.onImportAuto}
+          disabled={state.importing}
+        >
+          {state.importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
         </Button>
       </div>
 

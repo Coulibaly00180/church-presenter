@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { PlanItem } from "@/lib/types";
-import { CP_PLAN_ITEM_KIND_LABELS } from "@/lib/planKinds";
+import { getPlanKindLabel } from "@/lib/planKinds";
 
 type EditItemDialogProps = {
   open: boolean;
@@ -57,7 +57,7 @@ export function EditItemDialog({ open, onOpenChange, planId, item, onSaved }: Ed
 
   if (!item) return null;
 
-  const kindLabel = CP_PLAN_ITEM_KIND_LABELS[item.kind] ?? item.kind;
+  const kindLabel = getPlanKindLabel(item.kind);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

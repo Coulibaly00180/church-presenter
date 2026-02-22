@@ -88,7 +88,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
   const loadProfiles = async () => {
     const result = await window.cp.settings.getProfiles();
     if (!result.ok) {
-      toast.error(result.error || "Profiles unavailable");
+      toast.error(result.error || "Profils indisponibles");
       return;
     }
     setProfilesSnapshot(result.snapshot);
@@ -143,7 +143,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
       const validation = await window.cp.files.validateFont({ path: textFontPath });
       if (!validation.ok) {
         if (!cancelled) {
-          setFontValidation(validation.error || "Validation failed");
+          setFontValidation(validation.error || "Validation echouee");
           setFontValidationError(true);
           setFontPreviewFamily("system-ui");
         }
@@ -151,7 +151,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
       }
       if (!validation.valid) {
         if (!cancelled) {
-          setFontValidation(validation.reason || "Invalid font file");
+          setFontValidation(validation.reason || "Fichier de police invalide");
           setFontValidationError(true);
           setFontPreviewFamily("system-ui");
         }
@@ -167,13 +167,13 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
         fontSet.add?.(loaded);
         mountedFace = loaded;
         if (!cancelled) {
-          setFontValidation(`Font valid: ${previewName}`);
+          setFontValidation(`Police valide : ${previewName}`);
           setFontValidationError(false);
           setFontPreviewFamily(`"${runtimeFamily}", system-ui`);
         }
       } catch {
         if (!cancelled) {
-          setFontValidation("Font load failed (corrupted or unreadable)");
+          setFontValidation("Chargement echoue (fichier corrompu ou illisible)");
           setFontValidationError(true);
           setFontPreviewFamily("system-ui");
         }
@@ -211,14 +211,14 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
   const pickFont = async () => {
     const result = await window.cp.files.pickFont();
     if (!result.ok || !("path" in result)) {
-      if (!result.ok && "error" in result) toast.error(result.error || "Font import failed");
+      if (!result.ok && "error" in result) toast.error(result.error || "Import de police echoue");
       return;
     }
 
     await loadLibraryFiles();
     const validation = await window.cp.files.validateFont({ path: result.path });
     if (!validation.ok || !validation.valid) {
-      toast.error(validation.ok ? (validation.reason || "Invalid font file") : validation.error);
+      toast.error(validation.ok ? (validation.reason || "Fichier de police invalide") : validation.error);
       return;
     }
 
@@ -226,19 +226,19 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     setTextFont(guessedFamily);
     setTextFontPath(result.path);
     apply({ textFont: guessedFamily, textFontPath: result.path });
-    toast.success("Font imported");
+    toast.success("Police importee");
   };
 
   const renameSelectedFont = async () => {
     if (!textFontPath) return;
     const selectedFile = fontFiles.find((file) => file.path === textFontPath);
     const defaultName = selectedFile?.name || textFontPath.split(/[\\/]/).pop() || "";
-    const nextNameRaw = window.prompt("New font name", defaultName);
+    const nextNameRaw = window.prompt("Nouveau nom de police", defaultName);
     if (!nextNameRaw?.trim()) return;
 
     const result = await window.cp.files.renameMedia({ path: textFontPath, name: nextNameRaw.trim() });
     if (!result.ok) {
-      toast.error(result.error || "Rename failed");
+      toast.error(result.error || "Renommage echoue");
       return;
     }
 
@@ -247,18 +247,18 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     setTextFontPath(result.path);
     apply({ textFont: nextFamily, textFontPath: result.path });
     await loadLibraryFiles();
-    toast.success("Font renamed");
+    toast.success("Police renommee");
   };
 
   const deleteSelectedFont = async () => {
     if (!textFontPath) return;
     const selectedFile = fontFiles.find((file) => file.path === textFontPath);
-    const confirmed = window.confirm(`Delete font ${selectedFile?.name || textFontPath}?`);
+    const confirmed = window.confirm(`Supprimer la police ${selectedFile?.name || textFontPath} ?`);
     if (!confirmed) return;
 
     const result = await window.cp.files.deleteMedia({ path: textFontPath });
     if (!result.ok) {
-      toast.error(result.error || "Delete failed");
+      toast.error(result.error || "Suppression echouee");
       return;
     }
 
@@ -266,88 +266,88 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     setTextFontPath("");
     apply({ textFont: "system-ui", textFontPath: "" });
     await loadLibraryFiles();
-    toast.success("Font deleted");
+    toast.success("Police supprimee");
   };
 
   const chooseLibraryDir = async () => {
     const result = await window.cp.files.chooseLibraryDir();
     if (!result.ok) {
-      if ("error" in result) toast.error(result.error || "Unable to update media folder");
+      if ("error" in result) toast.error(result.error || "Impossible de modifier le dossier media");
       return;
     }
     setLibraryDir(result.path);
     await loadLibraryFiles();
     await loadProfiles();
-    toast.success("Media folder updated");
+    toast.success("Dossier media mis a jour");
   };
 
   const saveActiveProfile = async () => {
     const result = await window.cp.settings.saveActiveProfile();
     if (!result.ok) {
-      toast.error(result.error || "Profile save failed");
+      toast.error(result.error || "Sauvegarde du profil echouee");
       return;
     }
     setProfilesSnapshot(result.snapshot);
-    toast.success(`Profile saved: ${result.profile.name}`);
+    toast.success(`Profil sauvegarde : ${result.profile.name}`);
   };
 
   const createProfile = async () => {
-    const name = window.prompt("Profile name", "Nouvelle assemblee");
+    const name = window.prompt("Nom du profil", "Nouvelle assemblee");
     if (!name?.trim()) return;
     const result = await window.cp.settings.createProfile({ name: name.trim() });
     if (!result.ok) {
-      toast.error(result.error || "Profile creation failed");
+      toast.error(result.error || "Creation du profil echouee");
       return;
     }
     setProfilesSnapshot(result.snapshot);
     await loadProjectionState();
     await loadLibraryFiles();
     await loadScreenMeta();
-    toast.success(`Profile created: ${result.profile.name}`);
+    toast.success(`Profil cree : ${result.profile.name}`);
   };
 
   const activateProfile = async (profileId: string) => {
     const result = await window.cp.settings.activateProfile({ profileId });
     if (!result.ok) {
-      toast.error(result.error || "Profile activation failed");
+      toast.error(result.error || "Activation du profil echouee");
       return;
     }
     setProfilesSnapshot(result.snapshot);
     await loadProjectionState();
     await loadLibraryFiles();
     await loadScreenMeta();
-    toast.success(`Profile loaded: ${result.profile.name}`);
+    toast.success(`Profil charge : ${result.profile.name}`);
   };
 
   const renameActiveProfile = async () => {
     const active = profilesSnapshot.profiles.find((profile) => profile.id === profilesSnapshot.activeProfileId);
     if (!active) return;
-    const name = window.prompt("Rename profile", active.name);
+    const name = window.prompt("Renommer le profil", active.name);
     if (!name?.trim()) return;
     const result = await window.cp.settings.renameProfile({ profileId: active.id, name: name.trim() });
     if (!result.ok) {
-      toast.error(result.error || "Rename failed");
+      toast.error(result.error || "Renommage echoue");
       return;
     }
     setProfilesSnapshot(result.snapshot);
-    toast.success("Profile renamed");
+    toast.success("Profil renomme");
   };
 
   const deleteActiveProfile = async () => {
     const active = profilesSnapshot.profiles.find((profile) => profile.id === profilesSnapshot.activeProfileId);
     if (!active) return;
-    const confirmed = window.confirm(`Delete profile ${active.name}?`);
+    const confirmed = window.confirm(`Supprimer le profil ${active.name} ?`);
     if (!confirmed) return;
     const result = await window.cp.settings.deleteProfile({ profileId: active.id });
     if (!result.ok) {
-      toast.error(result.error || "Delete failed");
+      toast.error(result.error || "Suppression echouee");
       return;
     }
     setProfilesSnapshot(result.snapshot);
     await loadProjectionState();
     await loadLibraryFiles();
     await loadScreenMeta();
-    toast.success("Profile deleted");
+    toast.success("Profil supprime");
   };
 
   const setMirror = async (key: "B" | "C", mirror: ScreenMirrorMode) => {
@@ -376,26 +376,26 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(94vw,760px)] max-w-[760px] max-h-[88vh] grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
         <DialogHeader>
-          <DialogTitle>Projection appearance</DialogTitle>
-          <DialogDescription>Edit colors, text size, fonts, and media branding.</DialogDescription>
+          <DialogTitle>Apparence de projection</DialogTitle>
+          <DialogDescription>Couleurs, taille du texte, polices et logo.</DialogDescription>
         </DialogHeader>
 
         <div className="min-h-0 overflow-y-auto pr-1 space-y-4">
           <div className="space-y-2 rounded-md border p-2">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-xs">Assembly profile</Label>
+              <Label className="text-xs">Profil d'assemblee</Label>
               <div className="flex items-center gap-1">
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={createProfile}>
-                  New
+                  Nouveau
                 </Button>
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={renameActiveProfile} disabled={!activeProfile}>
-                  <Pencil className="h-3 w-3 mr-1" /> Rename
+                  <Pencil className="h-3 w-3 mr-1" /> Renommer
                 </Button>
                 <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={deleteActiveProfile} disabled={!activeProfile}>
-                  <Trash2 className="h-3 w-3 mr-1" /> Delete
+                  <Trash2 className="h-3 w-3 mr-1" /> Supprimer
                 </Button>
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={saveActiveProfile} disabled={!activeProfile}>
-                  <Save className="h-3 w-3 mr-1" /> Save
+                  <Save className="h-3 w-3 mr-1" /> Enregistrer
                 </Button>
               </div>
             </div>
@@ -416,28 +416,28 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 ))}
               </select>
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={loadProfiles}>
-                <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+                <RefreshCw className="h-3 w-3 mr-1" /> Actualiser
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Active profile stores logo, colors, fonts, media folder, and screen mappings.
+              Le profil actif stocke le logo, les couleurs, les polices, le dossier media et les configurations d'ecran.
             </p>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">Media folder</Label>
+              <Label className="text-xs">Dossier media</Label>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={chooseLibraryDir}>
-                  <FolderOpen className="h-3 w-3 mr-1" /> Change
+                  <FolderOpen className="h-3 w-3 mr-1" /> Modifier
                 </Button>
                 <span className="text-[10px] text-muted-foreground truncate" title={libraryDir}>
-                  {libraryDir || "No folder selected"}
+                  {libraryDir || "Aucun dossier"}
                 </span>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               <div className="space-y-1 rounded border p-2">
-                <Label className="text-[10px]">Screen B mapping</Label>
+                <Label className="text-[10px]">Configuration ecran B</Label>
                 <div className="flex items-center gap-1.5">
                   <select
                     className="h-7 rounded border bg-background px-2 text-[10px]"
@@ -447,8 +447,8 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                       void setMirror("B", mode === "FREE" ? { kind: "FREE" } : { kind: "MIRROR", from: "A" });
                     }}
                   >
-                    <option value="FREE">Free</option>
-                    <option value="MIRROR">Mirror</option>
+                    <option value="FREE">Libre</option>
+                    <option value="MIRROR">Miroir</option>
                   </select>
                   {mirrorB.kind === "MIRROR" && (
                     <select
@@ -460,14 +460,14 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                         void setMirror("B", { kind: "MIRROR", from });
                       }}
                     >
-                      <option value="A">From A</option>
-                      <option value="C">From C</option>
+                      <option value="A">Depuis A</option>
+                      <option value="C">Depuis C</option>
                     </select>
                   )}
                 </div>
               </div>
               <div className="space-y-1 rounded border p-2">
-                <Label className="text-[10px]">Screen C mapping</Label>
+                <Label className="text-[10px]">Configuration ecran C</Label>
                 <div className="flex items-center gap-1.5">
                   <select
                     className="h-7 rounded border bg-background px-2 text-[10px]"
@@ -477,8 +477,8 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                       void setMirror("C", mode === "FREE" ? { kind: "FREE" } : { kind: "MIRROR", from: "A" });
                     }}
                   >
-                    <option value="FREE">Free</option>
-                    <option value="MIRROR">Mirror</option>
+                    <option value="FREE">Libre</option>
+                    <option value="MIRROR">Miroir</option>
                   </select>
                   {mirrorC.kind === "MIRROR" && (
                     <select
@@ -490,8 +490,8 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                         void setMirror("C", { kind: "MIRROR", from });
                       }}
                     >
-                      <option value="A">From A</option>
-                      <option value="B">From B</option>
+                      <option value="A">Depuis A</option>
+                      <option value="B">Depuis B</option>
                     </select>
                   )}
                 </div>
@@ -501,7 +501,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Background mode</Label>
+              <Label className="text-xs">Mode fond</Label>
               <select
                 className="h-8 rounded border bg-background px-2 text-xs"
                 value={bgMode}
@@ -511,14 +511,14 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   apply({ backgroundMode: next });
                 }}
               >
-                <option value="SOLID">Solid</option>
-                <option value="GRADIENT_LINEAR">Linear gradient</option>
-                <option value="GRADIENT_RADIAL">Radial gradient</option>
+                <option value="SOLID">Uni</option>
+                <option value="GRADIENT_LINEAR">Degrade lineaire</option>
+                <option value="GRADIENT_RADIAL">Degrade radial</option>
               </select>
             </div>
             {bgMode === "SOLID" ? (
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Background color</Label>
+                <Label className="text-xs">Couleur de fond</Label>
                 <input
                   type="color"
                   value={bg}
@@ -532,7 +532,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
             ) : (
               <div className="space-y-2 rounded-md border p-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Color A</Label>
+                  <Label className="text-xs">Couleur A</Label>
                   <input
                     type="color"
                     value={bgGradientFrom}
@@ -544,7 +544,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Color B</Label>
+                  <Label className="text-xs">Couleur B</Label>
                   <input
                     type="color"
                     value={bgGradientTo}
@@ -582,7 +582,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Text mode</Label>
+              <Label className="text-xs">Mode texte</Label>
               <select
                 className="h-8 rounded border bg-background px-2 text-xs"
                 value={fgMode}
@@ -592,13 +592,13 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   apply({ foregroundMode: next });
                 }}
               >
-                <option value="SOLID">Solid</option>
-                <option value="GRADIENT">Gradient</option>
+                <option value="SOLID">Uni</option>
+                <option value="GRADIENT">Degrade</option>
               </select>
             </div>
             {fgMode === "SOLID" ? (
               <div className="flex items-center justify-between">
-                <Label className="text-xs">Text color</Label>
+                <Label className="text-xs">Couleur du texte</Label>
                 <input
                   type="color"
                   value={fg}
@@ -612,7 +612,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
             ) : (
               <div className="space-y-2 rounded-md border p-2">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Color A</Label>
+                  <Label className="text-xs">Couleur A</Label>
                   <input
                     type="color"
                     value={fgGradientFrom}
@@ -624,7 +624,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Color B</Label>
+                  <Label className="text-xs">Couleur B</Label>
                   <input
                     type="color"
                     value={fgGradientTo}
@@ -641,7 +641,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
 
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Text size</Label>
+              <Label className="text-xs">Taille du texte</Label>
               <span className="text-xs text-muted-foreground font-mono">{scale.toFixed(1)}x</span>
             </div>
             <input
@@ -660,7 +660,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Text font</Label>
+            <Label className="text-xs">Police de texte</Label>
             <select
               className="h-8 w-full rounded border bg-background px-2 text-xs"
               value={textFont}
@@ -680,7 +680,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Custom font (.ttf/.otf)</Label>
+            <Label className="text-xs">Police personnalisee (.ttf/.otf)</Label>
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 className="h-8 min-w-[220px] flex-1 rounded border bg-background px-2 text-xs"
@@ -694,11 +694,11 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   }
                   const validation = await window.cp.files.validateFont({ path });
                   if (!validation.ok) {
-                    toast.error(validation.error || "Validation failed");
+                    toast.error(validation.error || "Validation echouee");
                     return;
                   }
                   if (!validation.valid) {
-                    toast.error(validation.reason || "Invalid font file");
+                    toast.error(validation.reason || "Fichier de police invalide");
                     return;
                   }
                   const file = fontFiles.find((entry) => entry.path === path);
@@ -708,7 +708,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   apply({ textFont: family, textFontPath: path });
                 }}
               >
-                <option value="">None</option>
+                <option value="">Aucune</option>
                 {fontFiles.map((file) => (
                   <option key={file.path} value={file.path}>
                     {file.name}
@@ -716,7 +716,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 ))}
               </select>
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={pickFont}>
-                <ImagePlus className="h-3 w-3 mr-1" /> Import
+                <ImagePlus className="h-3 w-3 mr-1" /> Importer
               </Button>
               <Button
                 variant="outline"
@@ -725,7 +725,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 onClick={renameSelectedFont}
                 disabled={!textFontPath}
               >
-                <Pencil className="h-3 w-3 mr-1" /> Rename
+                <Pencil className="h-3 w-3 mr-1" /> Renommer
               </Button>
               <Button
                 variant="ghost"
@@ -737,7 +737,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   apply({ textFontPath: "" });
                 }}
               >
-                Detach
+                Detacher
               </Button>
               <Button
                 variant="ghost"
@@ -746,15 +746,15 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 onClick={deleteSelectedFont}
                 disabled={!textFontPath}
               >
-                <Trash2 className="h-3 w-3 mr-1" /> Delete
+                <Trash2 className="h-3 w-3 mr-1" /> Supprimer
               </Button>
               <Button variant="outline" size="sm" className="h-8 text-xs" onClick={loadLibraryFiles}>
-                <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+                <RefreshCw className="h-3 w-3 mr-1" /> Actualiser
               </Button>
             </div>
             <div className="rounded-md border p-2 space-y-1">
               <p className={`text-[10px] ${fontValidationError ? "text-destructive" : "text-muted-foreground"}`}>
-                {fontValidation || "Select a font to validate and preview it."}
+                {fontValidation || "Selectionnez une police pour la valider et la previsualiser."}
               </p>
               <p className="text-sm rounded border bg-muted/20 px-2 py-1.5" style={{ fontFamily: fontPreviewFamily }}>
                 Preview: ABCDEFG abcdefg 012345
@@ -763,7 +763,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Background image</Label>
+            <Label className="text-xs">Image de fond</Label>
             <div className="flex items-center gap-2">
               {bgImage && (
                 <img
@@ -773,7 +773,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 />
               )}
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={pickImage}>
-                <ImagePlus className="h-3 w-3 mr-1" /> Choose...
+                <ImagePlus className="h-3 w-3 mr-1" /> Choisir...
               </Button>
               {bgImage && (
                 <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={clearImage}>
@@ -781,11 +781,11 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                 </Button>
               )}
             </div>
-            {!bgImage && <p className="text-[10px] text-muted-foreground">No image selected</p>}
+            {!bgImage && <p className="text-[10px] text-muted-foreground">Aucune image selectionnee</p>}
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Logo (top right)</Label>
+            <Label className="text-xs">Logo (coin superieur droit)</Label>
             <div className="flex items-center gap-2 flex-wrap">
               <select
                 className="h-7 min-w-[220px] flex-1 rounded-md border bg-background px-2 text-xs"
@@ -796,18 +796,18 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
                   apply({ logoPath: value });
                 }}
               >
-                <option value="">No logo</option>
+                <option value="">Pas de logo</option>
                 {imageFiles.map((file) => (
                   <option key={file.path} value={file.path}>
                     {file.name}
                   </option>
                 ))}
               </select>
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={loadLibraryFiles} title="Refresh">
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={loadLibraryFiles} title="Actualiser">
                 <RefreshCw className="h-3 w-3" />
               </Button>
               <Button variant="outline" size="sm" className="h-7 text-xs" onClick={pickLogo}>
-                <ImagePlus className="h-3 w-3 mr-1" /> Import
+                <ImagePlus className="h-3 w-3 mr-1" /> Importer
               </Button>
               {logoPath && (
                 <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={clearLogo}>
@@ -816,7 +816,7 @@ export function ProjectionSettings({ open, onOpenChange }: Props) {
               )}
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Choose a logo from media/images to display it at top right.
+              Choisissez un logo parmi les images media pour l'afficher en haut a droite.
             </p>
           </div>
         </div>
