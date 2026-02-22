@@ -107,7 +107,7 @@ export function BibleTab({ planId }: BibleTabProps) {
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-medium">{state.referenceLabel}</span>
             <Button variant="ghost" size="xs" className="text-[10px]" onClick={() => state.selectAllVerses(state.selectedVerses.size !== state.verses.length)}>
-              {state.selectedVerses.size === state.verses.length ? "Deselect." : "Tout select."}
+              {state.selectedVerses.size === state.verses.length ? "Tout decocher" : "Tout cocher"}
             </Button>
           </div>
 

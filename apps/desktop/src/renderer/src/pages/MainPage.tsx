@@ -456,17 +456,17 @@ export function MainPage() {
         <CardContent className="pt-4 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={live?.enabled ? "default" : "secondary"} className="h-7 px-3 font-semibold">
-              {live?.enabled ? "LIVE ON" : "LIVE OFF"}
+              {live?.enabled ? "ACTIF" : "INACTIF"}
             </Badge>
             <Badge variant="outline" className="h-7 px-3 font-semibold">
-              TARGET {liveTarget}
+              ECRAN {liveTarget}
             </Badge>
             <Badge variant={liveMode === "NORMAL" ? "secondary" : "outline"} className="h-7 px-3 font-semibold">
               MODE {liveModeLabel}
             </Badge>
             {(["A", "B", "C"] as ScreenKey[]).map((key) => (
               <Badge key={`main-lock-${key}`} variant={live?.lockedScreens?.[key] ? "destructive" : "secondary"} className="h-7 px-2">
-                {key}: {live?.lockedScreens?.[key] ? "LOCK" : "LIVE"}
+                {key} : {live?.lockedScreens?.[key] ? "FIXE" : "LIBRE"}
               </Badge>
             ))}
           </div>

@@ -11,11 +11,11 @@ type Props = {
 };
 
 function yesNo(value: boolean) {
-  return value ? "YES" : "NO";
+  return value ? "OUI" : "NON";
 }
 
 function mirrorLabel(mirror: ScreenMirrorMode) {
-  return mirror.kind === "FREE" ? "FREE" : `MIRROR(${mirror.from})`;
+  return mirror.kind === "FREE" ? "LIBRE" : `MIROIR(${mirror.from})`;
 }
 
 export function DebugDialog({ open, onOpenChange }: Props) {
@@ -26,7 +26,7 @@ export function DebugDialog({ open, onOpenChange }: Props) {
     setLoading(true);
     const result = await window.cp.diagnostics.getState();
     if (!result.ok) {
-      toast.error(result.error || "Unable to load diagnostics");
+      toast.error(result.error || "Impossible de charger les diagnostics");
       setLoading(false);
       return;
     }
@@ -38,9 +38,9 @@ export function DebugDialog({ open, onOpenChange }: Props) {
     if (!diagnostics) return;
     try {
       await navigator.clipboard.writeText(JSON.stringify(diagnostics, null, 2));
-      toast.success("Diagnostics copied to clipboard");
+      toast.success("Diagnostics copies dans le presse-papier");
     } catch {
-      toast.error("Clipboard copy failed");
+      toast.error("Echec de la copie dans le presse-papier");
     }
   };
 
@@ -53,17 +53,17 @@ export function DebugDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(94vw,920px)] max-w-[920px]">
         <DialogHeader>
-          <DialogTitle>Debug diagnostics</DialogTitle>
-          <DialogDescription>Screens, media folders, and read/write permissions.</DialogDescription>
+          <DialogTitle>Diagnostics</DialogTitle>
+          <DialogDescription>Ecrans, dossiers media et permissions de lecture/ecriture.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={load} disabled={loading}>
-              <RefreshCw className="h-3 w-3 mr-1" /> {loading ? "Loading..." : "Refresh"}
+              <RefreshCw className="h-3 w-3 mr-1" /> {loading ? "Chargement..." : "Actualiser"}
             </Button>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={copyJson} disabled={!diagnostics}>
-              <Clipboard className="h-3 w-3 mr-1" /> Copy JSON
+              <Clipboard className="h-3 w-3 mr-1" /> Copier JSON
             </Button>
           </div>
 
@@ -71,29 +71,29 @@ export function DebugDialog({ open, onOpenChange }: Props) {
             <>
               <div className="rounded border p-2 space-y-1">
                 <p className="text-xs">
-                  <span className="text-muted-foreground">Generated:</span>{" "}
+                  <span className="text-muted-foreground">Genere :</span>{" "}
                   {new Date(diagnostics.generatedAt).toLocaleString()}
                 </p>
                 <p className="text-xs">
-                  <span className="text-muted-foreground">App version:</span> {diagnostics.appVersion}
+                  <span className="text-muted-foreground">Version :</span> {diagnostics.appVersion}
                 </p>
                 <p className="text-xs truncate" title={diagnostics.userDataDir}>
-                  <span className="text-muted-foreground">User data:</span> {diagnostics.userDataDir}
+                  <span className="text-muted-foreground">Donnees :</span> {diagnostics.userDataDir}
                 </p>
                 <p className="text-xs truncate" title={diagnostics.libraryDir}>
-                  <span className="text-muted-foreground">Media library:</span> {diagnostics.libraryDir}
+                  <span className="text-muted-foreground">Mediatheque :</span> {diagnostics.libraryDir}
                 </p>
               </div>
 
               <div className="rounded border p-2">
-                <p className="text-xs font-medium mb-1.5">Screens</p>
+                <p className="text-xs font-medium mb-1.5">Ecrans</p>
                 <div className="grid grid-cols-[56px_68px_120px_92px_100px_1fr] gap-1 text-[10px] font-medium text-muted-foreground">
-                  <span>Screen</span>
-                  <span>Open</span>
-                  <span>Mirror</span>
+                  <span>Ecran</span>
+                  <span>Ouvert</span>
+                  <span>Miroir</span>
                   <span>Mode</span>
-                  <span>Current</span>
-                  <span>Updated</span>
+                  <span>Contenu</span>
+                  <span>Mis a jour</span>
                 </div>
                 {diagnostics.screens.map((screen) => (
                   <div
@@ -111,7 +111,7 @@ export function DebugDialog({ open, onOpenChange }: Props) {
               </div>
 
               <div className="rounded border p-2">
-                <p className="text-xs font-medium mb-1.5">Folders</p>
+                <p className="text-xs font-medium mb-1.5">Dossiers</p>
                 <div className="space-y-1.5">
                   {([
                     { key: "root", label: "root" },
@@ -126,13 +126,13 @@ export function DebugDialog({ open, onOpenChange }: Props) {
                           <Badge variant="outline" className="h-4 px-1 font-mono">
                             {label}
                           </Badge>
-                          <span className="text-muted-foreground">files:</span>
+                          <span className="text-muted-foreground">fichiers :</span>
                           <span className="font-mono">{folder.fileCount}</span>
-                          <span className="text-muted-foreground">R:</span>
+                          <span className="text-muted-foreground">L :</span>
                           <span className="font-mono">{yesNo(folder.readable)}</span>
-                          <span className="text-muted-foreground">W:</span>
+                          <span className="text-muted-foreground">E :</span>
                           <span className="font-mono">{yesNo(folder.writable)}</span>
-                          <span className="text-muted-foreground">exists:</span>
+                          <span className="text-muted-foreground">existe :</span>
                           <span className="font-mono">{yesNo(folder.exists)}</span>
                         </div>
                         <p className="text-[10px] text-muted-foreground truncate" title={folder.path}>
@@ -150,7 +150,7 @@ export function DebugDialog({ open, onOpenChange }: Props) {
               </div>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground">No diagnostics loaded.</p>
+            <p className="text-xs text-muted-foreground">Aucun diagnostic charge.</p>
           )}
         </div>
       </DialogContent>
