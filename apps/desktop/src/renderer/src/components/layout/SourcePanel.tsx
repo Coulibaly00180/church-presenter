@@ -90,12 +90,12 @@ export function SourcePanel({ planId, onSelectPlan }: SourcePanelProps) {
 
         {/* Tab content - scrollable area */}
         <div className="flex-1 min-h-0 overflow-hidden p-3">
-          <TabsContent value="bible" className="mt-0 h-full min-h-0" forceMount>
-            <div className="h-full min-h-0 overflow-y-auto pr-1">
+          <TabsContent value="bible" className="mt-0 h-full min-h-0 data-[state=inactive]:hidden" forceMount>
+            <div className="h-full min-h-0 overflow-hidden">
               <BibleTab planId={planId} />
             </div>
           </TabsContent>
-          <TabsContent value="songs" className="mt-0 h-full min-h-0" forceMount>
+          <TabsContent value="songs" className="mt-0 h-full min-h-0 data-[state=inactive]:hidden" forceMount>
             <div className="h-full min-h-0 overflow-hidden">
               <SongsTab planId={planId} />
             </div>

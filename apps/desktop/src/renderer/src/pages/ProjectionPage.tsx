@@ -203,7 +203,7 @@ export function ProjectionPage() {
   const metaLine = [meta?.artist, meta?.album, meta?.year].filter(Boolean).join(" - ");
   const overlayTitle = useMemo(() => {
     if (current.kind === "EMPTY") return "";
-    if (isTimer) return timerTitle || "Timer";
+    if (isTimer) return timerTitle || "Minuterie";
     const songTitle = (current.metaSong?.title || "").trim();
     const itemTitle = (current.title || "").trim();
     if (songTitle && itemTitle && itemTitle.toLowerCase() !== songTitle.toLowerCase()) {
@@ -433,7 +433,7 @@ export function ProjectionPage() {
       <div style={{ ...cardStyle, position: "relative", zIndex: 1 }} key={animKey}>
         {/* Watermark screen ID */}
         <div className="fixed bottom-4 right-5 opacity-35 font-black tracking-widest" style={{ fontFamily: "system-ui" }}>
-          SCREEN {screenKey}
+          ECRAN {screenKey}
         </div>
 
         {current.kind === "EMPTY" ? (
