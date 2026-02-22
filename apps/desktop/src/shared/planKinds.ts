@@ -21,7 +21,7 @@ export const CP_PLAN_ITEM_KIND_LABELS: Record<CpPlanItemKind, string> = {
   BIBLE_VERSE: "Verset",
   BIBLE_PASSAGE: "Passage",
   SONG_BLOCK: "Chant",
-  TIMER: "Timer",
+  TIMER: "Minuterie",
 };
 
 export const CP_PLAN_ITEM_KIND_DEFAULT_TITLES: Record<CpPlanItemKind, string> = {
@@ -32,7 +32,7 @@ export const CP_PLAN_ITEM_KIND_DEFAULT_TITLES: Record<CpPlanItemKind, string> = 
   BIBLE_VERSE: "Bible",
   BIBLE_PASSAGE: "Bible",
   SONG_BLOCK: "Chant",
-  TIMER: "Timer",
+  TIMER: "Minuterie",
 };
 
 export function isCpPlanItemKind(value: unknown): value is CpPlanItemKind {

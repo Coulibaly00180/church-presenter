@@ -334,7 +334,7 @@ export function LiveBar() {
   const targetState = screenStates[target];
   const lowerThirdEnabled = !!targetState?.lowerThirdEnabled;
   const liveMode: CpProjectionMode = live?.black ? "BLACK" : live?.white ? "WHITE" : (targetState?.mode ?? "NORMAL");
-  const liveStatus = live?.enabled ? "ON" : "OFF";
+  const liveStatus = live?.enabled ? "ACTIF" : "INACTIF";
 
   const openScreen = async (key: ScreenKey) => {
     if (locked[key]) return;
@@ -383,7 +383,7 @@ export function LiveBar() {
           <TooltipContent>Activer / desactiver le live</TooltipContent>
         </Tooltip>
         <Badge variant="outline" className="h-7 px-2 font-semibold">
-          TARGET {target}
+          ECRAN {target}
         </Badge>
         <Badge variant={liveMode === "NORMAL" ? "secondary" : "outline"} className="h-7 px-2 font-semibold">
           MODE {modeLabel(liveMode).toUpperCase()}
@@ -464,7 +464,7 @@ export function LiveBar() {
       <div className="flex items-center gap-1">
         {(["A", "B", "C"] as ScreenKey[]).map((k) => (
           <Badge key={`lock-badge-${k}`} variant={locked[k] ? "destructive" : "secondary"} className="text-xs px-2 h-7">
-            {k}:{locked[k] ? "LOCK" : "LIVE"}
+            {k}:{locked[k] ? "FIXE" : "LIBRE"}
           </Badge>
         ))}
       </div>
