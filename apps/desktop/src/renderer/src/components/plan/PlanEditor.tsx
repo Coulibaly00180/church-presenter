@@ -1,0 +1,156 @@
+import { useCallback, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type Modifier,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { ListPlus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePlan } from "@/hooks/usePlan";
+import { useLive } from "@/hooks/useLive";
+import { reorderPlanItems } from "@/lib/reorder";
+import type { PlanItem } from "@/lib/types";
+import { AddItemDialog } from "@/components/dialogs/AddItemDialog";
+import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
+import { PlanItemCard, PlanItemCardGhost } from "./PlanItemCard";
+import { PlanToolbar } from "./PlanToolbar";
+
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+
+export function PlanEditor() {
+  const { plan, reorder, loadingPlan, addItem } = usePlan();
+  const { live } = useLive();
+  const [activeItem, setActiveItem] = useState<CpPlanItem | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editSongId, setEditSongId] = useState<string | null>(null);
+  const [songEditorOpen, setSongEditorOpen] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const item = plan?.items.find((i) => i.id === event.active.id);
+    setActiveItem(item ?? null);
+  }, [plan]);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    setActiveItem(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id || !plan) return;
+
+    const result = reorderPlanItems({
+      items: plan.items as PlanItem[],
+      visibleItems: plan.items as PlanItem[],
+      filterSongsOnly: false,
+      activeId: String(active.id),
+      overId: String(over.id),
+    });
+
+    if (result) {
+      await reorder(result.orderedItemIds);
+    }
+  }, [plan, reorder]);
+
+  const handleEdit = useCallback((item: CpPlanItem) => {
+    if (item.kind === "SONG_BLOCK" && item.refId) {
+      setEditSongId(item.refId);
+      setSongEditorOpen(true);
+    }
+  }, []);
+
+  const handleSelectKind = useCallback(async (kind: CpPlanItemKind) => {
+    if (kind === "SONG_BLOCK") {
+      setEditSongId(null);
+      setSongEditorOpen(true);
+    } else {
+      await addItem({ kind });
+    }
+  }, [addItem]);
+
+  if (!plan) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-muted">
+        <ListPlus className="h-12 w-12 opacity-30" />
+        <p className="text-sm">Aucun plan sélectionné</p>
+        <p className="text-xs">Choisissez ou créez un plan via l'en-tête</p>
+      </div>
+    );
+  }
+
+  const currentCursor = live?.enabled && live.planId === plan.id ? live.cursor : -1;
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <PlanToolbar onAddItem={() => setAddDialogOpen(true)} />
+
+      {loadingPlan ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-sm text-text-muted">Chargement…</div>
+        </div>
+      ) : plan.items.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-muted">
+          <ListPlus className="h-10 w-10 opacity-30" />
+          <p className="text-sm">Plan vide</p>
+          <Button variant="outline" size="sm" onClick={() => setAddDialogOpen(true)}>
+            Ajouter un élément
+          </Button>
+        </div>
+      ) : (
+        <ScrollArea className="flex-1">
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragStart={handleDragStart}
+            onDragEnd={(e) => void handleDragEnd(e)}
+          >
+            <SortableContext
+              items={plan.items.map((i) => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="flex flex-col gap-1 p-3">
+                {plan.items.map((item, index) => (
+                  <PlanItemCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    isCurrentLive={index === currentCursor}
+                    onEdit={handleEdit}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+
+            <DragOverlay>
+              {activeItem && <PlanItemCardGhost item={activeItem} />}
+            </DragOverlay>
+          </DndContext>
+        </ScrollArea>
+      )}
+
+      <AddItemDialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        onSelect={(kind) => void handleSelectKind(kind)}
+      />
+
+      <SongEditorDialog
+        songId={editSongId ?? undefined}
+        open={songEditorOpen}
+        onClose={() => { setSongEditorOpen(false); setEditSongId(null); }}
+      />
+    </div>
+  );
+}
