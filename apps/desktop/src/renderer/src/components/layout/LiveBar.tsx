@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Circle, Clock, Monitor, MoonStar, Sun, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Circle, Clock, Monitor, MoonStar, Play, Square, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SlidePreview } from "@/components/live/SlidePreview";
@@ -22,6 +22,30 @@ export function LiveBar() {
   const [nextState, setNextState] = useState<CpProjectionState | null>(null);
 
   const isEnabled = live?.enabled ?? false;
+
+  // Auto-advance
+  const AUTO_INTERVALS = [5, 10, 15, 20, 30, 60] as const;
+  type AutoInterval = (typeof AUTO_INTERVALS)[number];
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoInterval, setAutoInterval] = useState<AutoInterval>(15);
+  const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Reset auto-advance when live mode changes
+  useEffect(() => {
+    if (!isEnabled) setAutoEnabled(false);
+  }, [isEnabled]);
+
+  // Auto-advance interval
+  useEffect(() => {
+    if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    if (!autoEnabled || !isEnabled) return;
+    autoTimerRef.current = setInterval(() => {
+      void window.cp.live.next();
+    }, autoInterval * 1000);
+    return () => {
+      if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    };
+  }, [autoEnabled, autoInterval, isEnabled]);
 
   // Live timer countdown in the top strip
   const [timerCountdown, setTimerCountdown] = useState<string | null>(null);
@@ -167,6 +191,33 @@ export function LiveBar() {
               <Monitor className="h-3.5 w-3.5" />
               Reprendre
             </Button>
+          )}
+        </div>
+
+        {/* Auto-advance */}
+        <div className="flex items-center gap-1 ml-2">
+          <Button
+            variant={autoEnabled ? "default" : "ghost"}
+            size="xs"
+            onClick={() => setAutoEnabled((v) => !v)}
+            className={cn("gap-1", autoEnabled && "bg-accent text-white")}
+            aria-pressed={autoEnabled}
+            aria-label="Auto-avance"
+          >
+            {autoEnabled ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+            Auto
+          </Button>
+          {autoEnabled && (
+            <select
+              value={autoInterval}
+              onChange={(e) => setAutoInterval(Number(e.target.value) as AutoInterval)}
+              className="text-xs bg-bg-elevated border border-border rounded px-1 py-0.5 text-text-primary h-6"
+              aria-label="Intervalle auto-avance"
+            >
+              {AUTO_INTERVALS.map((s) => (
+                <option key={s} value={s}>{s}s</option>
+              ))}
+            </select>
           )}
         </div>
 
