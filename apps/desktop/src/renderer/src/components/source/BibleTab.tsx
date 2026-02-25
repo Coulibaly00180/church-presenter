@@ -219,10 +219,11 @@ export function BibleTab() {
     }
   }, [verses, cursorVerseNum, live?.enabled, handleProjectSingle]);
 
-  // Arrow key capture for verse-by-verse keyboard navigation (capture phase, priority over LiveBar shortcuts)
+  // Arrow key capture for verse-by-verse keyboard navigation (capture phase, priority over LiveBar shortcuts).
+  // Active whenever verse list is visible in verse mode — projection only happens if live is enabled
+  // (handled inside handleVerseCursorMove). Works in both prep mode and live mode.
   useEffect(() => {
-    const isActive = view === "verses" && live?.enabled && projMode === "verse";
-    if (!isActive) return;
+    if (view !== "verses" || projMode !== "verse") return;
 
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -245,7 +246,7 @@ export function BibleTab() {
 
     window.addEventListener("keydown", onKeyDown, true); // capture phase
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [view, live?.enabled, projMode, handleVerseCursorMove]);
+  }, [view, projMode, handleVerseCursorMove]);
 
   const handleAdd = useCallback(async () => {
     if (selectedVerses.size === 0) { toast.error("Aucun verset sélectionné"); return; }
