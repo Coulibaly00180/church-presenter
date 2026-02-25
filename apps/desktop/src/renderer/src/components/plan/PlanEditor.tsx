@@ -23,6 +23,7 @@ import { reorderPlanItems } from "@/lib/reorder";
 import type { PlanItem } from "@/lib/types";
 import { AddItemDialog } from "@/components/dialogs/AddItemDialog";
 import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
+import { EditItemDialog } from "@/components/dialogs/EditItemDialog";
 import { PlanItemCard, PlanItemCardGhost } from "./PlanItemCard";
 import { PlanToolbar } from "./PlanToolbar";
 
@@ -35,6 +36,8 @@ export function PlanEditor() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editSongId, setEditSongId] = useState<string | null>(null);
   const [songEditorOpen, setSongEditorOpen] = useState(false);
+  const [editItem, setEditItem] = useState<CpPlanItem | null>(null);
+  const [editItemOpen, setEditItemOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -67,6 +70,13 @@ export function PlanEditor() {
     if (item.kind === "SONG_BLOCK" && item.refId) {
       setEditSongId(item.refId);
       setSongEditorOpen(true);
+    } else if (
+      item.kind === "TIMER" ||
+      item.kind === "ANNOUNCEMENT_TEXT" ||
+      item.kind === "VERSE_MANUAL"
+    ) {
+      setEditItem(item);
+      setEditItemOpen(true);
     }
   }, []);
 
@@ -182,6 +192,12 @@ export function PlanEditor() {
         songId={editSongId ?? undefined}
         open={songEditorOpen}
         onClose={() => { setSongEditorOpen(false); setEditSongId(null); }}
+      />
+
+      <EditItemDialog
+        item={editItem}
+        open={editItemOpen}
+        onClose={() => { setEditItemOpen(false); setEditItem(null); }}
       />
     </div>
   );

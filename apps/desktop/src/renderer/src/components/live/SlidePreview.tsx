@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface SlidePreviewProps {
@@ -10,6 +11,16 @@ interface SlidePreviewProps {
   /** Click handler */
   onClick?: () => void;
   className?: string;
+}
+
+function parseMMSS(str: string): number {
+  const parts = str.split(":");
+  return (parseInt(parts[0] ?? "0", 10) || 0) * 60 + (parseInt(parts[1] ?? "0", 10) || 0);
+}
+
+function formatMMSS(totalSecs: number): string {
+  const s = Math.max(0, Math.floor(totalSecs));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
 export function SlidePreview({
@@ -26,6 +37,26 @@ export function SlidePreview({
   const isBlack = projectionState?.mode === "BLACK";
   const isWhite = projectionState?.mode === "WHITE";
   const current = projectionState?.current;
+
+  // Live countdown for TIMER items
+  const isTimer = current?.kind === "TEXT" && current?.title?.startsWith("TIMER:");
+  const [countdown, setCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isTimer || !projectionState) {
+      setCountdown(null);
+      return;
+    }
+    const totalSeconds = parseMMSS(current?.body ?? "0:00");
+    const startedAt = projectionState.updatedAt;
+    const calc = () => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      setCountdown(formatMMSS(Math.max(0, totalSeconds - elapsed)));
+    };
+    calc();
+    const id = setInterval(calc, 250);
+    return () => clearInterval(id);
+  }, [isTimer, current?.body, projectionState?.updatedAt, projectionState]);
 
   return (
     <div className={cn("flex flex-col gap-1", className)}>
@@ -56,21 +87,33 @@ export function SlidePreview({
           <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
             {current.kind === "TEXT" && (
               <>
-                {current.title && (
+                {isTimer ? (
+                  /* Timer countdown display */
                   <p
-                    className="text-[9px] font-semibold leading-tight truncate w-full text-center"
+                    className="text-sm font-bold tabular-nums leading-none"
                     style={{ color: projectionState?.foreground ?? "#fff" }}
                   >
-                    {current.title}
+                    {countdown ?? current.body}
                   </p>
-                )}
-                {current.body && (
-                  <p
-                    className="text-[8px] leading-tight line-clamp-3 w-full text-center mt-0.5"
-                    style={{ color: projectionState?.foreground ?? "#fff" }}
-                  >
-                    {current.body}
-                  </p>
+                ) : (
+                  <>
+                    {current.title && (
+                      <p
+                        className="text-[9px] font-semibold leading-tight truncate w-full text-center"
+                        style={{ color: projectionState?.foreground ?? "#fff" }}
+                      >
+                        {current.title}
+                      </p>
+                    )}
+                    {current.body && (
+                      <p
+                        className="text-[8px] leading-tight line-clamp-3 w-full text-center mt-0.5"
+                        style={{ color: projectionState?.foreground ?? "#fff" }}
+                      >
+                        {current.body}
+                      </p>
+                    )}
+                  </>
                 )}
               </>
             )}

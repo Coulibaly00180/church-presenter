@@ -11,6 +11,7 @@ interface PlanContextValue {
   refreshList: () => Promise<void>;
   refreshPlan: () => Promise<void>;
   addItem: (payload: Omit<CpPlanAddItemPayload, "planId">) => Promise<CpPlanItem | null>;
+  updateItem: (itemId: string, patch: { title?: string; content?: string }) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   reorder: (orderedItemIds: string[]) => Promise<void>;
   createPlan: (payload: CpPlanCreatePayload) => Promise<CpPlan | null>;
@@ -76,6 +77,16 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     } catch {
       toast.error("Impossible d'ajouter l'élément");
       return null;
+    }
+  }, [selectedPlanId, refreshPlan]);
+
+  const updateItem = useCallback(async (itemId: string, patch: { title?: string; content?: string }) => {
+    if (!selectedPlanId) return;
+    try {
+      await window.cp.plans.updateItem({ planId: selectedPlanId, itemId, ...patch });
+      await refreshPlan();
+    } catch {
+      toast.error("Impossible de modifier l'élément");
     }
   }, [selectedPlanId, refreshPlan]);
 
@@ -151,6 +162,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     refreshList,
     refreshPlan,
     addItem,
+    updateItem,
     removeItem,
     reorder,
     createPlan,

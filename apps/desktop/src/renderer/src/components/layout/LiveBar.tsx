@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Circle, Monitor, MoonStar, Sun, X } from "lucide-react";
+import { Circle, Clock, Monitor, MoonStar, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SlidePreview } from "@/components/live/SlidePreview";
@@ -21,6 +21,35 @@ export function LiveBar() {
   const [nextState, setNextState] = useState<CpProjectionState | null>(null);
 
   const isEnabled = live?.enabled ?? false;
+
+  // Live timer countdown in the top strip
+  const [timerCountdown, setTimerCountdown] = useState<string | null>(null);
+
+  useEffect(() => {
+    const isTimerActive =
+      currentState?.current?.kind === "TEXT" &&
+      currentState.current.title?.startsWith("TIMER:");
+    if (!isTimerActive || !currentState) {
+      setTimerCountdown(null);
+      return;
+    }
+    const body = currentState.current.body ?? "0:00";
+    const parts = body.split(":");
+    const totalSecs =
+      (parseInt(parts[0] ?? "0", 10) || 0) * 60 +
+      (parseInt(parts[1] ?? "0", 10) || 0);
+    const startedAt = currentState.updatedAt;
+    const calc = () => {
+      const remaining = Math.max(0, totalSecs - (Date.now() - startedAt) / 1000);
+      const s = Math.floor(remaining);
+      setTimerCountdown(
+        `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`
+      );
+    };
+    calc();
+    const id = setInterval(calc, 250);
+    return () => clearInterval(id);
+  }, [currentState]);
 
   // Load projection states
   useEffect(() => {
@@ -140,6 +169,16 @@ export function LiveBar() {
           <span className="text-xs tabular-nums text-text-muted font-medium px-1">
             {live.cursor + 1} / {plan.items.length}
           </span>
+        )}
+
+        {/* Timer countdown badge */}
+        {timerCountdown && (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/15 border border-warning/30">
+            <Clock className="h-3 w-3 text-warning shrink-0" />
+            <span className="text-xs tabular-nums font-bold text-warning">
+              {timerCountdown}
+            </span>
+          </div>
         )}
 
         {/* Screen selector */}
