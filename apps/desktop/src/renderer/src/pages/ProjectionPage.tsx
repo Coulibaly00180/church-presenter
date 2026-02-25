@@ -78,15 +78,35 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
 
   const scaleFactor = state.textScale ?? 1;
 
+  const isGradientFg = state.foregroundMode === "GRADIENT" && state.foregroundGradientFrom && state.foregroundGradientTo;
+  const fgGradientStyle = isGradientFg
+    ? `linear-gradient(90deg, ${state.foregroundGradientFrom}, ${state.foregroundGradientTo})`
+    : null;
+
+  const applyFgStyle = (el: HTMLElement | null, fontSize: number) => {
+    if (!el) return;
+    el.style.fontSize = `${fontSize}px`;
+    if (fgGradientStyle) {
+      el.style.background = fgGradientStyle;
+      el.style.webkitBackgroundClip = "text";
+      el.style.webkitTextFillColor = "transparent";
+      el.style.backgroundClip = "text";
+      el.style.color = "";
+    } else {
+      el.style.background = "";
+      el.style.webkitBackgroundClip = "";
+      el.style.webkitTextFillColor = "";
+      el.style.backgroundClip = "";
+      el.style.color = state.foreground ?? "#ffffff";
+    }
+  };
+
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-12 text-center gap-4">
       {current.title && (
         <h2
           className="font-semibold leading-tight"
-          style={{
-            fontSize: `${Math.round(22 * scaleFactor)}px`,
-            color: state.foreground ?? "#ffffff",
-          }}
+          ref={(el) => applyFgStyle(el, Math.round(22 * scaleFactor))}
         >
           {current.title}
         </h2>
@@ -94,10 +114,7 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
       {current.body && (
         <p
           className="leading-relaxed whitespace-pre-wrap"
-          style={{
-            fontSize: `${Math.round(20 * scaleFactor)}px`,
-            color: state.foreground ?? "#ffffff",
-          }}
+          ref={(el) => applyFgStyle(el, Math.round(20 * scaleFactor))}
         >
           {current.body}
         </p>

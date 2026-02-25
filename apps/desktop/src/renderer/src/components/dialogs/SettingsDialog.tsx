@@ -21,9 +21,21 @@ type Tab = "projection" | "screens" | "interface" | "data";
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [activeTab, setActiveTab] = useState<Tab>("projection");
 
-  // Projection appearance
+  // Projection — background
+  const [bgMode, setBgMode] = useState<CpBackgroundFillMode>("SOLID");
   const [bg, setBg] = useState("#000000");
+  const [bgFrom, setBgFrom] = useState("#000000");
+  const [bgTo, setBgTo] = useState("#1E1B4B");
+  const [bgAngle, setBgAngle] = useState(180);
+  const [bgImage, setBgImage] = useState("");
+
+  // Projection — foreground / text
+  const [fgMode, setFgMode] = useState<CpForegroundFillMode>("SOLID");
   const [fg, setFg] = useState("#ffffff");
+  const [fgFrom, setFgFrom] = useState("#ffffff");
+  const [fgTo, setFgTo] = useState("#A5B4FC");
+
+  // Projection — text scale + logo
   const [textScale, setTextScale] = useState(1);
   const [logoPath, setLogoPath] = useState("");
   const [logoPosition, setLogoPosition] = useState<CpLogoPosition>("bottom-right");
@@ -44,8 +56,16 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   useEffect(() => {
     if (!open) return;
     void window.cp.projection.getState().then((state) => {
+      setBgMode(state.backgroundMode ?? "SOLID");
       setBg(state.background ?? "#000000");
+      setBgFrom(state.backgroundGradientFrom ?? "#000000");
+      setBgTo(state.backgroundGradientTo ?? "#1E1B4B");
+      setBgAngle(state.backgroundGradientAngle ?? 180);
+      setBgImage(state.backgroundImage ?? "");
+      setFgMode(state.foregroundMode ?? "SOLID");
       setFg(state.foreground ?? "#ffffff");
+      setFgFrom(state.foregroundGradientFrom ?? "#ffffff");
+      setFgTo(state.foregroundGradientTo ?? "#A5B4FC");
       setTextScale(state.textScale ?? 1);
       setLogoPath(state.logoPath ?? "");
       setLogoPosition((state.logoPosition as CpLogoPosition) ?? "bottom-right");
@@ -63,9 +83,24 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   // ─── Projection handlers ───────────────────────────────────────────────────
   const handleApplyAppearance = useCallback(async () => {
-    await window.cp.projection.setAppearance({ background: bg, foreground: fg, textScale, logoPath, logoPosition, logoOpacity });
+    await window.cp.projection.setAppearance({
+      background: bg,
+      backgroundMode: bgMode,
+      backgroundGradientFrom: bgFrom,
+      backgroundGradientTo: bgTo,
+      backgroundGradientAngle: bgAngle,
+      backgroundImage: bgImage,
+      foreground: fg,
+      foregroundMode: fgMode,
+      foregroundGradientFrom: fgFrom,
+      foregroundGradientTo: fgTo,
+      textScale,
+      logoPath,
+      logoPosition,
+      logoOpacity,
+    });
     toast.success("Apparence de projection appliquée");
-  }, [bg, fg, textScale, logoPath, logoPosition, logoOpacity]);
+  }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textScale, logoPath, logoPosition, logoOpacity]);
 
   const handlePickLogo = useCallback(async () => {
     const result = await window.cp.files.pickMedia();
@@ -76,6 +111,15 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     setLogoPath("");
     await window.cp.projection.setAppearance({ logoPath: "" });
     toast.success("Logo supprimé");
+  }, []);
+
+  const handlePickBgImage = useCallback(async () => {
+    const result = await window.cp.files.pickMedia();
+    if (result.ok && result.path) setBgImage(result.path);
+  }, []);
+
+  const handleClearBgImage = useCallback(() => {
+    setBgImage("");
   }, []);
 
   // ─── Interface handlers ────────────────────────────────────────────────────
@@ -175,9 +219,34 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           {/* ── Projection tab ─────────────────────────────────────────────── */}
           {activeTab === "projection" && (
             <div className="space-y-4 pt-1 pb-2">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Fond</label>
+
+              {/* Background */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-text-secondary">Fond</p>
+                {/* Mode selector */}
+                <div className="flex gap-1">
+                  {([
+                    ["SOLID",           "Uni"],
+                    ["GRADIENT_LINEAR", "Dégradé"],
+                    ["GRADIENT_RADIAL", "Radial"],
+                  ] as [CpBackgroundFillMode, string][]).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={cn(
+                        "text-xs px-2.5 py-1 rounded border transition-colors",
+                        bgMode === mode
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-text-muted hover:bg-bg-elevated",
+                      )}
+                      onClick={() => setBgMode(mode)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {bgMode === "SOLID" && (
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -188,9 +257,109 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     />
                     <span className="text-xs text-text-muted font-mono uppercase">{bg}</span>
                   </div>
+                )}
+
+                {(bgMode === "GRADIENT_LINEAR" || bgMode === "GRADIENT_RADIAL") && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-text-muted">De</span>
+                        <input
+                          type="color"
+                          aria-label="Couleur de début du dégradé"
+                          value={bgFrom}
+                          onChange={(e) => setBgFrom(e.target.value)}
+                          className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
+                        />
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-text-muted">À</span>
+                        <input
+                          type="color"
+                          aria-label="Couleur de fin du dégradé"
+                          value={bgTo}
+                          onChange={(e) => setBgTo(e.target.value)}
+                          className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
+                        />
+                      </div>
+                      {/* Gradient preview strip */}
+                      <div
+                        className="flex-1 h-7 rounded border border-border"
+                        ref={(el) => {
+                          if (!el) return;
+                          el.style.background = bgMode === "GRADIENT_RADIAL"
+                            ? `radial-gradient(circle, ${bgFrom}, ${bgTo})`
+                            : `linear-gradient(${bgAngle}deg, ${bgFrom}, ${bgTo})`;
+                        }}
+                      />
+                    </div>
+                    {bgMode === "GRADIENT_LINEAR" && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-muted shrink-0">Angle {bgAngle}°</span>
+                        <input
+                          type="range"
+                          aria-label="Angle du dégradé"
+                          min={0}
+                          max={360}
+                          step={15}
+                          value={bgAngle}
+                          onChange={(e) => setBgAngle(Number(e.target.value))}
+                          className="flex-1 accent-primary"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Background image */}
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-xs text-text-muted shrink-0">Image :</span>
+                  {bgImage ? (
+                    <>
+                      <span className="text-[10px] text-text-muted font-mono truncate flex-1">{bgImage.split(/[\\/]/).pop()}</span>
+                      <button
+                        type="button"
+                        className="text-xs text-danger hover:underline flex items-center gap-0.5 shrink-0"
+                        onClick={handleClearBgImage}
+                      >
+                        <X className="h-3 w-3" />
+                        Retirer
+                      </button>
+                    </>
+                  ) : (
+                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => void handlePickBgImage()}>
+                      <Upload className="h-3 w-3" />
+                      Choisir une image
+                    </Button>
+                  )}
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-text-secondary">Texte</label>
+              </div>
+
+              {/* Foreground / Text color */}
+              <div className="space-y-2 border-t border-border pt-3">
+                <p className="text-xs font-medium text-text-secondary">Couleur du texte</p>
+                <div className="flex gap-1">
+                  {([
+                    ["SOLID",    "Uni"],
+                    ["GRADIENT", "Dégradé"],
+                  ] as [CpForegroundFillMode, string][]).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={cn(
+                        "text-xs px-2.5 py-1 rounded border transition-colors",
+                        fgMode === mode
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-text-muted hover:bg-bg-elevated",
+                      )}
+                      onClick={() => setFgMode(mode)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {fgMode === "SOLID" && (
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
@@ -201,7 +370,40 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     />
                     <span className="text-xs text-text-muted font-mono uppercase">{fg}</span>
                   </div>
-                </div>
+                )}
+
+                {fgMode === "GRADIENT" && (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-text-muted">De</span>
+                      <input
+                        type="color"
+                        aria-label="Couleur de début du dégradé de texte"
+                        value={fgFrom}
+                        onChange={(e) => setFgFrom(e.target.value)}
+                        className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-text-muted">À</span>
+                      <input
+                        type="color"
+                        aria-label="Couleur de fin du dégradé de texte"
+                        value={fgTo}
+                        onChange={(e) => setFgTo(e.target.value)}
+                        className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
+                      />
+                    </div>
+                    {/* Text gradient preview */}
+                    <div
+                      className="flex-1 h-7 rounded border border-border"
+                      ref={(el) => {
+                        if (!el) return;
+                        el.style.background = `linear-gradient(90deg, ${fgFrom}, ${fgTo})`;
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -320,12 +522,37 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 className="flex items-center justify-center rounded-md h-20 font-medium select-none relative overflow-hidden"
                 ref={(el) => {
                   if (!el) return;
-                  el.style.backgroundColor = bg;
-                  el.style.color = fg;
+                  if (bgMode === "GRADIENT_LINEAR") {
+                    el.style.background = `linear-gradient(${bgAngle}deg, ${bgFrom}, ${bgTo})`;
+                  } else if (bgMode === "GRADIENT_RADIAL") {
+                    el.style.background = `radial-gradient(circle, ${bgFrom}, ${bgTo})`;
+                  } else {
+                    el.style.background = "";
+                    el.style.backgroundColor = bg;
+                  }
                   el.style.fontSize = `${Math.round(16 * textScale)}px`;
                 }}
               >
-                Aperçu du texte projeté
+                <span
+                  ref={(el) => {
+                    if (!el) return;
+                    if (fgMode === "GRADIENT") {
+                      el.style.background = `linear-gradient(90deg, ${fgFrom}, ${fgTo})`;
+                      el.style.webkitBackgroundClip = "text";
+                      el.style.webkitTextFillColor = "transparent";
+                      el.style.backgroundClip = "text";
+                      el.style.color = "";
+                    } else {
+                      el.style.background = "";
+                      el.style.webkitBackgroundClip = "";
+                      el.style.webkitTextFillColor = "";
+                      el.style.backgroundClip = "";
+                      el.style.color = fg;
+                    }
+                  }}
+                >
+                  Aperçu du texte projeté
+                </span>
                 {logoPath && (() => {
                   const previewPosClass = {
                     "bottom-right": "bottom-1 right-1",
