@@ -24,6 +24,7 @@ import type { PlanItem } from "@/lib/types";
 import { AddItemDialog } from "@/components/dialogs/AddItemDialog";
 import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
 import { EditItemDialog } from "@/components/dialogs/EditItemDialog";
+import { ServicePreviewDialog } from "@/components/dialogs/ServicePreviewDialog";
 import { PlanItemCard, PlanItemCardGhost } from "./PlanItemCard";
 import { PlanToolbar } from "./PlanToolbar";
 
@@ -38,6 +39,7 @@ export function PlanEditor() {
   const [songEditorOpen, setSongEditorOpen] = useState(false);
   const [editItem, setEditItem] = useState<CpPlanItem | null>(null);
   const [editItemOpen, setEditItemOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -105,7 +107,7 @@ export function PlanEditor() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <PlanToolbar onAddItem={() => setAddDialogOpen(true)} />
+      <PlanToolbar onAddItem={() => setAddDialogOpen(true)} onPreview={() => setPreviewOpen(true)} />
 
       {loadingPlan ? (
         <div className="flex flex-1 items-center justify-center">
@@ -199,6 +201,14 @@ export function PlanEditor() {
         open={editItemOpen}
         onClose={() => { setEditItemOpen(false); setEditItem(null); }}
       />
+
+      {plan && (
+        <ServicePreviewDialog
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          plan={plan}
+        />
+      )}
     </div>
   );
 }

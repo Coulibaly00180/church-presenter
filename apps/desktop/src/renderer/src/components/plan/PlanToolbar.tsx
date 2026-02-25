@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Check, Download, FileInput, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Check, Download, FileInput, LayoutList, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,9 +14,10 @@ import { isoToYmd } from "@/lib/date";
 
 interface PlanToolbarProps {
   onAddItem?: () => void;
+  onPreview?: () => void;
 }
 
-export function PlanToolbar({ onAddItem }: PlanToolbarProps) {
+export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
   const { plan, updatePlan, deletePlan, selectedPlanId } = usePlan();
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
@@ -132,6 +133,15 @@ export function PlanToolbar({ onAddItem }: PlanToolbarProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {onPreview && (
+              <>
+                <DropdownMenuItem onClick={onPreview}>
+                  <LayoutList className="h-4 w-4" />
+                  Aperçu du service
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
             <DropdownMenuItem onClick={() => void handleExport()}>
               <Download className="h-4 w-4" />
               Exporter le plan
