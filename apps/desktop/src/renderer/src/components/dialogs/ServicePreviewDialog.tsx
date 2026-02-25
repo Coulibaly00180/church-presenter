@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { KindBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { getPlanKindDefaultTitle } from "@/lib/planKinds";
+import { estimateItemDurationSeconds, formatMinutes } from "@/lib/planDuration";
 import { Clock, MessageSquare } from "lucide-react";
 
 interface ServicePreviewDialogProps {
@@ -16,39 +17,11 @@ interface ServicePreviewDialogProps {
   plan: CpPlan;
 }
 
-// ─── Duration estimation ───────────────────────────────────────────────────────
-
-function estimateDurationSeconds(item: CpPlanItem): number {
-  if (item.kind === "TIMER" && item.content) {
-    const parts = item.content.split(":");
-    const m = parseInt(parts[0] ?? "0", 10) || 0;
-    const s = parseInt(parts[1] ?? "0", 10) || 0;
-    return m * 60 + s;
-  }
-  switch (item.kind as CpPlanItemKind) {
-    case "SONG_BLOCK":           return 3 * 60;
-    case "BIBLE_VERSE":
-    case "BIBLE_PASSAGE":
-    case "VERSE_MANUAL":         return 2 * 60;
-    case "ANNOUNCEMENT_TEXT":    return 60;
-    case "ANNOUNCEMENT_IMAGE":
-    case "ANNOUNCEMENT_PDF":     return 2 * 60;
-    default:                     return 2 * 60;
-  }
-}
-
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return s > 0 ? `${m}m${s < 10 ? "0" : ""}${s}` : `${m} min`;
-}
-
-function formatTotal(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  if (h > 0) return `${h}h${m > 0 ? `${String(m).padStart(2, "0")}` : "00"}`;
-  return `${m} min`;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -61,7 +34,7 @@ export function ServicePreviewDialog({ open, onClose, plan }: ServicePreviewDial
   let cursor = 0;
   for (const item of items) {
     starts.push(cursor);
-    cursor += estimateDurationSeconds(item);
+    cursor += estimateItemDurationSeconds(item);
   }
   const totalSeconds = cursor;
 
@@ -73,7 +46,7 @@ export function ServicePreviewDialog({ open, onClose, plan }: ServicePreviewDial
             <Clock className="h-4 w-4 text-text-muted" />
             Aperçu du service
             <span className="ml-auto text-sm font-normal text-text-muted">
-              Durée estimée : {formatTotal(totalSeconds)}
+              Durée estimée : {formatMinutes(totalSeconds)}
             </span>
           </DialogTitle>
         </DialogHeader>
@@ -81,7 +54,7 @@ export function ServicePreviewDialog({ open, onClose, plan }: ServicePreviewDial
         <ScrollArea className="flex-1 -mx-6 px-6">
           <div className="flex flex-col divide-y divide-border">
             {items.map((item, index) => {
-              const duration = estimateDurationSeconds(item);
+              const duration = estimateItemDurationSeconds(item);
               const startMin = Math.floor((starts[index] ?? 0) / 60);
               const startSec = (starts[index] ?? 0) % 60;
               const startLabel = `+${startMin}:${String(startSec).padStart(2, "0")}`;
@@ -137,7 +110,7 @@ export function ServicePreviewDialog({ open, onClose, plan }: ServicePreviewDial
           </span>
           <div className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
             <Clock className="h-3.5 w-3.5 text-text-muted" />
-            {formatTotal(totalSeconds)}
+            {formatMinutes(totalSeconds)}
           </div>
         </div>
       </DialogContent>

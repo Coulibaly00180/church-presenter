@@ -11,6 +11,7 @@ import { usePlan } from "@/hooks/usePlan";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import { getPlanKindDefaultTitle } from "@/lib/planKinds";
+import { estimateItemDurationSeconds, formatMinutes } from "@/lib/planDuration";
 import { cn } from "@/lib/utils";
 import type { PlanItem } from "@/lib/types";
 
@@ -112,6 +113,14 @@ export function LiveBar() {
   const currentItem = plan?.items[live.cursor];
   const nextItem = plan?.items[live.cursor + 1];
 
+  // Duration-based progress
+  const itemDurations = plan?.items.map(estimateItemDurationSeconds) ?? [];
+  const totalDurationSeconds = itemDurations.reduce((sum, d) => sum + d, 0);
+  const completedSeconds = itemDurations.slice(0, live.cursor).reduce((sum, d) => sum + d, 0);
+  const progressPercent = totalDurationSeconds > 0 ? (completedSeconds / totalDurationSeconds) * 100 : 0;
+  const remainingSeconds = totalDurationSeconds - completedSeconds;
+  const remainingLabel = totalDurationSeconds > 0 ? formatMinutes(remainingSeconds) : null;
+
   return (
     <div
       className="flex flex-col bg-bg-base border-t border-border overflow-hidden h-[var(--live-bar-height)] min-h-[var(--live-bar-height)]"
@@ -164,10 +173,13 @@ export function LiveBar() {
         {/* Navigation */}
         <NavControls className="ml-auto" />
 
-        {/* Progress counter */}
+        {/* Progress counter + remaining time */}
         {plan && (
-          <span className="text-xs tabular-nums text-text-muted font-medium px-1">
-            {live.cursor + 1} / {plan.items.length}
+          <span className="text-xs tabular-nums text-text-muted font-medium px-1 flex items-center gap-1.5">
+            <span>{live.cursor + 1} / {plan.items.length}</span>
+            {remainingLabel && (
+              <span className="text-text-muted/70">· {remainingLabel}</span>
+            )}
           </span>
         )}
 
@@ -196,6 +208,16 @@ export function LiveBar() {
           Quitter
         </Button>
       </div>
+
+      {/* Progress bar */}
+      {totalDurationSeconds > 0 && (
+        <div className="h-0.5 bg-border shrink-0">
+          <div
+            className="h-full bg-primary/60 transition-[width] duration-500 ease-out"
+            ref={(el) => { if (el) el.style.width = `${progressPercent}%`; }}
+          />
+        </div>
+      )}
 
       {/* Bottom: slide previews + mini plan list */}
       <div className="flex flex-1 items-stretch overflow-hidden gap-3 px-4 py-2">
