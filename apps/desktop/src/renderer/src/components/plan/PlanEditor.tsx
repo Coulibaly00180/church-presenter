@@ -14,7 +14,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ListPlus } from "lucide-react";
+import { ClipboardList, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlan } from "@/hooks/usePlan";
@@ -81,10 +81,12 @@ export function PlanEditor() {
 
   if (!plan) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-muted">
-        <ListPlus className="h-12 w-12 opacity-30" />
-        <p className="text-sm">Aucun plan sélectionné</p>
-        <p className="text-xs">Choisissez ou créez un plan via l'en-tête</p>
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-text-muted px-8 text-center">
+        <ClipboardList className="h-14 w-14 opacity-20" />
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-text-secondary">Aucun plan sélectionné</p>
+          <p className="text-xs">Choisissez ou créez un plan via l'en-tête</p>
+        </div>
       </div>
     );
   }
@@ -97,47 +99,77 @@ export function PlanEditor() {
 
       {loadingPlan ? (
         <div className="flex flex-1 items-center justify-center">
-          <div className="text-sm text-text-muted">Chargement…</div>
+          <div className="text-sm text-text-muted animate-pulse">Chargement…</div>
         </div>
       ) : plan.items.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-text-muted">
-          <ListPlus className="h-10 w-10 opacity-30" />
-          <p className="text-sm">Plan vide</p>
-          <Button variant="outline" size="sm" onClick={() => setAddDialogOpen(true)}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-text-muted px-8 text-center">
+          <ClipboardList className="h-14 w-14 opacity-20" />
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-text-secondary">Plan vide</p>
+            <p className="text-xs leading-relaxed">
+              Ajoute du contenu depuis le panneau de gauche : chants, versets bibliques,
+              annonces, médias ou minuterie.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setAddDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
             Ajouter un élément
           </Button>
         </div>
       ) : (
-        <ScrollArea className="flex-1">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragStart={handleDragStart}
-            onDragEnd={(e) => void handleDragEnd(e)}
-          >
-            <SortableContext
-              items={plan.items.map((i) => i.id)}
-              strategy={verticalListSortingStrategy}
+        <>
+          <ScrollArea className="flex-1">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis]}
+              onDragStart={handleDragStart}
+              onDragEnd={(e) => void handleDragEnd(e)}
             >
-              <div className="flex flex-col gap-1 p-3">
-                {plan.items.map((item, index) => (
-                  <PlanItemCard
-                    key={item.id}
-                    item={item}
-                    index={index}
-                    isCurrentLive={index === currentCursor}
-                    onEdit={handleEdit}
-                  />
-                ))}
-              </div>
-            </SortableContext>
+              <SortableContext
+                items={plan.items.map((i) => i.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="flex flex-col gap-1 p-3">
+                  {plan.items.map((item, index) => (
+                    <PlanItemCard
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      isCurrentLive={index === currentCursor}
+                      onEdit={handleEdit}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
 
-            <DragOverlay>
-              {activeItem && <PlanItemCardGhost item={activeItem} />}
-            </DragOverlay>
-          </DndContext>
-        </ScrollArea>
+              <DragOverlay>
+                {activeItem && <PlanItemCardGhost item={activeItem} />}
+              </DragOverlay>
+            </DndContext>
+          </ScrollArea>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-bg-surface shrink-0">
+            <span className="text-xs text-text-muted">
+              {plan.items.length} élément{plan.items.length !== 1 ? "s" : ""}
+            </span>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="gap-1 text-text-secondary"
+              onClick={() => setAddDialogOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Ajouter
+            </Button>
+          </div>
+        </>
       )}
 
       <AddItemDialog

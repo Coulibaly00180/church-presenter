@@ -17,16 +17,30 @@ interface PlanItemCardProps {
   onEdit?: (item: CpPlanItem) => void;
 }
 
-const KIND_CSS_VAR: Partial<Record<CpPlanItemKind, string>> = {
-  SONG_BLOCK: "var(--kind-song)",
-  BIBLE_VERSE: "var(--kind-bible)",
-  BIBLE_PASSAGE: "var(--kind-bible)",
-  VERSE_MANUAL: "var(--kind-bible)",
-  ANNOUNCEMENT_TEXT: "var(--kind-announcement)",
-  ANNOUNCEMENT_IMAGE: "var(--kind-media)",
-  ANNOUNCEMENT_PDF: "var(--kind-media)",
-  TIMER: "var(--kind-timer)",
-};
+/** Returns a short subtitle describing the item content. */
+function getItemSubtitle(item: CpPlanItem): string | null {
+  const firstLine = (s: string | null | undefined): string | null =>
+    s?.split("\n")[0]?.trim().slice(0, 80) || null;
+
+  switch (item.kind as CpPlanItemKind) {
+    case "SONG_BLOCK":
+    case "BIBLE_VERSE":
+    case "BIBLE_PASSAGE":
+    case "VERSE_MANUAL":
+    case "ANNOUNCEMENT_TEXT":
+    case "TIMER":
+      return firstLine(item.content);
+    case "ANNOUNCEMENT_IMAGE":
+    case "ANNOUNCEMENT_PDF":
+      if (item.mediaPath) {
+        const filename = item.mediaPath.split(/[\\/]/).pop() ?? null;
+        if (filename && filename !== item.title?.trim()) return filename;
+      }
+      return null;
+    default:
+      return null;
+  }
+}
 
 export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: PlanItemCardProps) {
   const { live } = useLive();
@@ -41,15 +55,8 @@ export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: Pla
     isDragging,
   } = useSortable({ id: item.id });
 
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    borderLeftColor: KIND_CSS_VAR[item.kind as CpPlanItemKind] ?? "transparent",
-    height: "var(--plan-item-height-compact)",
-  };
-
-  const displayTitle =
-    item.title?.trim() || getPlanKindDefaultTitle(item.kind);
+  const subtitle = getItemSubtitle(item);
+  const displayTitle = item.title?.trim() || getPlanKindDefaultTitle(item.kind);
 
   const handleClick = useCallback(async () => {
     if (!live) return;
@@ -69,65 +76,77 @@ export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: Pla
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      // dnd-kit transform MUST be inline — no CSS-only alternative
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      data-kind={item.kind}
       className={cn(
-        "group relative flex items-center gap-2 px-3 rounded-md border border-border bg-bg-surface",
-        "cursor-pointer select-none border-l-[3px]",
-        "hover:bg-bg-elevated hover:shadow-sm transition-all duration-fast",
-        isDragging && "opacity-50 shadow-lg z-10",
-        isCurrentLive && "bg-bg-elevated ring-1 ring-primary/50",
+        "group relative flex items-center gap-2 px-2 rounded-md border border-border bg-bg-surface",
+        "cursor-pointer select-none border-l-[3px] min-h-[56px]",
+        "hover:bg-bg-elevated hover:shadow-sm transition-all duration-100",
+        isDragging && "opacity-50 shadow-lg rotate-[0.5deg] z-10",
+        isCurrentLive && "bg-primary/5 ring-1 ring-primary/40",
       )}
-      role="button"
+      tabIndex={0}
       aria-label={`${displayTitle} — ${item.kind}`}
       aria-current={isCurrentLive ? "true" : undefined}
-      tabIndex={0}
       onClick={() => void handleClick()}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") void handleClick();
       }}
     >
-      {/* Drag handle */}
+      {/* Drag handle — hidden until hover */}
       <button
         {...attributes}
         {...listeners}
-        className="flex items-center justify-center h-6 w-5 text-text-muted hover:text-text-secondary cursor-grab active:cursor-grabbing shrink-0 focus:outline-none"
+        className="flex items-center justify-center h-6 w-4 text-text-muted opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing shrink-0 focus:outline-none transition-opacity"
         aria-label="Déplacer"
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
-        <GripVertical className="h-4 w-4" />
+        <GripVertical className="h-3.5 w-3.5" />
       </button>
 
       {/* Position index */}
-      <span className="text-xs text-text-muted tabular-nums w-5 text-center shrink-0">
+      <span className="text-[11px] text-text-muted tabular-nums w-4 text-right shrink-0">
         {index + 1}
       </span>
 
       {/* Kind badge */}
       <KindBadge kind={item.kind as CpPlanItemKind} className="shrink-0" />
 
-      {/* Title */}
-      <span className="flex-1 text-sm font-medium text-text-primary truncate">
-        {displayTitle}
-      </span>
-
-      {/* Content preview */}
-      {item.content && (
-        <span className="text-xs text-text-muted truncate max-w-[160px] hidden md:block">
-          {item.content.slice(0, 60)}
+      {/* Title + subtitle */}
+      <div className="flex flex-col flex-1 min-w-0 py-2">
+        <span
+          className={cn(
+            "text-sm font-medium truncate leading-snug",
+            isCurrentLive ? "text-primary" : "text-text-primary",
+          )}
+        >
+          {displayTitle}
         </span>
+        {subtitle && (
+          <span className="text-xs text-text-muted truncate leading-snug mt-0.5 italic">
+            {subtitle}
+          </span>
+        )}
+      </div>
+
+      {/* Live indicator dot */}
+      {isCurrentLive && (
+        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 animate-pulse" aria-hidden />
       )}
 
-      {/* Actions (shown on hover) */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      {/* Actions — visible on hover */}
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         {onEdit && (
           <Button
             variant="ghost"
             size="icon-xs"
             onClick={handleEdit}
             aria-label="Modifier"
+            className="h-6 w-6"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-3 w-3" />
           </Button>
         )}
         <Button
@@ -135,9 +154,9 @@ export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: Pla
           size="icon-xs"
           onClick={(e) => void handleRemove(e)}
           aria-label="Supprimer"
-          className="hover:text-danger hover:bg-danger/10"
+          className="h-6 w-6 hover:text-danger hover:bg-danger/10"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-3 w-3" />
         </Button>
       </div>
     </div>
@@ -146,19 +165,24 @@ export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: Pla
 
 /** Phantom card shown while dragging */
 export function PlanItemCardGhost({ item }: { item: CpPlanItem }) {
+  const subtitle = getItemSubtitle(item);
   return (
     <div
-      className="flex items-center gap-2 px-3 rounded-md border border-primary/30 bg-primary/5 border-l-[3px] opacity-60"
-      style={{
-        height: "var(--plan-item-height-compact)",
-        borderLeftColor: KIND_CSS_VAR[item.kind as CpPlanItemKind] ?? "transparent",
-      }}
+      data-kind={item.kind}
+      className="flex items-center gap-2 px-2 rounded-md border border-primary/30 bg-primary/5 border-l-[3px] opacity-70 min-h-[56px] shadow-lg"
     >
-      <GripVertical className="h-4 w-4 text-text-muted" />
+      <GripVertical className="h-3.5 w-3.5 text-text-muted" />
       <KindBadge kind={item.kind as CpPlanItemKind} />
-      <span className="flex-1 text-sm font-medium text-text-primary truncate">
-        {item.title?.trim() || getPlanKindDefaultTitle(item.kind)}
-      </span>
+      <div className="flex flex-col flex-1 min-w-0 py-2">
+        <span className="text-sm font-medium text-text-primary truncate leading-snug">
+          {item.title?.trim() || getPlanKindDefaultTitle(item.kind)}
+        </span>
+        {subtitle && (
+          <span className="text-xs text-text-muted truncate italic leading-snug mt-0.5">
+            {subtitle}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

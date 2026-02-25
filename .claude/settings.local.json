@@ -23,7 +23,9 @@
       "Bash(xargs:*)",
       "Bash(npm install:*)",
       "Bash(npx shadcn@latest add:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git checkout:*)",
+      "Bash(python3:*)"
     ]
   }
 }

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { CalendarDays, ChevronDown, HelpCircle, Plus, Settings, Video } from "lucide-react";
+import { useCallback, useState } from "react";
+import { CalendarDays, ChevronDown, Circle, HelpCircle, Plus, Settings, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,91 +12,139 @@ import {
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
+import { localNowYmd, isoToYmd } from "@/lib/date";
 
 interface HeaderProps {
   onOpenShortcuts?: () => void;
   onOpenSettings?: () => void;
-  onCreatePlan?: () => void;
 }
 
-export function Header({ onOpenShortcuts, onOpenSettings, onCreatePlan }: HeaderProps) {
+function formatPlanLabel(plan: CpPlanListItem | { title?: string | null; date: string | Date } | undefined): string {
+  if (!plan) return "Aucun plan";
+  if (plan.title) return plan.title;
+  const ymd = isoToYmd(String(plan.date));
+  return ymd;
+}
+
+function isTodayPlan(plan: { date: string | Date } | undefined): boolean {
+  if (!plan) return false;
+  return isoToYmd(String(plan.date)) === localNowYmd();
+}
+
+export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
   const { live, toggle } = useLive();
-  const { planList, selectedPlanId, plan, selectPlan } = usePlan();
+  const { planList, selectedPlanId, plan, selectPlan, createPlan } = usePlan();
   const [creatingPlan, setCreatingPlan] = useState(false);
 
   const isLive = live?.enabled ?? false;
 
-  const handleCreateToday = async () => {
+  const handleCreateToday = useCallback(async () => {
     setCreatingPlan(true);
     try {
-      onCreatePlan?.();
+      await createPlan({ dateIso: localNowYmd() });
     } finally {
       setCreatingPlan(false);
     }
-  };
+  }, [createPlan]);
 
   return (
     <header
-      className="flex items-center justify-between px-4 border-b border-border bg-bg-surface"
-      style={{ height: "var(--header-height)" }}
+      className="flex items-center justify-between px-4 border-b border-border bg-bg-surface shrink-0 h-12"
     >
       {/* Left: Logo + Plan selector */}
-      <div className="flex items-center gap-3">
-        <span className="font-semibold text-text-primary text-sm">Church Presenter</span>
+      <div className="flex items-center gap-2 min-w-0">
+        {/* Logo */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Video className="h-4 w-4 text-primary" />
+          <span className="font-semibold text-text-primary text-sm hidden sm:block">Church Presenter</span>
+        </div>
 
-        <div className="w-px h-5 bg-border" />
+        <div className="w-px h-5 bg-border shrink-0" />
 
+        {/* Plan selector */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="gap-1.5 max-w-[200px]">
-              <CalendarDays className="h-4 w-4 shrink-0 text-text-secondary" />
-              <span className="truncate text-sm">
-                {plan?.title ?? plan?.date
-                  ? String(plan.title ?? plan.date)
-                  : "Aucun plan"}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 max-w-[220px] h-8 px-2"
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+              <span className="truncate text-sm font-medium">
+                {plan ? formatPlanLabel(plan) : "Aucun plan"}
               </span>
-              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-muted ml-0.5" />
+              {plan && isTodayPlan(plan) && (
+                <span className="text-[9px] font-semibold bg-success/15 text-success px-1 py-0.5 rounded shrink-0">
+                  Auj.
+                </span>
+              )}
+              <ChevronDown className="h-3 w-3 shrink-0 text-text-muted ml-0.5" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-64">
-            <DropdownMenuLabel>Plans de culte</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs">Plans de culte</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {planList.length === 0 ? (
-              <div className="px-2 py-4 text-center text-sm text-text-muted">
+              <div className="px-3 py-4 text-center text-xs text-text-muted">
                 Aucun plan disponible
               </div>
             ) : (
-              planList.map((p) => (
-                <DropdownMenuItem
-                  key={p.id}
-                  className={cn(selectedPlanId === p.id && "bg-bg-elevated")}
-                  onClick={() => selectPlan(p.id)}
-                >
-                  <CalendarDays className="h-4 w-4 text-text-secondary" />
-                  <span className="truncate">{p.title ?? String(p.date)}</span>
-                </DropdownMenuItem>
-              ))
+              planList.map((p) => {
+                const isSelected = selectedPlanId === p.id;
+                const isToday = isTodayPlan(p);
+                return (
+                  <DropdownMenuItem
+                    key={p.id}
+                    className={cn(isSelected && "bg-bg-elevated font-medium")}
+                    onClick={() => selectPlan(p.id)}
+                  >
+                    <CalendarDays className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                    <span className="truncate flex-1">{formatPlanLabel(p)}</span>
+                    {isToday && (
+                      <span className="text-[9px] font-semibold bg-success/15 text-success px-1 py-0.5 rounded shrink-0">
+                        Auj.
+                      </span>
+                    )}
+                    {isSelected && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-hidden />
+                    )}
+                  </DropdownMenuItem>
+                );
+              })
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleCreateToday} disabled={creatingPlan}>
-              <Plus className="h-4 w-4" />
-              Nouveau plan
+            <DropdownMenuItem onClick={() => void handleCreateToday()} disabled={creatingPlan}>
+              <Plus className="h-3.5 w-3.5" />
+              {creatingPlan ? "Création…" : "Nouveau plan"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
       {/* Right: actions */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 shrink-0">
+        {/* Live toggle */}
         <Button
           variant={isLive ? "destructive" : "default"}
           size="sm"
           onClick={() => void toggle()}
-          className="gap-1.5"
+          className={cn(
+            "gap-1.5 h-8 px-3 font-medium",
+            !isLive && "bg-success hover:bg-success/90 text-white",
+          )}
           aria-label={isLive ? "Quitter le mode Direct" : "Passer en mode Direct"}
         >
-          <Video className="h-4 w-4" />
-          {isLive ? "Quitter Direct" : "Mode Direct"}
+          {isLive ? (
+            <>
+              <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
+              Direct
+            </>
+          ) : (
+            <>
+              <Video className="h-3.5 w-3.5" />
+              Mode Direct
+            </>
+          )}
         </Button>
 
         {onOpenSettings && (
@@ -105,6 +153,7 @@ export function Header({ onOpenShortcuts, onOpenSettings, onCreatePlan }: Header
             size="icon-sm"
             onClick={onOpenSettings}
             aria-label="Paramètres"
+            className="h-8 w-8"
           >
             <Settings className="h-4 w-4" />
           </Button>
@@ -115,7 +164,8 @@ export function Header({ onOpenShortcuts, onOpenSettings, onCreatePlan }: Header
             variant="ghost"
             size="icon-sm"
             onClick={onOpenShortcuts}
-            aria-label="Raccourcis clavier"
+            aria-label="Raccourcis clavier (?)"
+            className="h-8 w-8"
           >
             <HelpCircle className="h-4 w-4" />
           </Button>

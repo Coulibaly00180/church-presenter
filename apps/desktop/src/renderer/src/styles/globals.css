@@ -107,6 +107,8 @@
   --btn-height-md:  32px;
   --btn-height-lg:  40px;
   --btn-height-xl:  48px;
+  --header-height:  48px;
+  --live-bar-height: 220px;
 }
 
 /* ─── Mode Préparation — thème clair (défaut) ───────────────────────────────
@@ -184,6 +186,18 @@
 
 /* ─── Base ───────────────────────────────────────────────────────────────────
    ─────────────────────────────────────────────────────────────────────────── */
+/* ─── Plan item kind border colors (via data-kind attribute) ─────────────── */
+@layer utilities {
+  [data-kind="SONG_BLOCK"]         { border-left-color: var(--kind-song); }
+  [data-kind="BIBLE_VERSE"]        { border-left-color: var(--kind-bible); }
+  [data-kind="BIBLE_PASSAGE"]      { border-left-color: var(--kind-bible); }
+  [data-kind="VERSE_MANUAL"]       { border-left-color: var(--kind-bible); }
+  [data-kind="ANNOUNCEMENT_TEXT"]  { border-left-color: var(--kind-announcement); }
+  [data-kind="ANNOUNCEMENT_IMAGE"] { border-left-color: var(--kind-media); }
+  [data-kind="ANNOUNCEMENT_PDF"]   { border-left-color: var(--kind-media); }
+  [data-kind="TIMER"]              { border-left-color: var(--kind-timer); }
+}
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
