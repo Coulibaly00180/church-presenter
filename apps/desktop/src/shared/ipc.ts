@@ -8,6 +8,7 @@ export type CpProjectionMode = "NORMAL" | "BLACK" | "WHITE";
 export type CpMediaType = "IMAGE" | "PDF";
 export type CpBackgroundFillMode = "SOLID" | "GRADIENT_LINEAR" | "GRADIENT_RADIAL";
 export type CpForegroundFillMode = "SOLID" | "GRADIENT";
+export type CpLogoPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center";
 export type CpTheme = "light" | "dark";
 export type CpSongMeta = { title?: string; artist?: string; album?: string; year?: string };
 export type CpWindowState = { isOpen: boolean };
@@ -35,6 +36,8 @@ export type CpProjectionState = {
   backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  logoPosition?: CpLogoPosition;
+  logoOpacity?: number;
   foregroundMode?: CpForegroundFillMode;
   foregroundGradientFrom?: string;
   foregroundGradientTo?: string;
@@ -305,6 +308,8 @@ export type CpProjectionSetAppearancePayload = {
   backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  logoPosition?: CpLogoPosition;
+  logoOpacity?: number;
   foregroundMode?: CpForegroundFillMode;
   foregroundGradientFrom?: string;
   foregroundGradientTo?: string;

@@ -171,15 +171,26 @@ function ProjectionContent({ state, onTimerExpired }: { state: ProjectionState; 
         {current.kind === "MEDIA" && <MediaContent state={state} />}
       </div>
 
-      {/* Logo overlay — bottom-right corner */}
-      {state.logoPath && (
-        <img
-          src={`file://${state.logoPath}`}
-          alt=""
-          aria-hidden
-          className="absolute bottom-4 right-4 z-20 max-h-[10%] max-w-[15%] object-contain opacity-80 pointer-events-none"
-        />
-      )}
+      {/* Logo overlay */}
+      {state.logoPath && (() => {
+        const posClass = {
+          "bottom-right": "bottom-4 right-4",
+          "bottom-left":  "bottom-4 left-4",
+          "top-right":    "top-4 right-4",
+          "top-left":     "top-4 left-4",
+          "center":       "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+        }[state.logoPosition ?? "bottom-right"] ?? "bottom-4 right-4";
+        const opacity = (state.logoOpacity ?? 80) / 100;
+        return (
+          <img
+            src={`file://${state.logoPath}`}
+            alt=""
+            aria-hidden
+            className={`absolute z-20 max-h-[10%] max-w-[15%] object-contain pointer-events-none ${posClass}`}
+            ref={(el) => { if (el) el.style.opacity = String(opacity); }}
+          />
+        );
+      })()}
     </div>
   );
 }

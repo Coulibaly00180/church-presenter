@@ -25,6 +25,8 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [fg, setFg] = useState("#ffffff");
   const [textScale, setTextScale] = useState(1);
   const [logoPath, setLogoPath] = useState("");
+  const [logoPosition, setLogoPosition] = useState<CpLogoPosition>("bottom-right");
+  const [logoOpacity, setLogoOpacity] = useState(80);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
 
@@ -36,6 +38,8 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       setFg(state.foreground ?? "#ffffff");
       setTextScale(state.textScale ?? 1);
       setLogoPath(state.logoPath ?? "");
+      setLogoPosition((state.logoPosition as CpLogoPosition) ?? "bottom-right");
+      setLogoOpacity(state.logoOpacity ?? 80);
     });
     void window.cp.settings.getTheme().then((r) => {
       if (r.ok && r.theme) setTheme(r.theme);
@@ -48,9 +52,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   }, []);
 
   const handleApplyAppearance = useCallback(async () => {
-    await window.cp.projection.setAppearance({ background: bg, foreground: fg, textScale, logoPath });
+    await window.cp.projection.setAppearance({ background: bg, foreground: fg, textScale, logoPath, logoPosition, logoOpacity });
     toast.success("Apparence de projection appliquée");
-  }, [bg, fg, textScale, logoPath]);
+  }, [bg, fg, textScale, logoPath, logoPosition, logoOpacity]);
 
   const handlePickLogo = useCallback(async () => {
     const result = await window.cp.files.pickMedia();
@@ -213,6 +217,58 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               {logoPath && (
                 <p className="text-[10px] text-text-muted truncate font-mono">{logoPath.split(/[\\/]/).pop()}</p>
               )}
+
+              {/* Logo position */}
+              {logoPath && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-text-secondary">Position</label>
+                  <div className="grid grid-cols-3 grid-rows-3 gap-1 w-[76px]">
+                    {([
+                      ["top-left",     "↖", "col-start-1 row-start-1"],
+                      ["top-right",    "↗", "col-start-3 row-start-1"],
+                      ["center",       "·", "col-start-2 row-start-2"],
+                      ["bottom-left",  "↙", "col-start-1 row-start-3"],
+                      ["bottom-right", "↘", "col-start-3 row-start-3"],
+                    ] as [CpLogoPosition, string, string][]).map(([pos, arrow, gridCls]) => (
+                      <button
+                        key={pos}
+                        type="button"
+                        aria-label={pos}
+                        className={cn(
+                          "h-6 w-6 flex items-center justify-center rounded text-xs border transition-colors",
+                          gridCls,
+                          logoPosition === pos
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border hover:bg-bg-elevated text-text-muted",
+                        )}
+                        onClick={() => setLogoPosition(pos)}
+                      >
+                        {arrow}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Logo opacity */}
+              {logoPath && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-text-secondary">Opacité</label>
+                    <span className="text-xs text-text-muted tabular-nums">{logoOpacity}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    aria-label="Opacité du logo"
+                    min={10}
+                    max={100}
+                    step={5}
+                    value={logoOpacity}
+                    onChange={(e) => setLogoOpacity(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Live preview */}
@@ -221,14 +277,24 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               style={{ backgroundColor: bg, color: fg, fontSize: `${Math.round(16 * textScale)}px` }}
             >
               Aperçu du texte projeté
-              {logoPath && (
-                <img
-                  src={`file://${logoPath}`}
-                  alt=""
-                  aria-hidden
-                  className="absolute bottom-1 right-1 max-h-[30%] max-w-[20%] object-contain opacity-80"
-                />
-              )}
+              {logoPath && (() => {
+                const previewPosClass = {
+                  "bottom-right": "bottom-1 right-1",
+                  "bottom-left":  "bottom-1 left-1",
+                  "top-right":    "top-1 right-1",
+                  "top-left":     "top-1 left-1",
+                  "center":       "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
+                }[logoPosition] ?? "bottom-1 right-1";
+                return (
+                  <img
+                    src={`file://${logoPath}`}
+                    alt=""
+                    aria-hidden
+                    className={`absolute max-h-[30%] max-w-[20%] object-contain pointer-events-none ${previewPosClass}`}
+                    ref={(el) => { if (el) el.style.opacity = String(logoOpacity / 100); }}
+                  />
+                );
+              })()}
             </div>
 
             <Button className="w-full" onClick={() => void handleApplyAppearance()}>
