@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, ChevronLeft, Loader2, Plus, Search } from "lucide-react";
+import { BookOpen, ChevronLeft, Keyboard, Loader2, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,13 +15,19 @@ import { cn } from "@/lib/utils";
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { parseReference } from "@/bible/parseRef";
-import { getLSG1910Chapter, listLSG1910Books, type OfflineVerse, type LSG1910BookCatalogEntry } from "@/bible/lookupLSG1910";
+import {
+  getLSG1910Chapter,
+  listLSG1910Books,
+  type OfflineVerse,
+  type LSG1910BookCatalogEntry,
+} from "@/bible/lookupLSG1910";
 import { searchVerses, listTranslations, type BollsVerse } from "@/bible/bollsApi";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import type { PlanItem } from "@/lib/types";
 
 type BibleView = "reference" | "books" | "chapters" | "verses";
 type BibleMode = "browse" | "search";
+type ProjectionMode = "verse" | "passage";
 
 type TranslationEntry = { id: string; label: string };
 
@@ -48,6 +54,12 @@ export function BibleTab() {
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Projection mode ───────────────────────────────────────────────────────────
+  // "verse" = one verse per projection slide; "passage" = all selected on one slide
+  const [projMode, setProjMode] = useState<ProjectionMode>("verse");
+  // Currently navigated verse (keyboard cursor)
+  const [cursorVerseNum, setCursorVerseNum] = useState<number | null>(null);
+
   // ── Search state ──────────────────────────────────────────────────────────────
   const [translation, setTranslation] = useState("FRLSG");
   const [translations, setTranslations] = useState<TranslationEntry[]>(FALLBACK_TRANSLATIONS);
@@ -57,7 +69,7 @@ export function BibleTab() {
   const [searching, setSearching] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load LSG1910 book catalog and available translations on mount
+  // Load book catalog + available translations
   useEffect(() => {
     void listLSG1910Books()
       .then(setBooks)
@@ -73,6 +85,11 @@ export function BibleTab() {
       if (french.length > 0) setTranslations(french);
     }).catch(() => {/* keep fallback list */});
   }, []);
+
+  // Reset cursor when chapter changes
+  useEffect(() => {
+    setCursorVerseNum(null);
+  }, [selectedBook, selectedChapter]);
 
   // ── Browse handlers ───────────────────────────────────────────────────────────
 
@@ -119,6 +136,7 @@ export function BibleTab() {
       setVerses(loaded ?? []);
       setSelectedChapter(chapter);
       setSelectedVerses(new Set());
+      setCursorVerseNum(null);
       setView("verses");
     } catch {
       toast.error("Impossible de charger ce chapitre");
@@ -157,32 +175,144 @@ export function BibleTab() {
     return `${selectedBook.name} ${selectedChapter}:${suffix}`;
   }, [selectedBook, selectedChapter, selectedVerses]);
 
-  const handleAdd = useCallback(async () => {
-    const content = buildVerseContent();
-    if (!content) { toast.error("Aucun verset sélectionné"); return; }
-    const item = await addItem({
-      kind: "BIBLE_VERSE",
-      title: buildVerseTitle(),
-      content,
-      refId: `${selectedBook?.name} ${selectedChapter}`,
-      refSubId: "LSG",
-    });
-    if (item) toast.success("Ajouté au plan");
-  }, [addItem, buildVerseContent, buildVerseTitle, selectedBook, selectedChapter]);
+  // ── Projection helpers ────────────────────────────────────────────────────────
 
-  const handleProject = useCallback(async () => {
+  /** Project a single verse immediately */
+  const handleProjectSingle = useCallback(async (verse: OfflineVerse) => {
     if (!live) { toast.error("Mode Direct inactif"); return; }
-    const content = buildVerseContent();
-    if (!content) { toast.error("Aucun verset sélectionné"); return; }
+    if (!selectedBook || selectedChapter === null) return;
+    const title = `${selectedBook.name} ${selectedChapter}:${verse.verse}`;
     const fakeItem: PlanItem = {
       id: "bible-temp",
       order: 0,
       kind: "BIBLE_VERSE",
-      title: buildVerseTitle(),
-      content,
+      title,
+      content: `${verse.verse}. ${verse.text}`,
     };
     await projectPlanItemToTarget(live.target, fakeItem, live);
-  }, [live, buildVerseContent, buildVerseTitle]);
+  }, [live, selectedBook, selectedChapter]);
+
+  /** Called when user clicks a verse in verse-mode + live: project + select + set cursor */
+  const handleVerseClickInVerseMode = useCallback(async (verse: OfflineVerse) => {
+    setCursorVerseNum(verse.verse);
+    setSelectedVerses((prev) => {
+      const next = new Set(prev);
+      next.add(verse.verse);
+      return next;
+    });
+    await handleProjectSingle(verse);
+  }, [handleProjectSingle]);
+
+  /** Move the keyboard cursor by `dir` (+1 next, -1 prev) and project the verse */
+  const handleVerseCursorMove = useCallback(async (dir: 1 | -1) => {
+    if (verses.length === 0) return;
+    const sorted = verses.map((v) => v.verse).sort((a, b) => a - b);
+    const curIdx = cursorVerseNum !== null ? sorted.indexOf(cursorVerseNum) : -1;
+    const nextIdx = Math.max(0, Math.min(sorted.length - 1, curIdx + dir));
+    const nextVerseNum = sorted[nextIdx];
+    if (nextVerseNum === undefined) return;
+    const verseObj = verses.find((v) => v.verse === nextVerseNum);
+    if (!verseObj) return;
+    setCursorVerseNum(nextVerseNum);
+    if (live?.enabled) {
+      await handleProjectSingle(verseObj);
+    }
+  }, [verses, cursorVerseNum, live?.enabled, handleProjectSingle]);
+
+  // Arrow key capture for verse-by-verse keyboard navigation (capture phase, priority over LiveBar shortcuts)
+  useEffect(() => {
+    const isActive = view === "verses" && live?.enabled && projMode === "verse";
+    if (!isActive) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      ) return;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleVerseCursorMove(1);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleVerseCursorMove(-1);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown, true); // capture phase
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [view, live?.enabled, projMode, handleVerseCursorMove]);
+
+  const handleAdd = useCallback(async () => {
+    if (selectedVerses.size === 0) { toast.error("Aucun verset sélectionné"); return; }
+
+    if (projMode === "verse") {
+      // Add each selected verse as a separate plan item
+      const sorted = [...selectedVerses].sort((a, b) => a - b);
+      let added = 0;
+      for (const vNum of sorted) {
+        const verse = verses.find((v) => v.verse === vNum);
+        if (!verse) continue;
+        const title = `${selectedBook?.name ?? "Bible"} ${selectedChapter}:${vNum}`;
+        const item = await addItem({
+          kind: "BIBLE_VERSE",
+          title,
+          content: `${vNum}. ${verse.text}`,
+          refId: `${selectedBook?.name} ${selectedChapter}`,
+          refSubId: "LSG",
+        });
+        if (item) added++;
+      }
+      if (added > 0)
+        toast.success(`${added} verset${added > 1 ? "s" : ""} ajouté${added > 1 ? "s" : ""} au plan`);
+    } else {
+      // Add all selected as one passage
+      const content = buildVerseContent();
+      if (!content) { toast.error("Aucun verset sélectionné"); return; }
+      const item = await addItem({
+        kind: "BIBLE_VERSE",
+        title: buildVerseTitle(),
+        content,
+        refId: `${selectedBook?.name} ${selectedChapter}`,
+        refSubId: "LSG",
+      });
+      if (item) toast.success("Ajouté au plan");
+    }
+  }, [
+    selectedVerses, projMode, verses, selectedBook, selectedChapter,
+    addItem, buildVerseContent, buildVerseTitle,
+  ]);
+
+  const handleProject = useCallback(async () => {
+    if (!live) { toast.error("Mode Direct inactif"); return; }
+
+    if (projMode === "verse") {
+      // Project the first selected verse and activate keyboard cursor
+      const sorted = [...selectedVerses].sort((a, b) => a - b);
+      const firstVerseNum = sorted[0];
+      if (firstVerseNum === undefined) { toast.error("Aucun verset sélectionné"); return; }
+      const verse = verses.find((v) => v.verse === firstVerseNum);
+      if (!verse) return;
+      setCursorVerseNum(firstVerseNum);
+      await handleProjectSingle(verse);
+    } else {
+      // Project all selected as one passage
+      const content = buildVerseContent();
+      if (!content) { toast.error("Aucun verset sélectionné"); return; }
+      const fakeItem: PlanItem = {
+        id: "bible-temp",
+        order: 0,
+        kind: "BIBLE_VERSE",
+        title: buildVerseTitle(),
+        content,
+      };
+      await projectPlanItemToTarget(live.target, fakeItem, live);
+    }
+  }, [live, projMode, selectedVerses, verses, buildVerseContent, buildVerseTitle, handleProjectSingle]);
 
   // ── Search handlers ───────────────────────────────────────────────────────────
 
@@ -214,7 +344,6 @@ export function BibleTab() {
     }, 600);
   }, [translation]);
 
-  // Re-search when translation changes (if there's already a query)
   const handleTranslationChange = useCallback((t: string) => {
     setTranslation(t);
     setSearchResults([]);
@@ -260,11 +389,12 @@ export function BibleTab() {
 
   // ─────────────────────────────────────────────────────────────────────────────
 
+  const isLive = live?.enabled ?? false;
+
   return (
     <div className="flex flex-col h-full">
-      {/* Header : mode toggle + translation */}
+      {/* Header: mode toggle + translation */}
       <div className="px-3 py-2 border-b border-border space-y-2">
-        {/* Mode toggle */}
         <div className="flex gap-1">
           <Button
             variant={mode === "browse" ? "default" : "ghost"}
@@ -286,7 +416,6 @@ export function BibleTab() {
           </Button>
         </div>
 
-        {/* Translation selector — shown only in search mode */}
         {mode === "search" && (
           <Select value={translation} onValueChange={handleTranslationChange}>
             <SelectTrigger className="h-8 text-xs">
@@ -306,7 +435,6 @@ export function BibleTab() {
       {/* Content area */}
       {mode === "browse" ? (
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Browse header */}
           <div className="px-3 py-2 border-b border-border space-y-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none" />
@@ -346,7 +474,12 @@ export function BibleTab() {
               chapter={selectedChapter}
               verses={verses}
               selectedVerses={selectedVerses}
+              projMode={projMode}
+              onProjModeChange={setProjMode}
+              cursorVerseNum={cursorVerseNum}
+              isLive={isLive}
               onToggle={toggleVerse}
+              onClickInVerseMode={(v) => void handleVerseClickInVerseMode(v)}
               onBack={() => setView(selectedBook ? "chapters" : "reference")}
               onAdd={() => void handleAdd()}
               onProject={() => void handleProject()}
@@ -354,7 +487,6 @@ export function BibleTab() {
           ) : null}
         </div>
       ) : (
-        /* Search mode */
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="px-3 py-2 border-b border-border">
             <div className="relative">
@@ -385,7 +517,7 @@ export function BibleTab() {
               getBookName={getBookName}
               onAdd={(v) => void handleAddVerse(v)}
               onProject={(v) => void handleProjectVerse(v)}
-              live={!!live?.enabled}
+              live={isLive}
             />
           ) : searchQuery.trim() && !searching ? (
             <div className="flex flex-1 items-center justify-center">
@@ -474,7 +606,12 @@ function VersesView({
   chapter,
   verses,
   selectedVerses,
+  projMode,
+  onProjModeChange,
+  cursorVerseNum,
+  isLive,
   onToggle,
+  onClickInVerseMode,
   onBack,
   onAdd,
   onProject,
@@ -483,7 +620,12 @@ function VersesView({
   chapter: number | null;
   verses: OfflineVerse[];
   selectedVerses: Set<number>;
+  projMode: ProjectionMode;
+  onProjModeChange: (mode: ProjectionMode) => void;
+  cursorVerseNum: number | null;
+  isLive: boolean;
   onToggle: (v: number) => void;
+  onClickInVerseMode: (verse: OfflineVerse) => void;
   onBack: () => void;
   onAdd: () => void;
   onProject: () => void;
@@ -491,55 +633,119 @@ function VersesView({
   return (
     <div className="flex flex-col flex-1 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
         <Button variant="ghost" size="icon-xs" onClick={onBack} aria-label="Retour">
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-sm font-medium flex-1">
+        <span className="text-sm font-medium flex-1 truncate">
           {book?.name} {chapter}
         </span>
-        <span className="text-xs text-text-muted">
-          {selectedVerses.size > 0 ? `${selectedVerses.size} sélectionné(s)` : ""}
-        </span>
+        {/* Projection mode toggle */}
+        <div className="flex gap-0.5 shrink-0">
+          <button
+            type="button"
+            className={cn(
+              "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors",
+              projMode === "verse"
+                ? "bg-primary/10 text-primary"
+                : "text-text-muted hover:bg-bg-elevated"
+            )}
+            onClick={() => onProjModeChange("verse")}
+            title="Un verset par diapositive"
+          >
+            Verset
+          </button>
+          <button
+            type="button"
+            className={cn(
+              "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors",
+              projMode === "passage"
+                ? "bg-primary/10 text-primary"
+                : "text-text-muted hover:bg-bg-elevated"
+            )}
+            onClick={() => onProjModeChange("passage")}
+            title="Plusieurs versets sur une seule diapositive"
+          >
+            Passage
+          </button>
+        </div>
       </div>
 
       {/* Verse list */}
       <ScrollArea className="flex-1">
         <div className="py-1">
-          {verses.map((verse) => (
-            <button
-              key={verse.verse}
-              type="button"
-              className={cn(
-                "flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-bg-elevated transition-colors",
-                selectedVerses.has(verse.verse) && "bg-primary/10"
-              )}
-              onClick={() => onToggle(verse.verse)}
-              aria-pressed={selectedVerses.has(verse.verse) ? "true" : "false"}
-            >
-              <span className="text-xs font-mono text-text-muted w-5 shrink-0 mt-0.5">
-                {verse.verse}
-              </span>
-              <span className="text-sm text-text-primary leading-relaxed">
-                {verse.text}
-              </span>
-            </button>
-          ))}
+          {verses.map((verse) => {
+            const isSelected = selectedVerses.has(verse.verse);
+            const isCursor = cursorVerseNum === verse.verse;
+            return (
+              <button
+                key={verse.verse}
+                type="button"
+                className={cn(
+                  "flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-bg-elevated transition-colors",
+                  isSelected && "bg-primary/8",
+                  isCursor && "ring-1 ring-inset ring-primary/50 bg-primary/12",
+                )}
+                onClick={() => {
+                  if (projMode === "verse" && isLive) {
+                    onClickInVerseMode(verse);
+                  } else {
+                    onToggle(verse.verse);
+                  }
+                }}
+                aria-pressed={isSelected || undefined}
+              >
+                <span className="text-xs font-mono text-text-muted w-5 shrink-0 mt-0.5">
+                  {verse.verse}
+                </span>
+                <span className="text-sm text-text-primary leading-relaxed">
+                  {verse.text}
+                </span>
+                {isCursor && isLive && (
+                  <span className="ml-auto shrink-0 text-[9px] font-bold text-primary mt-0.5">
+                    ▶
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </ScrollArea>
 
       {/* Actions */}
-      {selectedVerses.size > 0 && (
-        <div className="flex gap-2 px-3 py-2 border-t border-border">
-          <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={onAdd}>
-            <Plus className="h-3.5 w-3.5" />
-            Ajouter au plan
-          </Button>
-          <Button variant="default" size="sm" className="flex-1" onClick={onProject}>
-            ▶ Projeter
-          </Button>
-        </div>
-      )}
+      <div className="flex flex-col gap-1.5 px-3 py-2 border-t border-border shrink-0">
+        {/* Keyboard nav hint (verse mode + live) */}
+        {projMode === "verse" && isLive && (
+          <p className="flex items-center justify-center gap-1 text-[10px] text-text-muted">
+            <Keyboard className="h-3 w-3 opacity-50" />
+            ← → pour naviguer · clic pour projeter
+          </p>
+        )}
+
+        {selectedVerses.size > 0 ? (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1 gap-1" onClick={onAdd}>
+              <Plus className="h-3.5 w-3.5" />
+              {projMode === "verse"
+                ? `Ajouter (${selectedVerses.size})`
+                : "Ajouter au plan"}
+            </Button>
+            {(projMode === "passage" || !isLive) && (
+              <Button variant="default" size="sm" className="flex-1" onClick={onProject}>
+                ▶ Projeter
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-[10px] text-text-muted text-center">
+            {projMode === "verse" && isLive
+              ? "Cliquez un verset pour le projeter"
+              : projMode === "verse"
+                ? "Sélectionnez des versets puis ajoutez au plan"
+                : "Sélectionnez des versets"}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
