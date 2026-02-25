@@ -3,15 +3,56 @@ import { useSearchParams } from "react-router-dom";
 
 type ProjectionState = CpProjectionState;
 
-function TimerDisplay({ body }: { body: string }) {
-  // body is expected to be a timer value string like "5:00"
+// ─── Helpers timer ────────────────────────────────────────────────────────────
+
+function parseMMSS(str: string): number {
+  const parts = str.split(":");
+  const m = parseInt(parts[0] ?? "0", 10) || 0;
+  const s = parseInt(parts[1] ?? "0", 10) || 0;
+  return m * 60 + s;
+}
+
+function formatMMSS(totalSecs: number): string {
+  const s = Math.max(0, Math.floor(totalSecs));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// ─── Composants de rendu ──────────────────────────────────────────────────────
+
+function TimerDisplay({ body, startedAt }: { body: string; startedAt: number }) {
+  const totalSeconds = parseMMSS(body);
+
+  const [remaining, setRemaining] = useState(() => {
+    const elapsed = (Date.now() - startedAt) / 1000;
+    return Math.max(0, totalSeconds - elapsed);
+  });
+
+  useEffect(() => {
+    const calc = () => {
+      const elapsed = (Date.now() - startedAt) / 1000;
+      setRemaining(Math.max(0, totalSeconds - elapsed));
+    };
+    calc();
+    const id = setInterval(calc, 250);
+    return () => clearInterval(id);
+  }, [totalSeconds, startedAt]);
+
+  const isDone = remaining <= 0;
+
   return (
     <div className="flex items-center justify-center w-full h-full">
       <span
-        className="font-bold tabular-nums tracking-tighter"
-        style={{ fontSize: "clamp(4rem, 20vw, 15rem)", color: "var(--foreground, #ffffff)" }}
+        style={{
+          fontSize: "clamp(4rem, 20vw, 15rem)",
+          fontWeight: "bold",
+          fontVariantNumeric: "tabular-nums",
+          letterSpacing: "-0.05em",
+          color: "var(--foreground, #ffffff)",
+          opacity: isDone ? 0.4 : 1,
+          transition: "opacity 0.3s",
+        }}
       >
-        {body}
+        {formatMMSS(remaining)}
       </span>
     </div>
   );
@@ -22,7 +63,7 @@ function TextContent({ state }: { state: ProjectionState }) {
   const isTimer = current.title?.startsWith("TIMER:");
 
   if (isTimer) {
-    return <TimerDisplay body={current.body ?? ""} />;
+    return <TimerDisplay body={current.body ?? "0:00"} startedAt={state.updatedAt} />;
   }
 
   const scaleFactor = state.textScale ?? 1;
