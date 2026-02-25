@@ -146,6 +146,34 @@
   --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
 }
 
+/* ─── Thème sombre de l'interface ───────────────────────────────────────────
+   Activé via la classe .theme-dark sur <html>.
+   Configurable dans Paramètres → Interface → Sombre.
+   ─────────────────────────────────────────────────────────────────────────── */
+.theme-dark {
+  /* Surfaces */
+  --bg-base:     #0F0F13;
+  --bg-surface:  #18181F;
+  --bg-elevated: #222230;
+  --border:      #2E2E40;
+
+  /* Texte */
+  --text-primary:   #FAFAFA;
+  --text-secondary: #A1A1AA;
+  --text-muted:     #52525B;
+
+  /* Actions */
+  --primary:           #6366F1;
+  --primary-hover:     #4F46E5;
+  --primary-foreground: #FFFFFF;
+
+  /* Ombres (sombre) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.6), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+}
+
 /* ─── Mode Direct — thème sombre ────────────────────────────────────────────
    Activé en ajoutant la classe .mode-live sur <body> ou <html>.
    Référence : docs/ux/01-vision-et-principes.md §6.1

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LiveProvider } from "@/contexts/LiveContext";
 import { PlanProvider } from "@/contexts/PlanContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -45,6 +45,15 @@ function AppShellInner({ children }: AppShellProps) {
 }
 
 export function AppShell({ children }: AppShellProps) {
+  // Apply saved theme on mount
+  useEffect(() => {
+    void window.cp.settings.getTheme().then((r) => {
+      if (r.ok && r.theme) {
+        document.documentElement.classList.toggle("theme-dark", r.theme === "dark");
+      }
+    });
+  }, []);
+
   return (
     <LiveProvider>
       <PlanProvider>
