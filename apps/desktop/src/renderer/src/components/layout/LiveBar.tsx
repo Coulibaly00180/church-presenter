@@ -117,11 +117,14 @@ export function LiveBar() {
     const currentCursor = live?.cursor ?? 0;
     const itemCount = plan?.items.length ?? 0;
     const nextCursor = Math.max(0, Math.min(currentCursor + dir, itemCount - 1));
+    console.debug("[live] navigate", dir, "cursor:", currentCursor, "→", nextCursor, "items:", itemCount, "planId:", live?.planId);
     if (dir > 0) await window.cp.live.next();
     else await window.cp.live.prev();
     const item = plan?.items[nextCursor];
     if (item && live) {
       await projectPlanItemToTarget(live.target, item as PlanItem, live);
+    } else {
+      console.warn("[live] navigate: no item or no live state", { item: !!item, live: !!live, nextCursor });
     }
   }, [live, plan]);
 

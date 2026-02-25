@@ -47,6 +47,16 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
 
   const isLive = live?.enabled ?? false;
 
+  // When starting live, bind the current plan + reset cursor so navigation works.
+  // When stopping, plain toggle() is enough.
+  const handleLiveToggle = useCallback(async () => {
+    if (isLive) {
+      await toggle();
+    } else {
+      await window.cp.live.set({ planId: selectedPlanId ?? null, enabled: true, cursor: 0 });
+    }
+  }, [isLive, toggle, selectedPlanId]);
+
   const handleDuplicate = useCallback(async () => {
     if (!selectedPlanId) return;
     const duplicated = await window.cp.plans.duplicate({ planId: selectedPlanId });
@@ -149,7 +159,7 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
           <Button
             variant={isLive ? "destructive" : "default"}
             size="sm"
-            onClick={() => void toggle()}
+            onClick={() => void handleLiveToggle()}
             className={cn(
               "gap-1.5 h-8 px-3 font-medium",
               !isLive && "bg-success hover:bg-success/90 text-white",

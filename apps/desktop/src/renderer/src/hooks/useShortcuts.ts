@@ -17,6 +17,11 @@ export function useShortcuts(handler: ShortcutHandler, enabled = true): void {
     void hydrateShortcuts();
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Trace every keydown in live mode so we can debug navigation issues
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[shortcuts] keydown", e.key, "target:", (e.target as HTMLElement)?.tagName);
+      }
+
       // Ignore events originating from text inputs/textareas
       const target = e.target as HTMLElement;
       if (

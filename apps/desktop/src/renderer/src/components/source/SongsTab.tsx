@@ -238,10 +238,10 @@ interface SongRowProps {
 
 function SongRow({ song, isFavorite, onSelect, onToggleFavorite }: SongRowProps) {
   return (
-    <div className="group/song">
+    <div className="group/song flex items-center hover:bg-bg-elevated transition-colors">
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-bg-elevated transition-colors"
+        className="flex flex-1 min-w-0 items-center gap-2 px-3 py-2 text-left"
         onClick={onSelect}
       >
         <div className="flex-1 min-w-0">
@@ -250,18 +250,18 @@ function SongRow({ song, isFavorite, onSelect, onToggleFavorite }: SongRowProps)
             <p className="text-xs text-text-muted truncate leading-snug">{song.artist}</p>
           )}
         </div>
-        <button
-          type="button"
-          className={cn(
-            "shrink-0 opacity-0 group-hover/song:opacity-100 transition-opacity p-0.5 rounded",
-            isFavorite && "opacity-100"
-          )}
-          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
-          aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
-          aria-pressed={isFavorite}
-        >
-          <Heart className={cn("h-3 w-3", isFavorite ? "fill-danger text-danger" : "text-text-muted")} />
-        </button>
+      </button>
+      <button
+        type="button"
+        className={cn(
+          "shrink-0 opacity-0 group-hover/song:opacity-100 transition-opacity p-0.5 rounded mr-2",
+          isFavorite && "opacity-100"
+        )}
+        onClick={onToggleFavorite}
+        aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+        aria-pressed={isFavorite || undefined}
+      >
+        <Heart className={cn("h-3 w-3", isFavorite ? "fill-danger text-danger" : "text-text-muted")} />
       </button>
     </div>
   );
