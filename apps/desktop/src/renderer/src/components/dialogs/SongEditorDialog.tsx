@@ -162,8 +162,7 @@ export function SongEditorDialog({ songId, open, onClose, onSaved }: SongEditorD
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="max-w-3xl"
-        style={{ maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+        className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
         showClose
       >
         <DialogHeader>
@@ -177,7 +176,7 @@ export function SongEditorDialog({ songId, open, onClose, onSaved }: SongEditorD
             </div>
           </DialogBody>
         ) : (
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 min-h-0 overflow-hidden">
             {/* Left: meta + blocks list */}
             <div className="flex flex-col w-56 border-r border-border p-3 gap-3 shrink-0">
               <div className="space-y-2">

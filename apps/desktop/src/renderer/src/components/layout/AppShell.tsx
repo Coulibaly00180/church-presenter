@@ -4,6 +4,7 @@ import { PlanProvider } from "@/contexts/PlanContext";
 import { Toaster } from "@/components/ui/sonner";
 import { ShortcutsDialog } from "@/components/dialogs/ShortcutsDialog";
 import { QuickTextDialog } from "@/components/dialogs/QuickTextDialog";
+import { SettingsDialog } from "@/components/dialogs/SettingsDialog";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { Header } from "./Header";
 import { LiveBar } from "./LiveBar";
@@ -15,6 +16,7 @@ interface AppShellProps {
 function AppShellInner({ children }: AppShellProps) {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [quickTextOpen, setQuickTextOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Global shortcut: Ctrl+T → quick text
   useShortcuts(
@@ -28,6 +30,7 @@ function AppShellInner({ children }: AppShellProps) {
     <div className="flex h-screen flex-col bg-bg-base overflow-hidden">
       <Header
         onOpenShortcuts={() => setShortcutsOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
       <main className="flex flex-1 overflow-hidden">
         {children}
@@ -36,6 +39,7 @@ function AppShellInner({ children }: AppShellProps) {
       <Toaster />
       <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <QuickTextDialog open={quickTextOpen} onClose={() => setQuickTextOpen(false)} />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }
