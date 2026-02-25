@@ -113,12 +113,24 @@ export function LiveBar() {
     }
   }, [live]);
 
+  const handleNavigate = useCallback(async (dir: 1 | -1) => {
+    const currentCursor = live?.cursor ?? 0;
+    const itemCount = plan?.items.length ?? 0;
+    const nextCursor = Math.max(0, Math.min(currentCursor + dir, itemCount - 1));
+    if (dir > 0) await window.cp.live.next();
+    else await window.cp.live.prev();
+    const item = plan?.items[nextCursor];
+    if (item && live) {
+      await projectPlanItemToTarget(live.target, item as PlanItem, live);
+    }
+  }, [live, plan]);
+
   // Keyboard shortcuts — all hooks must be before early returns
   useShortcuts(
     useCallback((action) => {
       switch (action) {
-        case "next": void window.cp.live.next(); break;
-        case "prev": void window.cp.live.prev(); break;
+        case "next": void handleNavigate(1); break;
+        case "prev": void handleNavigate(-1); break;
         case "toggleBlack": void toggleBlack(); break;
         case "toggleWhite": void toggleWhite(); break;
         case "resume": void resume(); break;
@@ -126,7 +138,7 @@ export function LiveBar() {
         case "targetB": void window.cp.live.setTarget("B"); break;
         case "targetC": void window.cp.live.setTarget("C"); break;
       }
-    }, [toggleBlack, toggleWhite, resume]),
+    }, [handleNavigate, toggleBlack, toggleWhite, resume]),
     isEnabled
   );
 
@@ -222,7 +234,11 @@ export function LiveBar() {
         </div>
 
         {/* Navigation */}
-        <NavControls className="ml-auto" />
+        <NavControls
+          className="ml-auto"
+          onPrev={() => void handleNavigate(-1)}
+          onNext={() => void handleNavigate(1)}
+        />
 
         {/* Progress counter + remaining time */}
         {plan && (

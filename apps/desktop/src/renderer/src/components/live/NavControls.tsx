@@ -5,10 +5,12 @@ import { cn } from "@/lib/utils";
 
 interface NavControlsProps {
   className?: string;
+  onPrev?: () => void;
+  onNext?: () => void;
 }
 
-export function NavControls({ className }: NavControlsProps) {
-  const { prev, next, live } = useLive();
+export function NavControls({ className, onPrev, onNext }: NavControlsProps) {
+  const { live } = useLive();
 
   if (!live?.enabled) return null;
 
@@ -17,7 +19,7 @@ export function NavControls({ className }: NavControlsProps) {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => void prev()}
+        onClick={onPrev}
         aria-label="Élément précédent"
         className="h-12 w-12 rounded-xl text-text-primary hover:bg-bg-elevated"
         style={{ height: "var(--btn-height-xl)", width: "var(--btn-height-xl)" }}
@@ -27,7 +29,7 @@ export function NavControls({ className }: NavControlsProps) {
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => void next()}
+        onClick={onNext}
         aria-label="Élément suivant"
         className="h-12 w-12 rounded-xl text-text-primary hover:bg-bg-elevated"
         style={{ height: "var(--btn-height-xl)", width: "var(--btn-height-xl)" }}

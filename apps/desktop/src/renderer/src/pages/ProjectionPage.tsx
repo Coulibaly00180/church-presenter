@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { projectPlanItemToTarget } from "@/lib/projection";
+import type { PlanItem } from "@/lib/types";
 
 type ProjectionState = CpProjectionState;
 
@@ -126,22 +128,28 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
   };
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full p-12 text-center gap-4">
+    <div className="relative w-full h-full">
+      {/* Title / reference — top-left overlay */}
       {current.title && (
-        <h2
-          className="font-semibold leading-tight"
-          ref={(el) => applyFgStyle(el, Math.round(22 * scaleFactor))}
-        >
-          {current.title}
-        </h2>
+        <div className="absolute top-6 left-8 z-10 max-w-[60%]">
+          <h2
+            className="font-semibold leading-snug opacity-75"
+            ref={(el) => applyFgStyle(el, Math.round(22 * scaleFactor))}
+          >
+            {current.title}
+          </h2>
+        </div>
       )}
+      {/* Body — centered on screen */}
       {current.body && (
-        <p
-          className="leading-relaxed whitespace-pre-wrap"
-          ref={(el) => applyFgStyle(el, Math.round(20 * scaleFactor))}
-        >
-          {current.body}
-        </p>
+        <div className="flex items-center justify-center w-full h-full px-16 py-20 text-center">
+          <p
+            className="leading-relaxed whitespace-pre-wrap max-w-[85%]"
+            ref={(el) => applyFgStyle(el, Math.round(26 * scaleFactor))}
+          >
+            {current.body}
+          </p>
+        </div>
       )}
     </div>
   );
@@ -157,6 +165,19 @@ function MediaContent({ state }: { state: ProjectionState }) {
         src={`file://${current.mediaPath}`}
         alt={current.title ?? ""}
         className="w-full h-full object-contain"
+      />
+    );
+  }
+
+  if (current.mediaType === "VIDEO") {
+    return (
+      <video
+        src={`file://${current.mediaPath}`}
+        className="w-full h-full object-contain"
+        autoPlay
+        controls={false}
+        loop
+        muted={false}
       />
     );
   }
@@ -220,7 +241,7 @@ function ProjectionContent({ state, onTimerExpired }: { state: ProjectionState; 
           "top-right":    "top-4 right-4",
           "top-left":     "top-4 left-4",
           "center":       "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
-        }[state.logoPosition ?? "bottom-right"] ?? "bottom-4 right-4";
+        }[state.logoPosition ?? "top-left"] ?? "top-4 left-4";
         const opacity = (state.logoOpacity ?? 80) / 100;
         return (
           <img
@@ -253,6 +274,38 @@ export function ProjectionPage() {
       return unsub;
     }
   }, [screenKey]);
+
+  // Keep live state in a ref so the keyboard handler always has fresh values
+  // without re-registering the listener on every cursor change.
+  const liveNavRef = useRef<CpLiveState | null>(null);
+  useEffect(() => {
+    void window.cp.live.get().then((s) => { liveNavRef.current = s; });
+    const unsub = window.cp.live.onUpdate((s) => { liveNavRef.current = s; });
+    return unsub;
+  }, []);
+
+  // Arrow-key navigation — handles the case where the projection window has
+  // focus instead of the regie window, so keyboard shortcuts still work.
+  useEffect(() => {
+    const onKeyDown = async (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const live = liveNavRef.current;
+      if (!live?.enabled || !live.planId) return;
+      e.preventDefault();
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const plan = await window.cp.plans.get(live.planId);
+      if (!plan) return;
+      const nextCursor = Math.max(0, Math.min(live.cursor + dir, plan.items.length - 1));
+      if (dir > 0) await window.cp.live.next();
+      else await window.cp.live.prev();
+      const item = plan.items[nextCursor];
+      if (item) {
+        await projectPlanItemToTarget(live.target, item as PlanItem, live);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Cancel auto-black if the slide changes
   useEffect(() => {
