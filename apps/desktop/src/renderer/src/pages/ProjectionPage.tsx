@@ -120,10 +120,13 @@ function MediaContent({ state }: { state: ProjectionState }) {
     );
   }
 
+  // PDF: use iframe with file:// URL — Electron's Chromium renders PDFs natively
   return (
-    <div className="flex items-center justify-center w-full h-full text-white text-sm opacity-50">
-      PDF : {current.mediaPath}
-    </div>
+    <iframe
+      src={`file://${current.mediaPath}`}
+      title={current.title ?? "PDF"}
+      className="w-full h-full border-0 bg-black"
+    />
   );
 }
 
@@ -167,6 +170,16 @@ function ProjectionContent({ state, onTimerExpired }: { state: ProjectionState; 
         {current.kind === "TEXT" && <TextContent state={state} onTimerExpired={onTimerExpired} />}
         {current.kind === "MEDIA" && <MediaContent state={state} />}
       </div>
+
+      {/* Logo overlay — bottom-right corner */}
+      {state.logoPath && (
+        <img
+          src={`file://${state.logoPath}`}
+          alt=""
+          aria-hidden
+          className="absolute bottom-4 right-4 z-20 max-h-[10%] max-w-[15%] object-contain opacity-80 pointer-events-none"
+        />
+      )}
     </div>
   );
 }

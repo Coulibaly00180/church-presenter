@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Download, Moon, Palette, Sun, Upload } from "lucide-react";
+import { Download, Image, Moon, Palette, Sun, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -24,6 +24,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [bg, setBg] = useState("#000000");
   const [fg, setFg] = useState("#ffffff");
   const [textScale, setTextScale] = useState(1);
+  const [logoPath, setLogoPath] = useState("");
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
 
@@ -34,6 +35,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       setBg(state.background ?? "#000000");
       setFg(state.foreground ?? "#ffffff");
       setTextScale(state.textScale ?? 1);
+      setLogoPath(state.logoPath ?? "");
     });
     void window.cp.settings.getTheme().then((r) => {
       if (r.ok && r.theme) setTheme(r.theme);
@@ -46,9 +48,20 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   }, []);
 
   const handleApplyAppearance = useCallback(async () => {
-    await window.cp.projection.setAppearance({ background: bg, foreground: fg, textScale });
+    await window.cp.projection.setAppearance({ background: bg, foreground: fg, textScale, logoPath });
     toast.success("Apparence de projection appliquée");
-  }, [bg, fg, textScale]);
+  }, [bg, fg, textScale, logoPath]);
+
+  const handlePickLogo = useCallback(async () => {
+    const result = await window.cp.files.pickMedia();
+    if (result.ok && result.path) setLogoPath(result.path);
+  }, []);
+
+  const handleClearLogo = useCallback(async () => {
+    setLogoPath("");
+    await window.cp.projection.setAppearance({ logoPath: "" });
+    toast.success("Logo supprimé");
+  }, []);
 
   const handleExportAll = useCallback(async () => {
     setExporting(true);
@@ -165,12 +178,57 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               </div>
             </div>
 
+            {/* Logo */}
+            <div className="space-y-2 pt-1 border-t border-border">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-text-secondary">Logo (overlay projection)</label>
+                {logoPath && (
+                  <button
+                    type="button"
+                    className="text-xs text-danger hover:underline flex items-center gap-0.5"
+                    onClick={() => void handleClearLogo()}
+                  >
+                    <X className="h-3 w-3" />
+                    Supprimer
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {logoPath ? (
+                  <img
+                    src={`file://${logoPath}`}
+                    alt="Logo"
+                    className="h-10 rounded border border-border object-contain bg-bg-elevated px-1"
+                  />
+                ) : (
+                  <div className="flex h-10 w-14 items-center justify-center rounded border border-dashed border-border bg-bg-elevated">
+                    <Image className="h-4 w-4 text-text-muted opacity-50" />
+                  </div>
+                )}
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void handlePickLogo()}>
+                  <Upload className="h-3.5 w-3.5" />
+                  {logoPath ? "Changer" : "Choisir un logo"}
+                </Button>
+              </div>
+              {logoPath && (
+                <p className="text-[10px] text-text-muted truncate font-mono">{logoPath.split(/[\\/]/).pop()}</p>
+              )}
+            </div>
+
             {/* Live preview */}
             <div
-              className="flex items-center justify-center rounded-md h-20 font-medium select-none"
+              className="flex items-center justify-center rounded-md h-20 font-medium select-none relative overflow-hidden"
               style={{ backgroundColor: bg, color: fg, fontSize: `${Math.round(16 * textScale)}px` }}
             >
               Aperçu du texte projeté
+              {logoPath && (
+                <img
+                  src={`file://${logoPath}`}
+                  alt=""
+                  aria-hidden
+                  className="absolute bottom-1 right-1 max-h-[30%] max-w-[20%] object-contain opacity-80"
+                />
+              )}
             </div>
 
             <Button className="w-full" onClick={() => void handleApplyAppearance()}>
