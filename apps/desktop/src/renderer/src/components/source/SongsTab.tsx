@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, Music2, Plus, Search, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Heart, Loader2, Music2, Plus, Search, TrendingUp, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,17 @@ import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { projectPlanItemToTarget } from "@/lib/projection";
 import type { PlanItem } from "@/lib/types";
+
+const FAVORITES_KEY = "cp_favorite_songs";
+function loadFavorites(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch { return new Set(); }
+}
+function saveFavorites(ids: Set<string>) {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify([...ids]));
+}
 
 interface SongsTabProps {
   onCreateSong?: () => void;
@@ -24,6 +35,8 @@ export function SongsTab({ onCreateSong }: SongsTabProps) {
   const [songDetail, setSongDetail] = useState<CpSongDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => loadFavorites());
+  const [frequentSongs, setFrequentSongs] = useState<CpSongListItem[]>([]);
 
   const loadSongs = useCallback(async (q: string) => {
     setLoading(true);
@@ -40,6 +53,10 @@ export function SongsTab({ onCreateSong }: SongsTabProps) {
   useEffect(() => {
     void loadSongs("");
   }, [loadSongs]);
+
+  useEffect(() => {
+    window.cp.songs.getFrequent(8).then(setFrequentSongs).catch(() => null);
+  }, []);
 
   // 150ms debounce per UX spec (US-030)
   const handleSearch = useCallback((value: string) => {
@@ -105,6 +122,16 @@ export function SongsTab({ onCreateSong }: SongsTabProps) {
     toast.success(`${result.imported} chant${result.imported !== 1 ? "s" : ""} importé${result.imported !== 1 ? "s" : ""}`);
     void loadSongs(query);
   }, [loadSongs, query]);
+
+  const handleToggleFavorite = useCallback((songId: string) => {
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(songId)) next.delete(songId);
+      else next.add(songId);
+      saveFavorites(next);
+      return next;
+    });
+  }, []);
 
   const handleProjectBlock = useCallback(async (song: CpSongListItem, block: CpSongBlock) => {
     if (!live) {
@@ -184,17 +211,83 @@ export function SongsTab({ onCreateSong }: SongsTabProps) {
           </div>
         ) : (
           <div className="py-1">
-            {songs.map((song) => (
+            {/* Favoris section (no active query) */}
+            {!query && favoriteIds.size > 0 && (() => {
+              const favSongs = songs.filter((s) => favoriteIds.has(s.id));
+              if (favSongs.length === 0) return null;
+              return (
+                <>
+                  <p className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    <Heart className="h-2.5 w-2.5 fill-danger text-danger" />
+                    Favoris
+                  </p>
+                  {favSongs.map((song) => (
+                    <SongRow
+                      key={`fav-${song.id}`}
+                      song={song}
+                      isExpanded={expandedId === song.id}
+                      songDetail={expandedId === song.id ? songDetail : null}
+                      loadingDetail={expandedId === song.id && loadingDetail}
+                      isFavorite={true}
+                      onExpand={() => void handleExpand(song.id)}
+                      onAddBlock={(block) => void handleAddBlock(song, block)}
+                      onAddAll={(blocks) => void handleAddAllBlocks(song, blocks)}
+                      onProjectBlock={(block) => void handleProjectBlock(song, block)}
+                      onToggleFavorite={() => handleToggleFavorite(song.id)}
+                    />
+                  ))}
+                  <div className="border-t border-border/50 my-1" />
+                </>
+              );
+            })()}
+
+            {/* Fréquents section (no active query, if data) */}
+            {!query && frequentSongs.length > 0 && (() => {
+              const nonFav = frequentSongs.filter((s) => !favoriteIds.has(s.id));
+              if (nonFav.length === 0) return null;
+              return (
+                <>
+                  <p className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    <TrendingUp className="h-2.5 w-2.5" />
+                    Fréquents
+                  </p>
+                  {nonFav.slice(0, 5).map((song) => (
+                    <SongRow
+                      key={`freq-${song.id}`}
+                      song={song}
+                      isExpanded={expandedId === song.id}
+                      songDetail={expandedId === song.id ? songDetail : null}
+                      loadingDetail={expandedId === song.id && loadingDetail}
+                      isFavorite={favoriteIds.has(song.id)}
+                      onExpand={() => void handleExpand(song.id)}
+                      onAddBlock={(block) => void handleAddBlock(song, block)}
+                      onAddAll={(blocks) => void handleAddAllBlocks(song, blocks)}
+                      onProjectBlock={(block) => void handleProjectBlock(song, block)}
+                      onToggleFavorite={() => handleToggleFavorite(song.id)}
+                    />
+                  ))}
+                  <div className="border-t border-border/50 my-1" />
+                </>
+              );
+            })()}
+
+            {/* Full list */}
+            {(!query
+              ? songs.filter((s) => !favoriteIds.has(s.id))
+              : songs
+            ).map((song) => (
               <SongRow
                 key={song.id}
                 song={song}
                 isExpanded={expandedId === song.id}
                 songDetail={expandedId === song.id ? songDetail : null}
                 loadingDetail={expandedId === song.id && loadingDetail}
+                isFavorite={favoriteIds.has(song.id)}
                 onExpand={() => void handleExpand(song.id)}
                 onAddBlock={(block) => void handleAddBlock(song, block)}
                 onAddAll={(blocks) => void handleAddAllBlocks(song, blocks)}
                 onProjectBlock={(block) => void handleProjectBlock(song, block)}
+                onToggleFavorite={() => handleToggleFavorite(song.id)}
               />
             ))}
           </div>
@@ -229,10 +322,12 @@ interface SongRowProps {
   isExpanded: boolean;
   songDetail: CpSongDetail | null;
   loadingDetail: boolean;
+  isFavorite: boolean;
   onExpand: () => void;
   onAddBlock: (block: CpSongBlock) => void;
   onAddAll: (blocks: CpSongBlock[]) => void;
   onProjectBlock: (block: CpSongBlock) => void;
+  onToggleFavorite: () => void;
 }
 
 function SongRow({
@@ -240,10 +335,12 @@ function SongRow({
   isExpanded,
   songDetail,
   loadingDetail,
+  isFavorite,
   onExpand,
   onAddBlock,
   onAddAll,
   onProjectBlock,
+  onToggleFavorite,
 }: SongRowProps) {
   return (
     <div className="group/song">
@@ -255,7 +352,7 @@ function SongRow({
           isExpanded && "bg-bg-elevated"
         )}
         onClick={onExpand}
-        aria-expanded={isExpanded}
+        aria-expanded={isExpanded ? "true" : "false"}
       >
         {isExpanded ? (
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-text-secondary" />
@@ -268,6 +365,18 @@ function SongRow({
             <p className="text-xs text-text-muted truncate leading-snug">{song.artist}</p>
           )}
         </div>
+        <button
+          type="button"
+          className={cn(
+            "shrink-0 opacity-0 group-hover/song:opacity-100 transition-opacity p-0.5 rounded",
+            isFavorite && "opacity-100"
+          )}
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
+          aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          aria-pressed={isFavorite ? "true" : "false"}
+        >
+          <Heart className={cn("h-3 w-3", isFavorite ? "fill-danger text-danger" : "text-text-muted")} />
+        </button>
       </button>
 
       {/* Expanded blocks */}

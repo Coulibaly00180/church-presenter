@@ -116,6 +116,7 @@ const cpApi: CpApi = {
     importJson: () => ipcRenderer.invoke("songs:importJson"),
     importWordBatch: () => ipcRenderer.invoke("songs:importWordBatch"),
     importAuto: () => ipcRenderer.invoke("songs:importAuto"),
+    getFrequent: (limit?: number) => ipcRenderer.invoke("songs:getFrequent", limit),
   },
 
   plans: {

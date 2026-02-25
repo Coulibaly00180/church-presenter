@@ -414,6 +414,7 @@ export interface CpApi {
     importJson: () => Promise<CpSongImportJsonResult>;
     importWordBatch: () => Promise<CpSongImportWordBatchResult>;
     importAuto: () => Promise<CpSongImportAutoResult>;
+    getFrequent: (limit?: number) => Promise<CpSongListItem[]>;
   };
   plans: {
     list: () => Promise<CpPlanListItem[]>;

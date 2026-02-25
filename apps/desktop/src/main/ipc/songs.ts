@@ -1296,5 +1296,38 @@ export function registerSongsIpc() {
       report,
     };
   });
+
+  // ─── songs:getFrequent ─────────────────────────────────────────────────────
+  ipcMain.handle("songs:getFrequent", async (_evt, rawLimit?: unknown) => {
+    const prisma = getPrisma();
+    const limit = typeof rawLimit === "number" && rawLimit > 0 ? Math.min(rawLimit, 50) : 10;
+
+    // Group ServiceItems by songId (SONG_BLOCK kind only), count occurrences
+    const grouped = await prisma.serviceItem.groupBy({
+      by: ["songId"],
+      where: { kind: "SONG_BLOCK", songId: { not: null } },
+      _count: { songId: true },
+      orderBy: { _count: { songId: "desc" } },
+      take: limit * 3, // fetch extra in case some songs are deleted
+    });
+
+    const songIds = grouped
+      .map((g) => g.songId)
+      .filter((id): id is string => !!id);
+
+    if (songIds.length === 0) return [];
+
+    const songs = await prisma.song.findMany({
+      where: { id: { in: songIds }, deletedAt: null },
+      select: { id: true, title: true, artist: true, album: true, year: true, updatedAt: true },
+      take: limit,
+    });
+
+    // Reorder songs to match groupBy order
+    const order = new Map(songIds.map((id, i) => [id, i]));
+    return songs
+      .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999))
+      .map((s) => ({ ...s, matchSnippet: null }));
+  });
 }
 
