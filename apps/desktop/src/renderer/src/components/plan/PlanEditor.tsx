@@ -27,6 +27,7 @@ import { EditItemDialog } from "@/components/dialogs/EditItemDialog";
 import { ServicePreviewDialog } from "@/components/dialogs/ServicePreviewDialog";
 import { PlanItemCard, PlanItemCardGhost } from "./PlanItemCard";
 import { PlanToolbar } from "./PlanToolbar";
+import { Dashboard } from "./Dashboard";
 
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
@@ -93,13 +94,14 @@ export function PlanEditor() {
 
   if (!plan) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-text-muted px-8 text-center">
-        <ClipboardList className="h-14 w-14 opacity-20" />
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-text-secondary">Aucun plan sélectionné</p>
-          <p className="text-xs">Choisissez ou créez un plan via l'en-tête</p>
-        </div>
-      </div>
+      <>
+        <Dashboard />
+        <AddItemDialog
+          open={addDialogOpen}
+          onClose={() => setAddDialogOpen(false)}
+          onSelect={(kind) => void handleSelectKind(kind)}
+        />
+      </>
     );
   }
 
