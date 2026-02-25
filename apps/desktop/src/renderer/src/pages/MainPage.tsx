@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { PlanEditor } from "@/components/plan/PlanEditor";
 import { SourcePanel } from "@/components/source/SourcePanel";
+import { SongDetailPanel } from "@/components/source/SongDetailPanel";
 import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
 import { Button } from "@/components/ui/button";
 
@@ -119,6 +120,7 @@ function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) {
 export function MainPage() {
   // null = loading, true = show welcome, false = skip welcome
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
+  const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check first-launch: show welcome if no songs and no plans
@@ -133,8 +135,15 @@ export function MainPage() {
   return (
     <AppShell>
       <div className="relative flex flex-1 overflow-hidden">
-        <SourcePanel />
-        <PlanEditor />
+        <SourcePanel onSelectSong={(id) => setSelectedSongId(id)} />
+        {selectedSongId ? (
+          <SongDetailPanel
+            songId={selectedSongId}
+            onClose={() => setSelectedSongId(null)}
+          />
+        ) : (
+          <PlanEditor />
+        )}
         {showWelcome && (
           <WelcomeScreen onDismiss={() => setShowWelcome(false)} />
         )}

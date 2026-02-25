@@ -20,7 +20,11 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"];
 
-export function SourcePanel() {
+interface SourcePanelProps {
+  onSelectSong?: (id: string) => void;
+}
+
+export function SourcePanel({ onSelectSong }: SourcePanelProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("songs");
   const [songEditorOpen, setSongEditorOpen] = useState(false);
@@ -136,7 +140,10 @@ export function SourcePanel() {
         {/* Tab content */}
         <div className="flex-1 overflow-hidden">
           {activeTab === "songs" && (
-            <SongsTab onCreateSong={() => setSongEditorOpen(true)} />
+            <SongsTab
+              onCreateSong={() => setSongEditorOpen(true)}
+              onSelectSong={onSelectSong}
+            />
           )}
           {activeTab === "bible" && <BibleTab />}
           {activeTab === "announcements" && <AnnouncementsTab />}
