@@ -143,6 +143,7 @@ export type CpPlanItem = {
   kind: CpPlanItemKind;
   title?: string | null;
   content?: string | null;
+  notes?: string | null;
   refId?: string | null;
   refSubId?: string | null;
   mediaPath?: string | null;
@@ -180,7 +181,7 @@ export type CpPlanDuplicatePayload = { planId: string; dateIso?: string; title?:
 export type CpPlanCreatePayload = { dateIso: string; title?: string };
 export type CpPlanUpdatePayload = { planId: string; title?: string };
 export type CpPlanUpdateResult = { ok: true };
-export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string };
+export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string; notes?: string };
 export type CpPlanUpdateItemResult = { ok: true };
 export type CpPlanRemoveItemPayload = { planId: string; itemId: string };
 export type CpPlanReorderPayload = { planId: string; orderedItemIds: string[] };

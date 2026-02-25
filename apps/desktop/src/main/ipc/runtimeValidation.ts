@@ -391,6 +391,7 @@ export function parsePlanUpdateItemPayload(value: unknown): CpPlanUpdateItemPayl
     itemId: expectString(rec.itemId, "plans:updateItem.itemId"),
     title: expectOptionalString(rec.title, "plans:updateItem.title", { trim: false, allowEmpty: true }),
     content: expectOptionalString(rec.content, "plans:updateItem.content", { trim: false, allowEmpty: true }),
+    notes: expectOptionalString(rec.notes, "plans:updateItem.notes", { trim: false, allowEmpty: true }),
   };
 }
 

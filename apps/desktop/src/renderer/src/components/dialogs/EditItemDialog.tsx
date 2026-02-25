@@ -33,6 +33,7 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
   const { updateItem } = usePlan();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [notes, setNotes] = useState("");
   const [minutes, setMinutes] = useState(5);
   const [seconds, setSeconds] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -43,6 +44,7 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
   useEffect(() => {
     if (!item || !open) return;
     setTitle(item.title ?? "");
+    setNotes(item.notes ?? "");
     if (isTimer && item.content) {
       const { minutes: m, seconds: s } = parseMMSS(item.content);
       setMinutes(m);
@@ -64,6 +66,7 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
       await updateItem(item.id, {
         title: title.trim() || undefined,
         ...(newContent !== undefined && { content: newContent }),
+        notes: notes.trim() || undefined,
       });
       toast.success("Élément mis à jour");
       onClose();
@@ -172,6 +175,18 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
               />
             </div>
           )}
+
+          {/* Notes privées régie (pour tous les types) */}
+          <div className="space-y-1 pt-1 border-t border-border">
+            <label className="text-xs font-medium text-text-muted">Notes de régie (privées)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 text-sm rounded-md border border-border bg-bg-surface text-text-secondary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+              placeholder="Notes visibles uniquement ici, non projetées…"
+            />
+          </div>
         </div>
 
         <DialogFooter>

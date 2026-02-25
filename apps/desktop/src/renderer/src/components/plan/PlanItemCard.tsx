@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KindBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -114,7 +114,7 @@ export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: Pla
       {/* Kind badge */}
       <KindBadge kind={item.kind as CpPlanItemKind} className="shrink-0" />
 
-      {/* Title + subtitle */}
+      {/* Title + subtitle + notes indicator */}
       <div className="flex flex-col flex-1 min-w-0 py-2">
         <span
           className={cn(
@@ -127,6 +127,12 @@ export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: Pla
         {subtitle && (
           <span className="text-xs text-text-muted truncate leading-snug mt-0.5 italic">
             {subtitle}
+          </span>
+        )}
+        {item.notes && (
+          <span className="flex items-center gap-1 text-xs text-text-muted truncate leading-snug mt-0.5">
+            <MessageSquare className="h-2.5 w-2.5 shrink-0" aria-hidden />
+            <span className="truncate">{item.notes}</span>
           </span>
         )}
       </div>

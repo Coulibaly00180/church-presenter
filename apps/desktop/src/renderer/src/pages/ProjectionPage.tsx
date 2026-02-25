@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 type ProjectionState = CpProjectionState;
@@ -19,7 +19,7 @@ function formatMMSS(totalSecs: number): string {
 
 // ─── Composants de rendu ──────────────────────────────────────────────────────
 
-function TimerDisplay({ body, startedAt }: { body: string; startedAt: number }) {
+function TimerDisplay({ body, startedAt, onExpired }: { body: string; startedAt: number; onExpired?: () => void }) {
   const totalSeconds = parseMMSS(body);
 
   const [remaining, setRemaining] = useState(() => {
@@ -38,6 +38,16 @@ function TimerDisplay({ body, startedAt }: { body: string; startedAt: number }) 
   }, [totalSeconds, startedAt]);
 
   const isDone = remaining <= 0;
+
+  // Notify parent once when timer expires
+  const firedRef = useRef(false);
+  useEffect(() => { firedRef.current = false; }, [startedAt]);
+  useEffect(() => {
+    if (isDone && !firedRef.current && onExpired) {
+      firedRef.current = true;
+      onExpired();
+    }
+  }, [isDone, onExpired]);
 
   return (
     <div className="flex items-center justify-center w-full h-full">
@@ -58,12 +68,12 @@ function TimerDisplay({ body, startedAt }: { body: string; startedAt: number }) 
   );
 }
 
-function TextContent({ state }: { state: ProjectionState }) {
+function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTimerExpired?: () => void }) {
   const { current } = state;
   const isTimer = current.title?.startsWith("TIMER:");
 
   if (isTimer) {
-    return <TimerDisplay body={current.body ?? "0:00"} startedAt={state.updatedAt} />;
+    return <TimerDisplay body={current.body ?? "0:00"} startedAt={state.updatedAt} onExpired={onTimerExpired} />;
   }
 
   const scaleFactor = state.textScale ?? 1;
@@ -117,7 +127,7 @@ function MediaContent({ state }: { state: ProjectionState }) {
   );
 }
 
-function ProjectionContent({ state }: { state: ProjectionState }) {
+function ProjectionContent({ state, onTimerExpired }: { state: ProjectionState; onTimerExpired?: () => void }) {
   const { mode, current } = state;
 
   if (mode === "BLACK") {
@@ -154,7 +164,7 @@ function ProjectionContent({ state }: { state: ProjectionState }) {
       {/* Content */}
       <div className="relative z-10 w-full h-full">
         {current.kind === "EMPTY" && null}
-        {current.kind === "TEXT" && <TextContent state={state} />}
+        {current.kind === "TEXT" && <TextContent state={state} onTimerExpired={onTimerExpired} />}
         {current.kind === "MEDIA" && <MediaContent state={state} />}
       </div>
     </div>
@@ -165,9 +175,9 @@ export function ProjectionPage() {
   const [searchParams] = useSearchParams();
   const screenKey = (searchParams.get("screen") ?? "A") as ScreenKey;
   const [projState, setProjState] = useState<ProjectionState | null>(null);
+  const autoBlackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // Load initial state
     if (screenKey === "A") {
       void window.cp.projection.getState().then(setProjState);
       const unsub = window.cp.projection.onState(setProjState);
@@ -179,13 +189,27 @@ export function ProjectionPage() {
     }
   }, [screenKey]);
 
+  // Cancel auto-black if the slide changes
+  useEffect(() => {
+    if (autoBlackTimerRef.current) {
+      clearTimeout(autoBlackTimerRef.current);
+      autoBlackTimerRef.current = null;
+    }
+  }, [projState?.updatedAt]);
+
+  const handleTimerExpired = useCallback(() => {
+    autoBlackTimerRef.current = setTimeout(() => {
+      void window.cp.live.toggleBlack();
+    }, 3000);
+  }, []);
+
   if (!projState) {
     return <div className="w-screen h-screen bg-black" />;
   }
 
   return (
     <div className="w-screen h-screen overflow-hidden">
-      <ProjectionContent state={projState} />
+      <ProjectionContent state={projState} onTimerExpired={handleTimerExpired} />
     </div>
   );
 }

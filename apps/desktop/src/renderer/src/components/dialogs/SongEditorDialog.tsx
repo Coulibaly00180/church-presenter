@@ -305,7 +305,7 @@ function SortableBlockItem({
       ref={setNodeRef}
       style={dndStyle}
       className={cn(
-        "flex items-center gap-1 rounded px-1.5 py-1 cursor-pointer transition-colors",
+        "group flex items-center gap-1 rounded px-1.5 py-1 cursor-pointer transition-colors",
         isActive ? "bg-bg-elevated text-text-primary" : "hover:bg-bg-elevated text-text-secondary",
         isDragging && "opacity-50"
       )}

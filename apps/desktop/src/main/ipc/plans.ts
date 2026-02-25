@@ -220,6 +220,7 @@ export function registerPlansIpc() {
       data: {
         ...(payload.title !== undefined ? { title: payload.title } : {}),
         ...(payload.content !== undefined ? { content: payload.content } : {}),
+        ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
       },
     });
     return { ok: true };
