@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 
 type ProjectionState = CpProjectionState;
@@ -68,9 +68,32 @@ function TimerDisplay({ body, startedAt, onExpired }: { body: string; startedAt:
   );
 }
 
+const CUSTOM_FONT_FAMILY = "cp-custom-font";
+
 function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTimerExpired?: () => void }) {
   const { current } = state;
   const isTimer = current.title?.startsWith("TIMER:");
+
+  // Load custom font file if provided via @font-face style injection
+  const fontFamilyToUse = useMemo(() => {
+    if (state.textFontPath) return CUSTOM_FONT_FAMILY;
+    return state.textFont || "system-ui";
+  }, [state.textFont, state.textFontPath]);
+
+  useEffect(() => {
+    const styleId = "cp-projection-custom-font";
+    let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = styleId;
+      document.head.appendChild(styleEl);
+    }
+    if (state.textFontPath) {
+      styleEl.textContent = `@font-face { font-family: "${CUSTOM_FONT_FAMILY}"; src: url("file://${CSS.escape(state.textFontPath)}"); }`;
+    } else {
+      styleEl.textContent = "";
+    }
+  }, [state.textFontPath]);
 
   if (isTimer) {
     return <TimerDisplay body={current.body ?? "0:00"} startedAt={state.updatedAt} onExpired={onTimerExpired} />;
@@ -86,6 +109,7 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
   const applyFgStyle = (el: HTMLElement | null, fontSize: number) => {
     if (!el) return;
     el.style.fontSize = `${fontSize}px`;
+    el.style.fontFamily = fontFamilyToUse;
     if (fgGradientStyle) {
       el.style.background = fgGradientStyle;
       el.style.webkitBackgroundClip = "text";

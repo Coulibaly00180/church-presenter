@@ -35,6 +35,11 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [fgFrom, setFgFrom] = useState("#ffffff");
   const [fgTo, setFgTo] = useState("#A5B4FC");
 
+  // Projection — typography
+  const [textFont, setTextFont] = useState("system-ui");
+  const [textFontPath, setTextFontPath] = useState("");
+  const [textFontLabel, setTextFontLabel] = useState("");
+
   // Projection — text scale + logo
   const [textScale, setTextScale] = useState(1);
   const [logoPath, setLogoPath] = useState("");
@@ -66,6 +71,9 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       setFg(state.foreground ?? "#ffffff");
       setFgFrom(state.foregroundGradientFrom ?? "#ffffff");
       setFgTo(state.foregroundGradientTo ?? "#A5B4FC");
+      setTextFont(state.textFont ?? "system-ui");
+      setTextFontPath(state.textFontPath ?? "");
+      setTextFontLabel(state.textFontPath ? state.textFontPath.split(/[\\/]/).pop() ?? "" : "");
       setTextScale(state.textScale ?? 1);
       setLogoPath(state.logoPath ?? "");
       setLogoPosition((state.logoPosition as CpLogoPosition) ?? "bottom-right");
@@ -94,13 +102,15 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       foregroundMode: fgMode,
       foregroundGradientFrom: fgFrom,
       foregroundGradientTo: fgTo,
+      textFont,
+      textFontPath,
       textScale,
       logoPath,
       logoPosition,
       logoOpacity,
     });
     toast.success("Apparence de projection appliquée");
-  }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textScale, logoPath, logoPosition, logoOpacity]);
+  }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textFont, textFontPath, textScale, logoPath, logoPosition, logoOpacity]);
 
   const handlePickLogo = useCallback(async () => {
     const result = await window.cp.files.pickMedia();
@@ -120,6 +130,24 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   const handleClearBgImage = useCallback(() => {
     setBgImage("");
+  }, []);
+
+  const handlePickFont = useCallback(async () => {
+    const result = await window.cp.files.pickFont();
+    if (result.ok && result.path) {
+      const validation = await window.cp.files.validateFont({ path: result.path });
+      if (validation.ok && validation.valid) {
+        setTextFontPath(result.path);
+        setTextFontLabel(result.path.split(/[\\/]/).pop() ?? "");
+        setTextFont(validation.family ?? "custom");
+      }
+    }
+  }, []);
+
+  const handleClearFont = useCallback(() => {
+    setTextFontPath("");
+    setTextFontLabel("");
+    setTextFont("system-ui");
   }, []);
 
   // ─── Interface handlers ────────────────────────────────────────────────────
@@ -406,25 +434,81 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 )}
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-text-secondary">Taille du texte</label>
-                  <span className="text-xs text-text-muted tabular-nums">{Math.round(textScale * 100)}%</span>
+              {/* Typography */}
+              <div className="space-y-2 border-t border-border pt-3">
+                <p className="text-xs font-medium text-text-secondary">Typographie</p>
+
+                {/* Font presets */}
+                <div className="flex flex-wrap gap-1">
+                  {([
+                    ["system-ui", "Système"],
+                    ["Georgia, serif", "Georgia"],
+                    ["'Courier New', monospace", "Courier"],
+                    ["Arial, sans-serif", "Arial"],
+                  ] as [string, string][]).map(([font, label]) => (
+                    <button
+                      key={font}
+                      type="button"
+                      className={cn(
+                        "text-xs px-2.5 py-1 rounded border transition-colors",
+                        textFont === font && !textFontPath
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-text-muted hover:bg-bg-elevated",
+                      )}
+                      onClick={() => { setTextFont(font); setTextFontPath(""); setTextFontLabel(""); }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-                <input
-                  type="range"
-                  aria-label="Taille du texte"
-                  min={0.5}
-                  max={2}
-                  step={0.05}
-                  value={textScale}
-                  onChange={(e) => setTextScale(Number(e.target.value))}
-                  className="w-full accent-primary"
-                />
-                <div className="flex justify-between text-[10px] text-text-muted">
-                  <span>50%</span>
-                  <span>100%</span>
-                  <span>200%</span>
+
+                {/* Custom font */}
+                <div className="flex items-center gap-2">
+                  {textFontPath ? (
+                    <>
+                      <span className={cn(
+                        "text-xs px-2.5 py-1 rounded border border-primary bg-primary/10 text-primary truncate max-w-[180px]",
+                      )}>
+                        {textFontLabel}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-xs text-danger hover:underline flex items-center gap-0.5 shrink-0"
+                        onClick={handleClearFont}
+                      >
+                        <X className="h-3 w-3" />
+                        Retirer
+                      </button>
+                    </>
+                  ) : (
+                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => void handlePickFont()}>
+                      <Upload className="h-3 w-3" />
+                      Police personnalisée
+                    </Button>
+                  )}
+                </div>
+
+                {/* Size slider */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-text-secondary">Taille du texte</label>
+                    <span className="text-xs text-text-muted tabular-nums">{Math.round(textScale * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    aria-label="Taille du texte"
+                    min={0.5}
+                    max={2}
+                    step={0.05}
+                    value={textScale}
+                    onChange={(e) => setTextScale(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex justify-between text-[10px] text-text-muted">
+                    <span>50%</span>
+                    <span>100%</span>
+                    <span>200%</span>
+                  </div>
                 </div>
               </div>
 
