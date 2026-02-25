@@ -1,4 +1,4 @@
-import { BookOpen, Clock, FileImage, FileText, MessageSquare, Music2, StickyNote } from "lucide-react";
+import { BookOpen, Clock, FileImage, FileText, FileVideo, MessageSquare, Music2, StickyNote } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -53,6 +53,13 @@ const ITEM_TYPES: Array<{
     label: "PDF",
     description: "Présentation PDF",
     icon: FileText,
+    colorVar: "var(--kind-media)",
+  },
+  {
+    kind: "ANNOUNCEMENT_VIDEO",
+    label: "Vidéo",
+    description: "Lecture vidéo en projection",
+    icon: FileVideo,
     colorVar: "var(--kind-media)",
   },
   {
