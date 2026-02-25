@@ -99,9 +99,9 @@ export function SongsTab({ onCreateSong }: SongsTabProps) {
   }, [addItem]);
 
   const handleImport = useCallback(async () => {
-    const result = await window.cp.songs.importJson();
-    if ("canceled" in result) return;
-    if (!result.ok) { toast.error("Import échoué", { description: result.error }); return; }
+    const result = await window.cp.songs.importAuto();
+    if (!result.ok) return; // canceled
+    if (result.imported === 0) { toast.info("Aucun chant importé"); return; }
     toast.success(`${result.imported} chant${result.imported !== 1 ? "s" : ""} importé${result.imported !== 1 ? "s" : ""}`);
     void loadSongs(query);
   }, [loadSongs, query]);

@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
-import { CalendarDays, ChevronDown, Circle, HelpCircle, Plus, Settings, Video } from "lucide-react";
+import { CalendarDays, ChevronDown, Circle, Copy, HelpCircle, Plus, Settings, Video } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -33,7 +34,7 @@ function isTodayPlan(plan: { date: string | Date } | undefined): boolean {
 
 export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
   const { live, toggle } = useLive();
-  const { planList, selectedPlanId, plan, selectPlan, createPlan } = usePlan();
+  const { planList, selectedPlanId, plan, selectPlan, createPlan, refreshList } = usePlan();
   const [creatingPlan, setCreatingPlan] = useState(false);
 
   const isLive = live?.enabled ?? false;
@@ -46,6 +47,16 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
       setCreatingPlan(false);
     }
   }, [createPlan]);
+
+  const handleDuplicate = useCallback(async () => {
+    if (!selectedPlanId) return;
+    const duplicated = await window.cp.plans.duplicate({ planId: selectedPlanId });
+    if (duplicated) {
+      await refreshList();
+      selectPlan(duplicated.id);
+      toast.success("Plan dupliqué");
+    }
+  }, [selectedPlanId, refreshList, selectPlan]);
 
   return (
     <header
@@ -113,6 +124,12 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
               })
             )}
             <DropdownMenuSeparator />
+            {plan && (
+              <DropdownMenuItem onClick={() => void handleDuplicate()}>
+                <Copy className="h-3.5 w-3.5" />
+                Dupliquer ce plan
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => void handleCreateToday()} disabled={creatingPlan}>
               <Plus className="h-3.5 w-3.5" />
               {creatingPlan ? "Création…" : "Nouveau plan"}

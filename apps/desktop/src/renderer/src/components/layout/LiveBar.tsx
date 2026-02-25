@@ -85,8 +85,7 @@ export function LiveBar() {
 
   return (
     <div
-      className="flex flex-col bg-bg-base border-t border-border overflow-hidden"
-      style={{ height: "var(--live-bar-height)", minHeight: "var(--live-bar-height)" }}
+      className="flex flex-col bg-bg-base border-t border-border overflow-hidden h-[var(--live-bar-height)] min-h-[var(--live-bar-height)]"
       role="region"
       aria-label="Barre Mode Direct"
     >
@@ -135,6 +134,13 @@ export function LiveBar() {
 
         {/* Navigation */}
         <NavControls className="ml-auto" />
+
+        {/* Progress counter */}
+        {plan && (
+          <span className="text-xs tabular-nums text-text-muted font-medium px-1">
+            {live.cursor + 1} / {plan.items.length}
+          </span>
+        )}
 
         {/* Screen selector */}
         <ScreenSelector />

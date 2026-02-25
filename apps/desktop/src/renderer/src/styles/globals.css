@@ -102,13 +102,12 @@
   --plan-item-height-compact:  56px;
   --plan-item-height-expanded: 72px;
   --source-panel-width:        280px;
-  --live-bar-height:           64px;
+  --live-bar-height:           220px;
   --btn-height-sm:  28px;
   --btn-height-md:  32px;
   --btn-height-lg:  40px;
   --btn-height-xl:  48px;
   --header-height:  48px;
-  --live-bar-height: 220px;
 }
 
 /* ─── Mode Préparation — thème clair (défaut) ───────────────────────────────

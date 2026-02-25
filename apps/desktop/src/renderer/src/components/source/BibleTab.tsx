@@ -240,7 +240,7 @@ function ChaptersView({
         <span className="text-sm font-medium">{book.name}</span>
       </div>
       <ScrollArea className="flex-1">
-        <div className="grid grid-cols-6 gap-1 p-3" style={{ maxHeight: "80px" }}>
+        <div className="grid grid-cols-6 gap-1 p-3 max-h-[80px]">
           {Array.from({ length: book.chapters }, (_, i) => i + 1).map((ch) => (
             <button
               key={ch}
