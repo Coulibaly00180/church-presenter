@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Check, Download, FileInput, LayoutList, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { BookOpen, Check, Download, FileInput, LayoutList, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PlanTemplateDialog } from "@/components/dialogs/PlanTemplateDialog";
 import { usePlan } from "@/hooks/usePlan";
 import { isoToYmd } from "@/lib/date";
 
@@ -21,6 +22,7 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
   const { plan, updatePlan, deletePlan, selectedPlanId } = usePlan();
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const displayTitle = plan?.title ?? (plan?.date ? isoToYmd(plan.date) : "Plan");
@@ -142,6 +144,11 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
                 <DropdownMenuSeparator />
               </>
             )}
+            <DropdownMenuItem onClick={() => setTemplateDialogOpen(true)}>
+              <BookOpen className="h-4 w-4" />
+              Modèles de plans
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => void handleExport()}>
               <Download className="h-4 w-4" />
               Exporter le plan
@@ -161,6 +168,8 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <PlanTemplateDialog open={templateDialogOpen} onClose={() => setTemplateDialogOpen(false)} />
     </div>
   );
 }
