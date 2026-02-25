@@ -4,6 +4,7 @@ import { constants as fsConstants } from "fs";
 import { join, basename, dirname, extname } from "path";
 import { access, copyFile, mkdir, readdir, readFile, stat, unlink, writeFile, rename } from "fs/promises";
 import { registerSongsIpc } from "./ipc/songs";
+import type { RegisterSongsIpcOptions } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
@@ -777,6 +778,8 @@ type LibraryDirs = {
   imagesDir: string;
   documentsDir: string;
   fontsDir: string;
+  videosDir: string;
+  songsJsonDir: string;
 };
 
 function buildLibraryDirs(rootDir: string): LibraryDirs {
@@ -785,6 +788,8 @@ function buildLibraryDirs(rootDir: string): LibraryDirs {
     imagesDir: join(rootDir, "images"),
     documentsDir: join(rootDir, "documents"),
     fontsDir: join(rootDir, "fonts"),
+    videosDir: join(rootDir, "videos"),
+    songsJsonDir: join(rootDir, "songs"),
   };
 }
 
@@ -794,6 +799,8 @@ async function ensureLibraryDirs(rootDir: string): Promise<LibraryDirs> {
   await mkdir(dirs.imagesDir, { recursive: true });
   await mkdir(dirs.documentsDir, { recursive: true });
   await mkdir(dirs.fontsDir, { recursive: true });
+  await mkdir(dirs.videosDir, { recursive: true });
+  await mkdir(dirs.songsJsonDir, { recursive: true });
   return dirs;
 }
 
@@ -866,7 +873,7 @@ async function validateFontFilePath(filePath: string): Promise<{ valid: boolean;
   }
 }
 
-async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "fonts" | "root"): Promise<CpMediaFile[]> {
+async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "fonts" | "videos" | "root"): Promise<CpMediaFile[]> {
   if (!(await pathExists(dirPath))) return [];
   const entries = await readdir(dirPath);
   const filesRaw = await Promise.all(
@@ -936,6 +943,9 @@ function createRegieWindow() {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
+      // Allow file:// URLs for media preview in development (same policy as projection windows).
+      webSecurity: app.isPackaged,
+      allowRunningInsecureContent: !app.isPackaged,
     },
   });
 
@@ -1088,7 +1098,13 @@ void app.whenReady().then(async () => {
   }
 
   try {
-    registerSongsIpc();
+    const songsIpcOptions: RegisterSongsIpcOptions = {
+      getSongsJsonDir: async () => {
+        const dirs = await getActiveLibraryDirs();
+        return dirs.songsJsonDir;
+      },
+    };
+    registerSongsIpc(songsIpcOptions);
   } catch (e) {
     console.error("registerSongsIpc failed", e);
   }
@@ -1188,11 +1204,12 @@ ipcMain.handle("devtools:open", (_evt, rawTarget: unknown) => {
 ipcMain.handle("diagnostics:getState", async () => {
   try {
     const dirs = await getActiveLibraryDirs();
-    const [root, images, documents, fonts] = await Promise.all([
+    const [root, images, documents, fonts, videos] = await Promise.all([
       getFolderDiagnostics(dirs.rootDir),
       getFolderDiagnostics(dirs.imagesDir),
       getFolderDiagnostics(dirs.documentsDir),
       getFolderDiagnostics(dirs.fontsDir),
+      getFolderDiagnostics(dirs.videosDir),
     ]);
 
     const screens = (["A", "B", "C"] as ScreenKey[]).map((key) => ({
@@ -1212,7 +1229,7 @@ ipcMain.handle("diagnostics:getState", async () => {
         userDataDir: app.getPath("userData"),
         libraryDir: dirs.rootDir,
         screens,
-        folders: { root, images, documents, fonts },
+        folders: { root, images, documents, fonts, videos },
       },
     };
   } catch (e: unknown) {
@@ -1389,9 +1406,9 @@ ipcMain.handle("settings:deleteProfile", async (_evt, rawPayload: unknown) => {
 
 ipcMain.handle("files:pickMedia", async () => {
   const res = await dialog.showOpenDialog({
-    title: "Choisir un fichier media (image / PDF)",
+    title: "Choisir un fichier media (image / PDF / vidéo)",
     filters: [
-      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf"] },
+      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf", "mp4", "webm", "mov", "avi", "mkv"] },
       { name: "All", extensions: ["*"] },
     ],
     properties: ["openFile"],
@@ -1402,7 +1419,7 @@ ipcMain.handle("files:pickMedia", async () => {
   if (!mediaType) return { ok: false, error: "Unsupported media extension" };
 
   const dirs = await getActiveLibraryDirs();
-  const targetDir = mediaType === "IMAGE" ? dirs.imagesDir : dirs.documentsDir;
+  const targetDir = mediaType === "IMAGE" ? dirs.imagesDir : mediaType === "PDF" ? dirs.documentsDir : dirs.videosDir;
   const target = join(targetDir, basename(p));
   try {
     await copyFile(p, target);
@@ -1445,14 +1462,15 @@ ipcMain.handle("files:pickFont", async () => {
 ipcMain.handle("files:listMedia", async () => {
   try {
     const dirs = await getActiveLibraryDirs();
-    const [imagesFiles, documentFiles, fontFiles, legacyRootFiles] = await Promise.all([
+    const [imagesFiles, documentFiles, fontFiles, videoFiles, legacyRootFiles] = await Promise.all([
       listLibraryFilesInDir(dirs.imagesDir, "images"),
       listLibraryFilesInDir(dirs.documentsDir, "documents"),
       listLibraryFilesInDir(dirs.fontsDir, "fonts"),
+      listLibraryFilesInDir(dirs.videosDir, "videos"),
       listLibraryFilesInDir(dirs.rootDir, "root"),
     ]);
     const filesByPath = new Map<string, CpMediaFile>();
-    [...imagesFiles, ...documentFiles, ...fontFiles, ...legacyRootFiles].forEach((file) => {
+    [...imagesFiles, ...documentFiles, ...fontFiles, ...videoFiles, ...legacyRootFiles].forEach((file) => {
       filesByPath.set(file.path, file);
     });
     const files = Array.from(filesByPath.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));

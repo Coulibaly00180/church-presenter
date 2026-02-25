@@ -38,6 +38,10 @@ export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem,
     await projectMediaToScreen({ target, title, mediaPath: item.mediaPath, mediaType: "PDF", lockedScreens });
     return;
   }
+  if (item.kind === "ANNOUNCEMENT_VIDEO" && item.mediaPath) {
+    await projectMediaToScreen({ target, title, mediaPath: item.mediaPath, mediaType: "VIDEO", lockedScreens });
+    return;
+  }
   if (item.kind === "TIMER") {
     await projectTextToScreen({ target, title: `TIMER:${title}`, body, lockedScreens });
     return;

@@ -213,6 +213,7 @@
   [data-kind="ANNOUNCEMENT_TEXT"]  { border-left-color: var(--kind-announcement); }
   [data-kind="ANNOUNCEMENT_IMAGE"] { border-left-color: var(--kind-media); }
   [data-kind="ANNOUNCEMENT_PDF"]   { border-left-color: var(--kind-media); }
+  [data-kind="ANNOUNCEMENT_VIDEO"] { border-left-color: var(--kind-media); }
   [data-kind="TIMER"]              { border-left-color: var(--kind-timer); }
 }
 

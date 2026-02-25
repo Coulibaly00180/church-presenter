@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { getPrisma } from "../db";
 import { Document, Packer, Paragraph, TextRun } from "docx";
 import mammoth from "mammoth";
-import { readFile, writeFile } from "fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
 import AdmZip from "adm-zip";
 import type { CpSongImportDocError, CpSongImportJsonError, CpSongImportReportEntry } from "../../shared/ipc";
@@ -997,7 +997,72 @@ function uniqueDocxName(baseTitle: string, used: Set<string>) {
   return candidate;
 }
 
-export function registerSongsIpc() {
+const SONG_JSON_KIND = "CHURCH_PRESENTER_SONGS_EXPORT" as const;
+const SONG_JSON_SCHEMA_VERSION = 2 as const;
+
+type SongForJsonSync = {
+  id: string;
+  title: string;
+  artist?: string | null;
+  album?: string | null;
+  year?: string | null;
+  blocks: Array<{ order: number; type: string; title?: string | null; content: string }>;
+};
+
+async function writeSongJsonAutoSync(
+  song: SongForJsonSync,
+  dirFn: (() => Promise<string | null>) | undefined,
+): Promise<void> {
+  if (!dirFn) return;
+  try {
+    const dir = await dirFn();
+    if (!dir) return;
+    await mkdir(dir, { recursive: true });
+    const data = {
+      kind: SONG_JSON_KIND,
+      schemaVersion: SONG_JSON_SCHEMA_VERSION,
+      payload: {
+        songs: [
+          {
+            title: song.title,
+            artist: song.artist ?? undefined,
+            album: song.album ?? undefined,
+            year: song.year ?? undefined,
+            blocks: song.blocks.map((b) => ({
+              order: b.order,
+              type: b.type,
+              title: b.title ?? undefined,
+              content: b.content,
+            })),
+          },
+        ],
+      },
+    };
+    await writeFile(path.join(dir, `${song.id}.json`), JSON.stringify(data, null, 2), "utf-8");
+  } catch {
+    // Auto-sync is best-effort; ignore errors silently.
+  }
+}
+
+async function deleteSongJsonAutoSync(
+  songId: string,
+  dirFn: (() => Promise<string | null>) | undefined,
+): Promise<void> {
+  if (!dirFn) return;
+  try {
+    const dir = await dirFn();
+    if (!dir) return;
+    await unlink(path.join(dir, `${songId}.json`));
+  } catch {
+    // File may not exist; ignore.
+  }
+}
+
+export type RegisterSongsIpcOptions = {
+  getSongsJsonDir?: () => Promise<string | null>;
+};
+
+export function registerSongsIpc(options?: RegisterSongsIpcOptions) {
   ipcMain.handle("songs:list", async (_evt, rawQ?: unknown) => {
     const prisma = getPrisma();
     const query = (parseOptionalQuery(rawQ, "songs:list.query") ?? "").trim();
@@ -1061,7 +1126,7 @@ export function registerSongsIpc() {
   ipcMain.handle("songs:create", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
     const payload = parseSongCreatePayload(rawPayload);
-    return prisma.song.create({
+    const song = await prisma.song.create({
       data: {
         title: payload.title,
         artist: payload.artist,
@@ -1076,22 +1141,26 @@ export function registerSongsIpc() {
       },
       include: { blocks: { orderBy: { order: "asc" } } },
     });
+    void writeSongJsonAutoSync(song, options?.getSongsJsonDir);
+    return song;
   });
 
   ipcMain.handle("songs:updateMeta", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
     const payload = parseSongUpdateMetaPayload(rawPayload);
-    return prisma.song.update({
+    const song = await prisma.song.update({
       where: { id: payload.id },
       data: { title: payload.title, artist: payload.artist, album: payload.album, year: payload.year },
       include: { blocks: { orderBy: { order: "asc" } } },
     });
+    void writeSongJsonAutoSync(song, options?.getSongsJsonDir);
+    return song;
   });
 
   ipcMain.handle("songs:replaceBlocks", async (_evt, rawPayload: unknown) => {
     const prisma = getPrisma();
     const payload = parseSongReplaceBlocksPayload(rawPayload);
-    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const song = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.songBlock.deleteMany({ where: { songId: payload.songId } });
       await tx.songBlock.createMany({
         data: payload.blocks.map((b) => ({
@@ -1108,12 +1177,15 @@ export function registerSongsIpc() {
         include: { blocks: { orderBy: { order: "asc" } } },
       });
     });
+    if (song) void writeSongJsonAutoSync(song, options?.getSongsJsonDir);
+    return song;
   });
 
   ipcMain.handle("songs:delete", async (_evt, rawId: unknown) => {
     const prisma = getPrisma();
     const id = parseNonEmptyString(rawId, "songs:delete.id");
     await prisma.song.update({ where: { id }, data: { deletedAt: new Date() } });
+    void deleteSongJsonAutoSync(id, options?.getSongsJsonDir);
     return { ok: true };
   });
 

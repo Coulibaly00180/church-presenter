@@ -3,6 +3,7 @@ import type { CpLibraryFileKind, CpMediaType } from "../../shared/ipc";
 
 const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
 const PDF_EXTENSIONS = new Set([".pdf"]);
+const VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".mov", ".avi", ".mkv"]);
 const DOCUMENT_EXTENSIONS = new Set([".doc", ".docx", ".odt", ".rtf", ".txt"]);
 const FONT_EXTENSIONS = new Set([".ttf", ".otf"]);
 
@@ -13,6 +14,11 @@ const MIME_BY_EXT: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".avi": "video/x-msvideo",
+  ".mkv": "video/x-matroska",
   ".doc": "application/msword",
   ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ".odt": "application/vnd.oasis.opendocument.text",
@@ -26,6 +32,7 @@ export function inferMediaType(filePath: string): CpMediaType | null {
   const ext = extname(filePath).toLowerCase();
   if (PDF_EXTENSIONS.has(ext)) return "PDF";
   if (IMAGE_EXTENSIONS.has(ext)) return "IMAGE";
+  if (VIDEO_EXTENSIONS.has(ext)) return "VIDEO";
   return null;
 }
 
@@ -33,6 +40,7 @@ export function inferLibraryFileKind(filePath: string): CpLibraryFileKind | null
   const ext = extname(filePath).toLowerCase();
   if (PDF_EXTENSIONS.has(ext)) return "PDF";
   if (IMAGE_EXTENSIONS.has(ext)) return "IMAGE";
+  if (VIDEO_EXTENSIONS.has(ext)) return "VIDEO";
   if (DOCUMENT_EXTENSIONS.has(ext)) return "DOCUMENT";
   if (FONT_EXTENSIONS.has(ext)) return "FONT";
   return null;

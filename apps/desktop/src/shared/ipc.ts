@@ -5,7 +5,7 @@ export type ScreenKey = "A" | "B" | "C";
 export type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
 
 export type CpProjectionMode = "NORMAL" | "BLACK" | "WHITE";
-export type CpMediaType = "IMAGE" | "PDF";
+export type CpMediaType = "IMAGE" | "PDF" | "VIDEO";
 export type CpBackgroundFillMode = "SOLID" | "GRADIENT_LINEAR" | "GRADIENT_RADIAL";
 export type CpForegroundFillMode = "SOLID" | "GRADIENT";
 export type CpLogoPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center";
@@ -213,7 +213,7 @@ export type CpDevtoolsTarget = "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" 
 export type CpDevtoolsOpenResult = { ok: true } | { ok: false; reason: "DISABLED_IN_PROD" };
 
 export type CpLibraryFileKind = CpMediaType | "DOCUMENT" | "FONT";
-export type CpLibraryFileFolder = "images" | "documents" | "fonts" | "root";
+export type CpLibraryFileFolder = "images" | "documents" | "fonts" | "videos" | "root";
 export type CpMediaFile = {
   name: string;
   path: string;

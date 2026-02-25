@@ -13,6 +13,7 @@ const PLAN_KIND_BADGE_VARIANTS: Record<CpPlanItemKind, PlanKindBadgeVariant> = {
   ANNOUNCEMENT_TEXT: "outline",
   ANNOUNCEMENT_IMAGE: "outline",
   ANNOUNCEMENT_PDF: "outline",
+  ANNOUNCEMENT_VIDEO: "outline",
   VERSE_MANUAL: "secondary",
   BIBLE_VERSE: "secondary",
   BIBLE_PASSAGE: "secondary",
@@ -36,6 +37,6 @@ export function isPlanKindBible(kind: string): kind is "VERSE_MANUAL" | "BIBLE_V
   return isBiblePlanItemKind(kind);
 }
 
-export function isPlanKindMedia(kind: string): kind is "ANNOUNCEMENT_IMAGE" | "ANNOUNCEMENT_PDF" {
+export function isPlanKindMedia(kind: string): kind is "ANNOUNCEMENT_IMAGE" | "ANNOUNCEMENT_PDF" | "ANNOUNCEMENT_VIDEO" {
   return isMediaPlanItemKind(kind);
 }
