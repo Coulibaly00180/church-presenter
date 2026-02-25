@@ -34,7 +34,7 @@ const PROJECTION_MODES = ["NORMAL", "BLACK", "WHITE"] as const;
 const BACKGROUND_FILL_MODES = ["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL"] as const;
 const FOREGROUND_FILL_MODES = ["SOLID", "GRADIENT"] as const;
 const LOGO_POSITIONS = ["bottom-right", "bottom-left", "top-right", "top-left", "center"] as const;
-const MEDIA_TYPES = ["IMAGE", "PDF"] as const;
+const MEDIA_TYPES = ["IMAGE", "PDF", "VIDEO"] as const;
 const DEVTOOLS_TARGETS = ["REGIE", "PROJECTION", "SCREEN_A", "SCREEN_B", "SCREEN_C"] as const;
 const DATA_IMPORT_MODES = ["MERGE", "REPLACE"] as const;
 const DATA_IMPORT_ATOMICITY = ["ENTITY", "STRICT"] as const;
@@ -244,7 +244,7 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
   if (rec.backgroundGradientFrom !== undefined) patch.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "projection:setAppearance.backgroundGradientFrom");
   if (rec.backgroundGradientTo !== undefined) patch.backgroundGradientTo = expectString(rec.backgroundGradientTo, "projection:setAppearance.backgroundGradientTo");
   if (rec.backgroundGradientAngle !== undefined) patch.backgroundGradientAngle = expectNumber(rec.backgroundGradientAngle, "projection:setAppearance.backgroundGradientAngle");
-  if (rec.backgroundImage !== undefined) patch.backgroundImage = expectString(rec.backgroundImage, "projection:setAppearance.backgroundImage");
+  if (rec.backgroundImage !== undefined) patch.backgroundImage = expectString(rec.backgroundImage, "projection:setAppearance.backgroundImage", { allowEmpty: true });
   if (rec.logoPath !== undefined) patch.logoPath = expectString(rec.logoPath, "projection:setAppearance.logoPath", { allowEmpty: true });
   if (rec.logoPosition !== undefined) patch.logoPosition = parseLogoPosition(rec.logoPosition, "projection:setAppearance.logoPosition");
   if (rec.logoOpacity !== undefined) patch.logoOpacity = expectNumber(rec.logoOpacity, "projection:setAppearance.logoOpacity");
