@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LiveProvider } from "@/contexts/LiveContext";
 import { PlanProvider } from "@/contexts/PlanContext";
 import { Toaster } from "@/components/ui/sonner";
@@ -6,6 +6,7 @@ import { ShortcutsDialog } from "@/components/dialogs/ShortcutsDialog";
 import { QuickTextDialog } from "@/components/dialogs/QuickTextDialog";
 import { SettingsDialog } from "@/components/dialogs/SettingsDialog";
 import { useShortcuts } from "@/hooks/useShortcuts";
+import type { ShortcutAction } from "@/lib/shortcuts";
 import { Header } from "./Header";
 import { LiveBar } from "./LiveBar";
 
@@ -19,12 +20,10 @@ function AppShellInner({ children }: AppShellProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Global shortcut: Ctrl+T → quick text
-  useShortcuts(
-    (action) => {
-      if (action === "toggleProjection") setQuickTextOpen((v) => !v);
-    },
-    true
-  );
+  const handleGlobalShortcut = useCallback((action: ShortcutAction) => {
+    if (action === "toggleProjection") setQuickTextOpen((v) => !v);
+  }, []);
+  useShortcuts(handleGlobalShortcut, true);
 
   return (
     <div className="flex h-screen flex-col bg-bg-base overflow-hidden">

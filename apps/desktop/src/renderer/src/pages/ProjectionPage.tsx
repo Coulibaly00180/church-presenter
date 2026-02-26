@@ -290,14 +290,14 @@ export function ProjectionPage() {
     const onKeyDown = async (e: KeyboardEvent) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       const live = liveNavRef.current;
-      console.debug("[proj] arrow key", e.key, "live:", live?.enabled, "planId:", live?.planId);
+      console.log("[proj] arrow key", e.key, "live:", live?.enabled, "planId:", live?.planId);
       if (!live?.enabled || !live.planId) return;
       e.preventDefault();
       const dir = e.key === "ArrowRight" ? 1 : -1;
       const plan = await window.cp.plans.get(live.planId);
       if (!plan) return;
       const nextCursor = Math.max(0, Math.min(live.cursor + dir, plan.items.length - 1));
-      console.debug("[proj] navigating cursor", live.cursor, "→", nextCursor);
+      console.log("[proj] navigating cursor", live.cursor, "→", nextCursor);
       if (dir > 0) await window.cp.live.next();
       else await window.cp.live.prev();
       const item = plan.items[nextCursor];

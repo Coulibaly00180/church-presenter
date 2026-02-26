@@ -15,6 +15,8 @@ import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
 import { localNowYmd, isoToYmd } from "@/lib/date";
+import { projectPlanItemToTarget } from "@/lib/projection";
+import type { PlanItem, LiveState } from "@/lib/types";
 
 interface HeaderProps {
   onOpenShortcuts?: () => void;
@@ -47,15 +49,20 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
 
   const isLive = live?.enabled ?? false;
 
-  // When starting live, bind the current plan + reset cursor so navigation works.
+  // When starting live, bind the current plan + reset cursor so navigation works,
+  // then immediately project the first item to open the projection window.
   // When stopping, plain toggle() is enough.
   const handleLiveToggle = useCallback(async () => {
     if (isLive) {
       await toggle();
     } else {
-      await window.cp.live.set({ planId: selectedPlanId ?? null, enabled: true, cursor: 0 });
+      const liveState = await window.cp.live.set({ planId: selectedPlanId ?? null, enabled: true, cursor: 0 });
+      const firstItem = plan?.items[0];
+      if (firstItem) {
+        await projectPlanItemToTarget(liveState.target, firstItem as PlanItem, liveState as unknown as LiveState);
+      }
     }
-  }, [isLive, toggle, selectedPlanId]);
+  }, [isLive, toggle, selectedPlanId, plan]);
 
   const handleDuplicate = useCallback(async () => {
     if (!selectedPlanId) return;

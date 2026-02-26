@@ -117,7 +117,7 @@ export function LiveBar() {
     const currentCursor = live?.cursor ?? 0;
     const itemCount = plan?.items.length ?? 0;
     const nextCursor = Math.max(0, Math.min(currentCursor + dir, itemCount - 1));
-    console.debug("[live] navigate", dir, "cursor:", currentCursor, "→", nextCursor, "items:", itemCount, "planId:", live?.planId);
+    console.log("[live] navigate", dir, "cursor:", currentCursor, "→", nextCursor, "items:", itemCount, "planId:", live?.planId);
     if (dir > 0) await window.cp.live.next();
     else await window.cp.live.prev();
     const item = plan?.items[nextCursor];
