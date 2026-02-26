@@ -24,8 +24,13 @@ describe("inferMediaType", () => {
     expect(inferMediaType("doc.PDF")).toBe("PDF");
   });
 
+  it("returns VIDEO for video extensions", () => {
+    expect(inferMediaType("video.mp4")).toBe("VIDEO");
+    expect(inferMediaType("clip.webm")).toBe("VIDEO");
+    expect(inferMediaType("clip.MOV")).toBe("VIDEO");
+  });
+
   it("returns null for unsupported extensions", () => {
-    expect(inferMediaType("video.mp4")).toBeNull();
     expect(inferMediaType("file.txt")).toBeNull();
     expect(inferMediaType("archive.zip")).toBeNull();
     expect(inferMediaType("noext")).toBeNull();
