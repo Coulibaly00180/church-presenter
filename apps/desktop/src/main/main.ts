@@ -955,9 +955,20 @@ function createRegieWindow() {
   if (base) void regieWin.loadURL(`${base}/#/regie`);
   else void regieWin.loadFile(join(__dirname, "../renderer/index.html"), { hash: "/regie" });
 
-  if (!app.isPackaged) {
-    regieWin.webContents.openDevTools({ mode: "detach" });
-  }
+  // DevTools auto-open disabled — open manually via Ctrl+Shift+I or devtools:open IPC.
+  // if (!app.isPackaged) regieWin.webContents.openDevTools({ mode: "detach" });
+
+  // Forward renderer console messages to the terminal (main process stdout).
+  regieWin.webContents.on("console-message", (_evt, level, message, line, sourceId) => {
+    const labels = ["[renderer:debug]", "[renderer:log]", "[renderer:warn]", "[renderer:error]"];
+    const label = labels[level] ?? "[renderer]";
+    const src = sourceId ? ` (${sourceId.split("/").pop() ?? sourceId}:${line})` : "";
+    if (level >= 2) {
+      console.error(`${label}${src}`, message);
+    } else {
+      console.log(`${label}${src}`, message);
+    }
+  });
 
   regieWin.webContents.on("did-finish-load", () => {
     // push initial states + window state
@@ -1044,9 +1055,20 @@ function createScreenWindow(key: ScreenKey) {
     sendScreenState(key);
   });
 
-  if (!app.isPackaged && isMain) {
-    win.webContents.openDevTools({ mode: "detach" });
-  }
+  // DevTools auto-open disabled — open manually via devtools:open IPC.
+  // if (!app.isPackaged && isMain) win.webContents.openDevTools({ mode: "detach" });
+
+  // Forward projection window console messages to the terminal.
+  win.webContents.on("console-message", (_evt, level, message, line, sourceId) => {
+    const labels = ["[proj:debug]", "[proj:log]", "[proj:warn]", "[proj:error]"];
+    const label = (labels[level] ?? "[proj]") + `[${key}]`;
+    const src = sourceId ? ` (${sourceId.split("/").pop() ?? sourceId}:${line})` : "";
+    if (level >= 2) {
+      console.error(`${label}${src}`, message);
+    } else {
+      console.log(`${label}${src}`, message);
+    }
+  });
 
   win.on("closed", () => {
     delete projWins[key];

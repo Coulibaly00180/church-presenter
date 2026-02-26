@@ -59,6 +59,10 @@ export function BibleTab() {
   const [projMode, setProjMode] = useState<ProjectionMode>("verse");
   // Currently navigated verse (keyboard cursor)
   const [cursorVerseNum, setCursorVerseNum] = useState<number | null>(null);
+  // Ref kept synchronously in sync with cursorVerseNum state.
+  // handleVerseCursorMove reads this ref so rapid keypresses (before React re-renders)
+  // always see the latest cursor value and never get stuck repeating the same verse.
+  const cursorVerseNumRef = useRef<number | null>(null);
 
   // ── Search state ──────────────────────────────────────────────────────────────
   const [translation, setTranslation] = useState("FRLSG");
@@ -88,6 +92,7 @@ export function BibleTab() {
 
   // Reset cursor when chapter changes
   useEffect(() => {
+    cursorVerseNumRef.current = null;
     setCursorVerseNum(null);
   }, [selectedBook, selectedChapter]);
 
@@ -136,6 +141,7 @@ export function BibleTab() {
       setVerses(loaded ?? []);
       setSelectedChapter(chapter);
       setSelectedVerses(new Set());
+      cursorVerseNumRef.current = null;
       setCursorVerseNum(null);
       setView("verses");
     } catch {
@@ -194,6 +200,7 @@ export function BibleTab() {
 
   /** Called when user clicks a verse in verse-mode + live: project + select + set cursor */
   const handleVerseClickInVerseMode = useCallback(async (verse: OfflineVerse) => {
+    cursorVerseNumRef.current = verse.verse;
     setCursorVerseNum(verse.verse);
     setSelectedVerses((prev) => {
       const next = new Set(prev);
@@ -206,6 +213,8 @@ export function BibleTab() {
   /** Move the keyboard cursor by `dir` (+1 next, -1 prev) and project the verse.
    * - When > 1 verse is selected, navigation is restricted to those selected verses.
    * - Projects regardless of whether live mode is active (works in browse mode too).
+   * - Reads cursorVerseNumRef (not state) so rapid keypresses before re-render see the
+   *   correct latest value and don't get stuck navigating to the same verse twice.
    */
   const handleVerseCursorMove = useCallback(async (dir: 1 | -1) => {
     if (verses.length === 0) return;
@@ -214,15 +223,21 @@ export function BibleTab() {
     const navigateThrough = selectedVerses.size > 1
       ? [...selectedVerses].sort((a, b) => a - b)
       : verses.map((v) => v.verse).sort((a, b) => a - b);
-    const curIdx = cursorVerseNum !== null ? navigateThrough.indexOf(cursorVerseNum) : -1;
+    // Read from ref — always reflects the latest cursor, even mid-render.
+    const curIdx = cursorVerseNumRef.current !== null
+      ? navigateThrough.indexOf(cursorVerseNumRef.current)
+      : -1;
     const nextIdx = Math.max(0, Math.min(navigateThrough.length - 1, curIdx + dir));
     const nextVerseNum = navigateThrough[nextIdx];
     if (nextVerseNum === undefined) return;
     const verseObj = verses.find((v) => v.verse === nextVerseNum);
     if (!verseObj) return;
+    // Update ref immediately (synchronous) so the next keypress reads the right value
+    // even if React hasn't committed the state update yet.
+    cursorVerseNumRef.current = nextVerseNum;
     setCursorVerseNum(nextVerseNum);
     await handleProjectSingle(verseObj);
-  }, [verses, cursorVerseNum, selectedVerses, handleProjectSingle]);
+  }, [verses, selectedVerses, handleProjectSingle]); // cursorVerseNum removed — read via ref
 
   // Keep a stable ref to the latest cursor-move callback so the keydown listener
   // never needs to be re-registered just because cursorVerseNum changed.
@@ -310,6 +325,7 @@ export function BibleTab() {
       if (firstVerseNum === undefined) { toast.error("Aucun verset sélectionné"); return; }
       const verse = verses.find((v) => v.verse === firstVerseNum);
       if (!verse) return;
+      cursorVerseNumRef.current = firstVerseNum;
       setCursorVerseNum(firstVerseNum);
       await handleProjectSingle(verse);
     } else {
@@ -706,7 +722,7 @@ function VersesView({
                     onToggle(verse.verse);
                   }
                 }}
-                aria-pressed={isSelected || undefined}
+                aria-pressed={isSelected}
               >
                 <span className="text-xs font-mono text-text-muted w-5 shrink-0 mt-0.5">
                   {verse.verse}
