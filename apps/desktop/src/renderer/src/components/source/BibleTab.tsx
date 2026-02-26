@@ -692,7 +692,7 @@ function VersesView({
                   isCursor && "ring-1 ring-inset ring-primary/50 bg-primary/12",
                 )}
                 onClick={() => {
-                  if (projMode === "verse") {
+                  if (projMode === "verse" && isLive) {
                     onClickInVerseMode(verse);
                   } else {
                     onToggle(verse.verse);
