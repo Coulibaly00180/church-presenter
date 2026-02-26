@@ -224,8 +224,16 @@ export function BibleTab() {
     await handleProjectSingle(verseObj);
   }, [verses, cursorVerseNum, selectedVerses, handleProjectSingle]);
 
+  // Keep a stable ref to the latest cursor-move callback so the keydown listener
+  // never needs to be re-registered just because cursorVerseNum changed.
+  const handleVerseCursorMoveRef = useRef(handleVerseCursorMove);
+  useEffect(() => {
+    handleVerseCursorMoveRef.current = handleVerseCursorMove;
+  }, [handleVerseCursorMove]);
+
   // Arrow key capture for verse-by-verse keyboard navigation (capture phase, priority over LiveBar shortcuts).
   // Active whenever verse list is visible in verse mode. Projects in both browse and live mode.
+  // Uses a ref so re-registering the listener on every cursor change is avoided (prevents stale closure).
   useEffect(() => {
     if (view !== "verses" || projMode !== "verse") return;
 
@@ -240,17 +248,17 @@ export function BibleTab() {
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
-        void handleVerseCursorMove(1);
+        void handleVerseCursorMoveRef.current(1);
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
         e.stopPropagation();
-        void handleVerseCursorMove(-1);
+        void handleVerseCursorMoveRef.current(-1);
       }
     };
 
     window.addEventListener("keydown", onKeyDown, true); // capture phase
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [view, projMode, handleVerseCursorMove]);
+  }, [view, projMode]); // intentionally omits handleVerseCursorMove — use ref above
 
   const handleAdd = useCallback(async () => {
     if (selectedVerses.size === 0) { toast.error("Aucun verset sélectionné"); return; }
