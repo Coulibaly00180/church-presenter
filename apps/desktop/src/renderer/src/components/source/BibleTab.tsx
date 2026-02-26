@@ -185,7 +185,7 @@ export function BibleTab() {
 
   /** Project a single verse immediately */
   const handleProjectSingle = useCallback(async (verse: OfflineVerse) => {
-    if (!live) { toast.error("Mode Direct inactif"); return; }
+    if (!live?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
     if (!selectedBook || selectedChapter === null) return;
     const title = `${selectedBook.name} ${selectedChapter}:${verse.verse}`;
     const fakeItem: PlanItem = {
@@ -316,7 +316,7 @@ export function BibleTab() {
   ]);
 
   const handleProject = useCallback(async () => {
-    if (!live) { toast.error("Mode Direct inactif"); return; }
+    if (!live?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
 
     if (projMode === "verse") {
       // Project the first selected verse and activate keyboard cursor

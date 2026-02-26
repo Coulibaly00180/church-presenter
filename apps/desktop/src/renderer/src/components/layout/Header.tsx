@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { CalendarDays, ChevronDown, Circle, Copy, HelpCircle, Plus, Settings, Video } from "lucide-react";
+import { CalendarDays, ChevronDown, Circle, Copy, HelpCircle, Plus, Radio, Settings, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,17 +43,16 @@ function isTodayPlan(plan: { date: string | Date } | undefined): boolean {
 }
 
 export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
-  const { live, toggle } = useLive();
+  const { live, toggle, startFreeMode } = useLive();
   const { planList, selectedPlanId, plan, selectPlan, refreshList } = usePlan();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const isLive = live?.enabled ?? false;
+  const isPlanMode = live?.enabled === true && live.planId !== null;
+  const isFreeMode = live?.enabled === true && live.planId === null;
 
-  // When starting live, bind the current plan + reset cursor so navigation works,
-  // then immediately project the first item to open the projection window.
-  // When stopping, plain toggle() is enough.
-  const handleLiveToggle = useCallback(async () => {
-    if (isLive) {
+  // Mode Direct (plan) — binds a plan, resets cursor, auto-projects first item.
+  const handlePlanModeToggle = useCallback(async () => {
+    if (isPlanMode) {
       await toggle();
     } else {
       const liveState = await window.cp.live.set({ planId: selectedPlanId ?? null, enabled: true, cursor: 0 });
@@ -62,7 +61,17 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
         await projectPlanItemToTarget(liveState.target, firstItem as PlanItem, liveState as unknown as LiveState);
       }
     }
-  }, [isLive, toggle, selectedPlanId, plan]);
+  }, [isPlanMode, toggle, selectedPlanId, plan]);
+
+  // Mode Libre — plan-less projection for rehearsals / bible studies.
+  // Auto-switches from Mode Direct if it was active.
+  const handleFreeToggle = useCallback(async () => {
+    if (isFreeMode) {
+      await toggle();
+    } else {
+      await startFreeMode();
+    }
+  }, [isFreeMode, toggle, startFreeMode]);
 
   const handleDuplicate = useCallback(async () => {
     if (!selectedPlanId) return;
@@ -162,18 +171,20 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
 
         {/* Right: actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Live toggle */}
+          {/* Mode Direct (plan) */}
           <Button
-            variant={isLive ? "destructive" : "default"}
+            variant={isPlanMode ? "destructive" : "default"}
             size="sm"
-            onClick={() => void handleLiveToggle()}
+            onClick={() => void handlePlanModeToggle()}
+            disabled={isFreeMode}
             className={cn(
               "gap-1.5 h-8 px-3 font-medium",
-              !isLive && "bg-success hover:bg-success/90 text-white",
+              !isPlanMode && !isFreeMode && "bg-success hover:bg-success/90 text-white",
             )}
-            aria-label={isLive ? "Quitter le mode Direct" : "Passer en mode Direct"}
+            aria-label={isPlanMode ? "Quitter le mode Direct" : "Passer en mode Direct"}
+            title={isFreeMode ? "Quitter d'abord le Mode Libre" : undefined}
           >
-            {isLive ? (
+            {isPlanMode ? (
               <>
                 <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
                 Direct
@@ -182,6 +193,33 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
               <>
                 <Video className="h-3.5 w-3.5" />
                 Mode Direct
+              </>
+            )}
+          </Button>
+
+          {/* Mode Libre (sans plan) */}
+          <Button
+            variant={isFreeMode ? "destructive" : "ghost"}
+            size="sm"
+            onClick={() => void handleFreeToggle()}
+            disabled={isPlanMode}
+            className={cn(
+              "gap-1.5 h-8 px-3 font-medium",
+              !isFreeMode && !isPlanMode && "text-text-secondary hover:text-text-primary",
+              isFreeMode && "bg-warning hover:bg-warning/90 text-white border-warning",
+            )}
+            aria-label={isFreeMode ? "Quitter le Mode Libre" : "Passer en Mode Libre"}
+            title={isPlanMode ? "Quitter d'abord le Mode Direct" : "Mode Libre — projection sans plan"}
+          >
+            {isFreeMode ? (
+              <>
+                <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
+                Libre
+              </>
+            ) : (
+              <>
+                <Radio className="h-3.5 w-3.5" />
+                Mode Libre
               </>
             )}
           </Button>

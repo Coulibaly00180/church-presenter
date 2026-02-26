@@ -4,6 +4,8 @@ interface LiveContextValue {
   live: CpLiveState | null;
   loading: boolean;
   toggle: () => Promise<void>;
+  /** Activate free mode (no plan required). Auto-switches from plan mode if needed. */
+  startFreeMode: () => Promise<void>;
   next: () => Promise<void>;
   prev: () => Promise<void>;
   setCursor: (cursor: number) => Promise<void>;
@@ -55,6 +57,7 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
     live,
     loading,
     toggle: withUpdate(() => window.cp.live.toggle()),
+    startFreeMode: withUpdate(() => window.cp.live.set({ enabled: true, planId: null, cursor: 0 })),
     next: withUpdate(() => window.cp.live.next()),
     prev: withUpdate(() => window.cp.live.prev()),
     setCursor: (cursor) => withUpdate(() => window.cp.live.setCursor(cursor))(),

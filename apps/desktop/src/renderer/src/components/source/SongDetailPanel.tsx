@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Edit2, Loader2, Plus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft, Edit2, Keyboard, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
+import { cn } from "@/lib/utils";
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { projectPlanItemToTarget } from "@/lib/projection";
@@ -38,6 +39,10 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
 
+  // Keyboard cursor for block-by-block navigation (same ref pattern as BibleTab)
+  const [blockCursor, setBlockCursor] = useState<number | null>(null);
+  const blockCursorRef = useRef<number | null>(null);
+
   const loadSong = useCallback(async () => {
     setLoading(true);
     try {
@@ -53,6 +58,12 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
   useEffect(() => {
     void loadSong();
   }, [loadSong]);
+
+  // Reset cursor when the song changes
+  useEffect(() => {
+    blockCursorRef.current = null;
+    setBlockCursor(null);
+  }, [songId]);
 
   const handleAddBlock = useCallback(
     async (block: CpSongBlock) => {
@@ -89,12 +100,16 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
   }, [song, addItem]);
 
   const handleProjectBlock = useCallback(
-    async (block: CpSongBlock) => {
-      if (!live) {
-        toast.error("Mode Direct inactif");
+    async (block: CpSongBlock, cursorIndex?: number) => {
+      if (!live?.enabled) {
+        toast.error("Activez Mode Direct ou Mode Libre pour projeter");
         return;
       }
       if (!song) return;
+      if (cursorIndex !== undefined) {
+        blockCursorRef.current = cursorIndex;
+        setBlockCursor(cursorIndex);
+      }
       const fakeItem: PlanItem = {
         id: block.id,
         order: 0,
@@ -108,6 +123,51 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
     },
     [live, song],
   );
+
+  /** Move keyboard cursor by dir (+1 next, -1 prev) and project the block. */
+  const handleBlockCursorMove = useCallback(
+    async (dir: 1 | -1) => {
+      if (!song || !live?.enabled) return;
+      const curIdx = blockCursorRef.current ?? -1;
+      const nextIdx = Math.max(0, Math.min(song.blocks.length - 1, curIdx + dir));
+      const block = song.blocks[nextIdx];
+      if (!block) return;
+      blockCursorRef.current = nextIdx; // synchronous update — rapid keypresses read correct value
+      setBlockCursor(nextIdx);
+      await handleProjectBlock(block);
+    },
+    [song, live, handleProjectBlock],
+  );
+
+  // Stable ref to avoid re-registering keydown listener on every cursor change
+  const handleBlockCursorMoveRef = useRef(handleBlockCursorMove);
+  useEffect(() => {
+    handleBlockCursorMoveRef.current = handleBlockCursorMove;
+  }, [handleBlockCursorMove]);
+
+  // Arrow key capture — active when song is loaded and any live mode is on (capture phase)
+  useEffect(() => {
+    if (!song || !live?.enabled) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      ) return;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleBlockCursorMoveRef.current(1);
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleBlockCursorMoveRef.current(-1);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [song?.id, live?.enabled]); // intentionally omits handleBlockCursorMove — use ref above
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-bg-base">
@@ -170,49 +230,75 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
           Chant introuvable
         </div>
       ) : (
-        <ScrollArea className="flex-1">
+        <>
+          {live?.enabled && (
+            <div className="px-4 pt-3 pb-0">
+              <p className="flex items-center gap-1 text-[10px] text-text-muted">
+                <Keyboard className="h-3 w-3 opacity-50" />
+                ← → pour naviguer · clic ▶ pour projeter
+              </p>
+            </div>
+          )}
+          <ScrollArea className="flex-1">
           <div className="p-4 space-y-3">
-            {song.blocks.map((block) => (
-              <div
-                key={block.id}
-                className="group rounded-lg border border-border bg-bg-surface overflow-hidden"
-              >
-                {/* Block header */}
-                <div className="flex items-center justify-between px-3 py-1.5 bg-bg-elevated/60 border-b border-border">
-                  <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
-                    {blockLabel(block)}
-                  </span>
-                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => void handleProjectBlock(block)}
-                      title="Projeter"
-                      aria-label={`Projeter ${blockLabel(block)}`}
-                      className="h-6 w-6 text-text-muted hover:text-primary"
-                    >
-                      <span className="text-[10px] leading-none">▶</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => void handleAddBlock(block)}
-                      title="Ajouter au plan"
-                      aria-label={`Ajouter ${blockLabel(block)} au plan`}
-                      className="h-6 w-6 text-text-muted hover:text-success"
-                    >
-                      <Plus className="h-3 w-3" />
-                    </Button>
+            {song.blocks.map((block, index) => {
+              const isCursor = blockCursor === index;
+              return (
+                <div
+                  key={block.id}
+                  className={cn(
+                    "group rounded-lg border bg-bg-surface overflow-hidden transition-colors",
+                    isCursor
+                      ? "border-primary/60 ring-1 ring-primary/30"
+                      : "border-border",
+                  )}
+                >
+                  {/* Block header */}
+                  <div className="flex items-center justify-between px-3 py-1.5 bg-bg-elevated/60 border-b border-border">
+                    <div className="flex items-center gap-1.5">
+                      {isCursor && (
+                        <span className="text-[9px] font-bold text-primary">▶</span>
+                      )}
+                      <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
+                        {blockLabel(block)}
+                      </span>
+                    </div>
+                    <div className={cn(
+                      "flex gap-0.5 transition-opacity",
+                      isCursor ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                    )}>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => void handleProjectBlock(block, index)}
+                        title="Projeter"
+                        aria-label={`Projeter ${blockLabel(block)}`}
+                        className="h-6 w-6 text-text-muted hover:text-primary"
+                      >
+                        <span className="text-[10px] leading-none">▶</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => void handleAddBlock(block)}
+                        title="Ajouter au plan"
+                        aria-label={`Ajouter ${blockLabel(block)} au plan`}
+                        className="h-6 w-6 text-text-muted hover:text-success"
+                      >
+                        <Plus className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
+                  {/* Block content */}
+                  <pre className="px-3 py-2.5 text-sm text-text-primary font-sans whitespace-pre-wrap leading-relaxed">
+                    {block.content}
+                  </pre>
                 </div>
-                {/* Block content */}
-                <pre className="px-3 py-2.5 text-sm text-text-primary font-sans whitespace-pre-wrap leading-relaxed">
-                  {block.content}
-                </pre>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </ScrollArea>
+          </ScrollArea>
+        </>
       )}
 
       {song && (

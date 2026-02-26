@@ -22,6 +22,8 @@ export function LiveBar() {
   const [nextState, setNextState] = useState<CpProjectionState | null>(null);
 
   const isEnabled = live?.enabled ?? false;
+  const isPlanMode = isEnabled && live?.planId !== null;
+  const isFreeMode = isEnabled && live?.planId === null;
 
   // Auto-advance
   const AUTO_INTERVALS = [5, 10, 15, 20, 30, 60] as const;
@@ -170,8 +172,21 @@ export function LiveBar() {
       <div className="flex items-center gap-3 px-4 h-10 shrink-0 border-b border-border">
         {/* Live indicator */}
         <div className="flex items-center gap-1.5">
-          <Circle className="h-2.5 w-2.5 fill-live-indicator text-live-indicator animate-pulse" aria-hidden />
-          <span className="text-xs font-semibold text-live-indicator uppercase tracking-wide">Direct</span>
+          <Circle
+            className={cn(
+              "h-2.5 w-2.5 animate-pulse",
+              isFreeMode ? "fill-warning text-warning" : "fill-live-indicator text-live-indicator",
+            )}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "text-xs font-semibold uppercase tracking-wide",
+              isFreeMode ? "text-warning" : "text-live-indicator",
+            )}
+          >
+            {isFreeMode ? "Libre" : "Direct"}
+          </span>
         </div>
 
         {/* Screen mode buttons */}
@@ -209,42 +224,46 @@ export function LiveBar() {
           )}
         </div>
 
-        {/* Auto-advance */}
-        <div className="flex items-center gap-1 ml-2">
-          <Button
-            variant={autoEnabled ? "default" : "ghost"}
-            size="xs"
-            onClick={() => setAutoEnabled((v) => !v)}
-            className={cn("gap-1", autoEnabled && "bg-accent text-white")}
-            aria-pressed={autoEnabled}
-            aria-label="Auto-avance"
-          >
-            {autoEnabled ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-            Auto
-          </Button>
-          {autoEnabled && (
-            <select
-              value={autoInterval}
-              onChange={(e) => setAutoInterval(Number(e.target.value) as AutoInterval)}
-              className="text-xs bg-bg-elevated border border-border rounded px-1 py-0.5 text-text-primary h-6"
-              aria-label="Intervalle auto-avance"
+        {/* Auto-advance — plan mode only */}
+        {isPlanMode && (
+          <div className="flex items-center gap-1 ml-2">
+            <Button
+              variant={autoEnabled ? "default" : "ghost"}
+              size="xs"
+              onClick={() => setAutoEnabled((v) => !v)}
+              className={cn("gap-1", autoEnabled && "bg-accent text-white")}
+              aria-pressed={autoEnabled}
+              aria-label="Auto-avance"
             >
-              {AUTO_INTERVALS.map((s) => (
-                <option key={s} value={s}>{s}s</option>
-              ))}
-            </select>
-          )}
-        </div>
+              {autoEnabled ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              Auto
+            </Button>
+            {autoEnabled && (
+              <select
+                value={autoInterval}
+                onChange={(e) => setAutoInterval(Number(e.target.value) as AutoInterval)}
+                className="text-xs bg-bg-elevated border border-border rounded px-1 py-0.5 text-text-primary h-6"
+                aria-label="Intervalle auto-avance"
+              >
+                {AUTO_INTERVALS.map((s) => (
+                  <option key={s} value={s}>{s}s</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
 
-        {/* Navigation */}
-        <NavControls
-          className="ml-auto"
-          onPrev={() => void handleNavigate(-1)}
-          onNext={() => void handleNavigate(1)}
-        />
+        {/* Navigation — plan mode only */}
+        {isPlanMode && (
+          <NavControls
+            className="ml-auto"
+            onPrev={() => void handleNavigate(-1)}
+            onNext={() => void handleNavigate(1)}
+          />
+        )}
 
-        {/* Progress counter + remaining time */}
-        {plan && (
+        {/* Progress counter + remaining time — plan mode only */}
+        {isPlanMode && plan && (
           <span className="text-xs tabular-nums text-text-muted font-medium px-1 flex items-center gap-1.5">
             <span>{live.cursor + 1} / {plan.items.length}</span>
             {remainingLabel && (
@@ -263,8 +282,8 @@ export function LiveBar() {
           </div>
         )}
 
-        {/* Screen selector */}
-        <ScreenSelector />
+        {/* Screen selector — pushed right in free mode (no NavControls to provide ml-auto) */}
+        <ScreenSelector className={cn(isFreeMode && "ml-auto")} />
 
         {/* Quit */}
         <Button
@@ -272,7 +291,7 @@ export function LiveBar() {
           size="xs"
           onClick={() => void toggle()}
           className="gap-1 text-text-secondary ml-1"
-          aria-label="Quitter le mode Direct"
+          aria-label={isFreeMode ? "Quitter le Mode Libre" : "Quitter le mode Direct"}
         >
           <X className="h-3.5 w-3.5" />
           Quitter
@@ -291,7 +310,7 @@ export function LiveBar() {
 
       {/* Bottom: slide previews + mini plan list */}
       <div className="flex flex-1 items-stretch overflow-hidden gap-3 px-4 py-2">
-        {/* Current slide preview */}
+        {/* Current slide preview — both modes */}
         <SlidePreview
           projectionState={currentState}
           variant="current"
@@ -299,17 +318,19 @@ export function LiveBar() {
           className="w-[120px] shrink-0"
         />
 
-        {/* Next slide preview */}
-        <SlidePreview
-          projectionState={nextState}
-          variant="next"
-          label={nextItem ? (nextItem.title?.trim() || getPlanKindDefaultTitle(nextItem.kind)) : "—"}
-          className="w-[80px] shrink-0"
-          onClick={nextItem ? () => void handleItemClick(nextItem, live.cursor + 1) : undefined}
-        />
+        {/* Next slide preview — plan mode only */}
+        {isPlanMode && (
+          <SlidePreview
+            projectionState={nextState}
+            variant="next"
+            label={nextItem ? (nextItem.title?.trim() || getPlanKindDefaultTitle(nextItem.kind)) : "—"}
+            className="w-[80px] shrink-0"
+            onClick={nextItem ? () => void handleItemClick(nextItem, live.cursor + 1) : undefined}
+          />
+        )}
 
-        {/* Mini plan list */}
-        {plan && (
+        {/* Mini plan list — plan mode only */}
+        {isPlanMode && plan && (
           <ScrollArea className="flex-1">
             <div className="flex gap-1.5 items-center h-full">
               {plan.items.map((item, index) => (
@@ -333,6 +354,15 @@ export function LiveBar() {
               ))}
             </div>
           </ScrollArea>
+        )}
+
+        {/* Free mode hint */}
+        {isFreeMode && (
+          <div className="flex flex-1 items-center justify-center">
+            <p className="text-xs text-text-muted">
+              Cliquez un chant ou naviguez la Bible — les flèches ← → projettent le contenu
+            </p>
+          </div>
         )}
       </div>
     </div>
