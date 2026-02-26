@@ -203,25 +203,29 @@ export function BibleTab() {
     await handleProjectSingle(verse);
   }, [handleProjectSingle]);
 
-  /** Move the keyboard cursor by `dir` (+1 next, -1 prev) and project the verse */
+  /** Move the keyboard cursor by `dir` (+1 next, -1 prev) and project the verse.
+   * - When > 1 verse is selected, navigation is restricted to those selected verses.
+   * - Projects regardless of whether live mode is active (works in browse mode too).
+   */
   const handleVerseCursorMove = useCallback(async (dir: 1 | -1) => {
     if (verses.length === 0) return;
-    const sorted = verses.map((v) => v.verse).sort((a, b) => a - b);
-    const curIdx = cursorVerseNum !== null ? sorted.indexOf(cursorVerseNum) : -1;
-    const nextIdx = Math.max(0, Math.min(sorted.length - 1, curIdx + dir));
-    const nextVerseNum = sorted[nextIdx];
+    // Navigate through selected verses only when multiple are selected;
+    // otherwise navigate through all verses in the chapter.
+    const navigateThrough = selectedVerses.size > 1
+      ? [...selectedVerses].sort((a, b) => a - b)
+      : verses.map((v) => v.verse).sort((a, b) => a - b);
+    const curIdx = cursorVerseNum !== null ? navigateThrough.indexOf(cursorVerseNum) : -1;
+    const nextIdx = Math.max(0, Math.min(navigateThrough.length - 1, curIdx + dir));
+    const nextVerseNum = navigateThrough[nextIdx];
     if (nextVerseNum === undefined) return;
     const verseObj = verses.find((v) => v.verse === nextVerseNum);
     if (!verseObj) return;
     setCursorVerseNum(nextVerseNum);
-    if (live?.enabled) {
-      await handleProjectSingle(verseObj);
-    }
-  }, [verses, cursorVerseNum, live?.enabled, handleProjectSingle]);
+    await handleProjectSingle(verseObj);
+  }, [verses, cursorVerseNum, selectedVerses, handleProjectSingle]);
 
   // Arrow key capture for verse-by-verse keyboard navigation (capture phase, priority over LiveBar shortcuts).
-  // Active whenever verse list is visible in verse mode — projection only happens if live is enabled
-  // (handled inside handleVerseCursorMove). Works in both prep mode and live mode.
+  // Active whenever verse list is visible in verse mode. Projects in both browse and live mode.
   useEffect(() => {
     if (view !== "verses" || projMode !== "verse") return;
 
@@ -688,7 +692,7 @@ function VersesView({
                   isCursor && "ring-1 ring-inset ring-primary/50 bg-primary/12",
                 )}
                 onClick={() => {
-                  if (projMode === "verse" && isLive) {
+                  if (projMode === "verse") {
                     onClickInVerseMode(verse);
                   } else {
                     onToggle(verse.verse);
@@ -702,7 +706,7 @@ function VersesView({
                 <span className="text-sm text-text-primary leading-relaxed">
                   {verse.text}
                 </span>
-                {isCursor && isLive && (
+                {isCursor && (
                   <span className="ml-auto shrink-0 text-[9px] font-bold text-primary mt-0.5">
                     ▶
                   </span>
@@ -715,11 +719,11 @@ function VersesView({
 
       {/* Actions */}
       <div className="flex flex-col gap-1.5 px-3 py-2 border-t border-border shrink-0">
-        {/* Keyboard nav hint (verse mode + live) */}
-        {projMode === "verse" && isLive && (
+        {/* Keyboard nav hint — verse mode */}
+        {projMode === "verse" && (
           <p className="flex items-center justify-center gap-1 text-[10px] text-text-muted">
             <Keyboard className="h-3 w-3 opacity-50" />
-            ← → pour naviguer · clic pour projeter
+            {isLive ? "← → pour naviguer · clic pour projeter" : "← → pour naviguer · Projeter pour commencer"}
           </p>
         )}
 
@@ -731,19 +735,15 @@ function VersesView({
                 ? `Ajouter (${selectedVerses.size})`
                 : "Ajouter au plan"}
             </Button>
-            {(projMode === "passage" || !isLive) && (
-              <Button variant="default" size="sm" className="flex-1" onClick={onProject}>
-                ▶ Projeter
-              </Button>
-            )}
+            <Button variant="default" size="sm" className="flex-1" onClick={onProject}>
+              ▶ Projeter
+            </Button>
           </div>
         ) : (
           <p className="text-[10px] text-text-muted text-center">
-            {projMode === "verse" && isLive
-              ? "Cliquez un verset pour le projeter"
-              : projMode === "verse"
-                ? "Sélectionnez des versets puis ajoutez au plan"
-                : "Sélectionnez des versets"}
+            {projMode === "verse"
+              ? (isLive ? "Cliquez un verset pour le projeter" : "Sélectionnez un verset puis Projeter")
+              : "Sélectionnez des versets"}
           </p>
         )}
       </div>
