@@ -88,6 +88,8 @@ export type CpScreenMirrorResult = { ok: true; mirror: ScreenMirrorMode };
 
 export type CpSongBlockType = "VERSE" | "CHORUS" | string;
 
+export type CpSongSortField = "title" | "artist" | "updatedAt" | "createdAt";
+
 export type CpSongBlock = {
   id: string;
   order: number;
@@ -426,7 +428,7 @@ export interface CpApi {
     onWindowState: (key: ScreenKey, cb: (payload: CpWindowState) => void) => () => void;
   };
   songs: {
-    list: (q?: string) => Promise<CpSongListItem[]>;
+    list: (q?: string, sortBy?: CpSongSortField) => Promise<CpSongListItem[]>;
     get: (id: string) => Promise<CpSongDetail | null>;
     create: (payload: { title: string; artist?: string; album?: string; year?: string }) => Promise<CpSongDetail>;
     updateMeta: (payload: { id: string; title: string; artist?: string; album?: string; year?: string }) => Promise<CpSongDetail>;

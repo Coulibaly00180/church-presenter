@@ -1063,9 +1063,18 @@ export type RegisterSongsIpcOptions = {
 };
 
 export function registerSongsIpc(options?: RegisterSongsIpcOptions) {
-  ipcMain.handle("songs:list", async (_evt, rawQ?: unknown) => {
+  ipcMain.handle("songs:list", async (_evt, rawQ?: unknown, rawSortBy?: unknown) => {
     const prisma = getPrisma();
     const query = (parseOptionalQuery(rawQ, "songs:list.query") ?? "").trim();
+    const sortBy = typeof rawSortBy === "string" && ["title", "artist", "updatedAt", "createdAt"].includes(rawSortBy)
+      ? (rawSortBy as "title" | "artist" | "updatedAt" | "createdAt")
+      : "title";
+
+    const browseOrderBy: Prisma.SongOrderByWithRelationInput | Prisma.SongOrderByWithRelationInput[] =
+      sortBy === "artist" ? [{ artist: "asc" as const }, { title: "asc" as const }]
+      : sortBy === "updatedAt" ? { updatedAt: "desc" as const }
+      : sortBy === "createdAt" ? { createdAt: "desc" as const }
+      : { title: "asc" as const };
 
     if (query.length > 0) {
       const songs = await prisma.song.findMany({
@@ -1079,7 +1088,7 @@ export function registerSongsIpc(options?: RegisterSongsIpcOptions) {
             { blocks: { some: { content: { contains: query } } } },
           ],
         },
-        orderBy: { updatedAt: "desc" },
+        orderBy: browseOrderBy,
         select: {
           id: true, title: true, artist: true, album: true, year: true, updatedAt: true,
           blocks: { where: { content: { contains: query } }, select: { content: true }, take: 1 },
@@ -1108,7 +1117,7 @@ export function registerSongsIpc(options?: RegisterSongsIpcOptions) {
 
     return prisma.song.findMany({
       where: { deletedAt: null },
-      orderBy: { updatedAt: "desc" },
+      orderBy: browseOrderBy,
       select: { id: true, title: true, artist: true, album: true, year: true, updatedAt: true },
       take: 200,
     });

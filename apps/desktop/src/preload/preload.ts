@@ -24,6 +24,7 @@ import type {
   CpSyncStatus,
   ScreenKey,
   ScreenMirrorMode,
+  CpSongSortField,
 } from "../shared/ipc";
 
 type ProjectionState = CpProjectionState;
@@ -100,7 +101,7 @@ const cpApi: CpApi = {
   },
 
   songs: {
-    list: (q?: string) => ipcRenderer.invoke("songs:list", q),
+    list: (q?: string, sortBy?: CpSongSortField) => ipcRenderer.invoke("songs:list", q, sortBy),
     get: (id: string) => ipcRenderer.invoke("songs:get", id),
     create: (payload: { title: string; artist?: string; album?: string; year?: string }) => ipcRenderer.invoke("songs:create", payload),
     updateMeta: (payload: { id: string; title: string; artist?: string; album?: string; year?: string }) =>

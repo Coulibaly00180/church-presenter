@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, Loader2, Music2, Plus, Search, TrendingUp, Upload, X } from "lucide-react";
+import { ArrowDownAZ, CalendarArrowDown, Clock, Heart, Loader2, Music2, Plus, Search, TrendingUp, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 const FAVORITES_KEY = "cp_favorite_songs";
+const SORT_KEY = "cp_songs_sort";
+
+const SORT_OPTIONS: { value: CpSongSortField; label: string; icon: React.ReactNode }[] = [
+  { value: "title",     label: "Titre",     icon: <ArrowDownAZ className="h-3 w-3" /> },
+  { value: "artist",    label: "Artiste",   icon: <ArrowDownAZ className="h-3 w-3" /> },
+  { value: "updatedAt", label: "Modifié",   icon: <Clock className="h-3 w-3" /> },
+  { value: "createdAt", label: "Ajouté",    icon: <CalendarArrowDown className="h-3 w-3" /> },
+];
+
 function loadFavorites(): Set<string> {
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
@@ -15,6 +24,15 @@ function loadFavorites(): Set<string> {
 }
 function saveFavorites(ids: Set<string>) {
   localStorage.setItem(FAVORITES_KEY, JSON.stringify([...ids]));
+}
+
+function loadSort(): CpSongSortField {
+  const raw = localStorage.getItem(SORT_KEY);
+  if (raw === "title" || raw === "artist" || raw === "updatedAt" || raw === "createdAt") return raw;
+  return "title";
+}
+function saveSort(s: CpSongSortField) {
+  localStorage.setItem(SORT_KEY, s);
 }
 
 interface SongsTabProps {
@@ -29,11 +47,12 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => loadFavorites());
   const [frequentSongs, setFrequentSongs] = useState<CpSongListItem[]>([]);
+  const [sortBy, setSortBy] = useState<CpSongSortField>(() => loadSort());
 
-  const loadSongs = useCallback(async (q: string) => {
+  const loadSongs = useCallback(async (q: string, sort: CpSongSortField) => {
     setLoading(true);
     try {
-      const list = await window.cp.songs.list(q || undefined);
+      const list = await window.cp.songs.list(q || undefined, sort);
       setSongs(list);
     } catch {
       toast.error("Impossible de charger les chants");
@@ -43,32 +62,37 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
   }, []);
 
   useEffect(() => {
-    void loadSongs("");
-  }, [loadSongs]);
+    void loadSongs("", sortBy);
+  }, [loadSongs, sortBy]);
 
   useEffect(() => {
     window.cp.songs.getFrequent(8).then(setFrequentSongs).catch(() => null);
+  }, []);
+
+  const handleSortChange = useCallback((next: CpSongSortField) => {
+    setSortBy(next);
+    saveSort(next);
   }, []);
 
   // 150ms debounce per UX spec
   const handleSearch = useCallback((value: string) => {
     setQuery(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => void loadSongs(value), 150);
-  }, [loadSongs]);
+    debounceRef.current = setTimeout(() => void loadSongs(value, sortBy), 150);
+  }, [loadSongs, sortBy]);
 
   const handleClearSearch = useCallback(() => {
     setQuery("");
-    void loadSongs("");
-  }, [loadSongs]);
+    void loadSongs("", sortBy);
+  }, [loadSongs, sortBy]);
 
   const handleImport = useCallback(async () => {
     const result = await window.cp.songs.importAuto();
     if (!result.ok) return;
     if (result.imported === 0) { toast.info("Aucun chant importé"); return; }
     toast.success(`${result.imported} chant${result.imported !== 1 ? "s" : ""} importé${result.imported !== 1 ? "s" : ""}`);
-    void loadSongs(query);
-  }, [loadSongs, query]);
+    void loadSongs(query, sortBy);
+  }, [loadSongs, query, sortBy]);
 
   const handleToggleFavorite = useCallback((songId: string) => {
     setFavoriteIds((prev) => {
@@ -82,8 +106,8 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search */}
-      <div className="px-3 py-2 border-b border-border">
+      {/* Search + sort */}
+      <div className="px-3 py-2 border-b border-border space-y-1.5">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
           <Input
@@ -102,6 +126,25 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
               <X className="h-3.5 w-3.5" />
             </button>
           )}
+        </div>
+        <div className="flex items-center gap-1" role="group" aria-label="Trier par">
+          {SORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={cn(
+                "flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors",
+                sortBy === opt.value
+                  ? "bg-primary text-primary-fg"
+                  : "text-text-muted hover:text-text-secondary hover:bg-bg-elevated"
+              )}
+              onClick={() => handleSortChange(opt.value)}
+              aria-current={sortBy === opt.value ? "true" : undefined}
+            >
+              {opt.icon}
+              {opt.label}
+            </button>
+          ))}
         </div>
       </div>
 
