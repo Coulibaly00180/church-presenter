@@ -26,6 +26,7 @@ declare global {
   type CpScreenMirrorResult = Shared.CpScreenMirrorResult;
 
   type CpSongBlockType = Shared.CpSongBlockType;
+  type CpSongSortField = Shared.CpSongSortField;
   type CpSongBlock = Shared.CpSongBlock;
   type CpSongListItem = Shared.CpSongListItem;
   type CpSongDetail = Shared.CpSongDetail;
