@@ -450,6 +450,9 @@ export interface CpApi {
     resume: () => Promise<CpLiveState>;
     setLocked: (key: ScreenKey, locked: boolean) => Promise<CpLiveState>;
     onUpdate: (cb: (state: CpLiveState) => void) => () => void;
+    /** Free mode: called from projection window to forward arrow navigation to regie window */
+    freeNavigate: (dir: 1 | -1) => Promise<void>;
+    onFreeNavigate: (cb: (dir: 1 | -1) => void) => () => void;
   };
   sync: {
     start: (port?: number) => Promise<CpSyncStartResult>;

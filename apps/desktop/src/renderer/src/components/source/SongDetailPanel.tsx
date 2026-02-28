@@ -160,6 +160,16 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
     [], // stable — reads live/song from refs
   );
 
+  // Free mode: receive arrow navigation forwarded from projection window
+  // (fires when the projection window has focus and user presses arrows there)
+  useEffect(() => {
+    if (!song || !live?.enabled) return;
+    const unsub = window.cp.live.onFreeNavigate((dir) => {
+      void handleBlockCursorMove(dir);
+    });
+    return unsub;
+  }, [song?.id, live?.enabled, handleBlockCursorMove]);
+
   // Arrow key capture — active when song is loaded and any live mode is on (capture phase)
   useEffect(() => {
     if (!song || !live?.enabled) return;

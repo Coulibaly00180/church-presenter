@@ -291,7 +291,13 @@ export function ProjectionPage() {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       const live = liveNavRef.current;
       console.log("[proj] arrow key", e.key, "live:", live?.enabled, "planId:", live?.planId);
-      if (!live?.enabled || !live.planId) return;
+      if (!live?.enabled) return;
+      if (!live.planId) {
+        // Free mode: forward to regie window which handles song/bible navigation
+        e.preventDefault();
+        await window.cp.live.freeNavigate(e.key === "ArrowRight" ? 1 : -1);
+        return;
+      }
       e.preventDefault();
       const dir = e.key === "ArrowRight" ? 1 : -1;
       const plan = await window.cp.plans.get(live.planId);

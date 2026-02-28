@@ -1797,3 +1797,9 @@ ipcMain.handle("live:setLocked", (_evt, rawPayload: unknown) => {
   const next = { ...screenCtx.liveState.lockedScreens, [payload.key]: payload.locked };
   return _mergeLive(screenCtx, { lockedScreens: next });
 });
+
+// Free mode: projection window forwards arrow keys to regie window
+ipcMain.handle("live:freeNavigate", (_evt, rawDir: unknown) => {
+  const dir: 1 | -1 = rawDir === 1 ? 1 : -1;
+  regieWin?.webContents.send("live:freeNavigate", dir);
+});

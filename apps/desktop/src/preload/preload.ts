@@ -165,6 +165,12 @@ const cpApi: CpApi = {
       ipcRenderer.on("live:update", handler);
       return () => ipcRenderer.removeListener("live:update", handler);
     },
+    freeNavigate: (dir: 1 | -1) => ipcRenderer.invoke("live:freeNavigate", dir),
+    onFreeNavigate: (cb: (dir: 1 | -1) => void) => {
+      const handler = (_: unknown, dir: 1 | -1) => cb(dir);
+      ipcRenderer.on("live:freeNavigate", handler);
+      return () => ipcRenderer.removeListener("live:freeNavigate", handler);
+    },
   },
 
   sync: {

@@ -261,6 +261,16 @@ export function BibleTab() {
     handleVerseCursorMoveRef.current = handleVerseCursorMove;
   }, [handleVerseCursorMove]);
 
+  // Free mode: receive arrow navigation forwarded from projection window
+  // (fires when the projection window has focus and user presses arrows there)
+  useEffect(() => {
+    if (view !== "verses" || projMode !== "verse" || !live?.enabled) return;
+    const unsub = window.cp.live.onFreeNavigate((dir) => {
+      void handleVerseCursorMoveRef.current(dir);
+    });
+    return unsub;
+  }, [view, projMode, live?.enabled]); // handleVerseCursorMoveRef is a stable ref — no dep needed
+
   // Arrow key capture for verse-by-verse keyboard navigation (capture phase, priority over LiveBar shortcuts).
   // Active whenever verse list is visible in verse mode. Projects in both browse and live mode.
   // Uses a ref so re-registering the listener on every cursor change is avoided (prevents stale closure).
@@ -329,6 +339,25 @@ export function BibleTab() {
     selectedVerses, projMode, verses, selectedBook, selectedChapter,
     addItem, buildVerseContent, buildVerseTitle,
   ]);
+
+  /** Add every verse in the current chapter as individual plan items (one per verse). */
+  const handleAddAllVerses = useCallback(async () => {
+    if (verses.length === 0) return;
+    let added = 0;
+    for (const verse of verses) {
+      const title = `${selectedBook?.name ?? "Bible"} ${selectedChapter}:${verse.verse}`;
+      const item = await addItem({
+        kind: "BIBLE_VERSE",
+        title,
+        content: `${verse.verse}. ${verse.text}`,
+        refId: `${selectedBook?.name} ${selectedChapter}`,
+        refSubId: "LSG",
+      });
+      if (item) added++;
+    }
+    if (added > 0)
+      toast.success(`${added} verset${added > 1 ? "s" : ""} ajouté${added > 1 ? "s" : ""} au plan`);
+  }, [verses, selectedBook, selectedChapter, addItem]);
 
   const handleProject = useCallback(async () => {
     if (!live?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
@@ -527,6 +556,7 @@ export function BibleTab() {
               onClickInVerseMode={(v) => void handleVerseClickInVerseMode(v)}
               onBack={() => setView(selectedBook ? "chapters" : "reference")}
               onAdd={() => void handleAdd()}
+              onAddAll={() => void handleAddAllVerses()}
               onProject={() => void handleProject()}
             />
           ) : null}
@@ -659,6 +689,7 @@ function VersesView({
   onClickInVerseMode,
   onBack,
   onAdd,
+  onAddAll,
   onProject,
 }: {
   book: LSG1910BookCatalogEntry | null;
@@ -673,6 +704,7 @@ function VersesView({
   onClickInVerseMode: (verse: OfflineVerse) => void;
   onBack: () => void;
   onAdd: () => void;
+  onAddAll: () => void;
   onProject: () => void;
 }) {
   return (
@@ -779,12 +811,13 @@ function VersesView({
               ▶ Projeter
             </Button>
           </div>
+        ) : projMode === "verse" ? (
+          <Button variant="outline" size="sm" className="w-full gap-1" onClick={onAddAll}>
+            <Plus className="h-3.5 w-3.5" />
+            Ajouter tout le chapitre au plan
+          </Button>
         ) : (
-          <p className="text-[10px] text-text-muted text-center">
-            {projMode === "verse"
-              ? (isLive ? "Cliquez un verset pour le projeter" : "Sélectionnez un verset puis Projeter")
-              : "Sélectionnez des versets"}
-          </p>
+          <p className="text-[10px] text-text-muted text-center">Sélectionnez des versets</p>
         )}
       </div>
     </div>
