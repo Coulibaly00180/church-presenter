@@ -5,12 +5,27 @@ export type ScreenKey = "A" | "B" | "C";
 export type ScreenMirrorMode = { kind: "FREE" } | { kind: "MIRROR"; from: ScreenKey };
 
 export type CpProjectionMode = "NORMAL" | "BLACK" | "WHITE";
-export type CpMediaType = "IMAGE" | "PDF";
+export type CpMediaType = "IMAGE" | "PDF" | "VIDEO";
 export type CpBackgroundFillMode = "SOLID" | "GRADIENT_LINEAR" | "GRADIENT_RADIAL";
 export type CpForegroundFillMode = "SOLID" | "GRADIENT";
+export type CpLogoPosition = "bottom-right" | "bottom-left" | "top-right" | "top-left" | "center";
 export type CpTheme = "light" | "dark";
 export type CpSongMeta = { title?: string; artist?: string; album?: string; year?: string };
 export type CpWindowState = { isOpen: boolean };
+
+export type CpItemBackground = {
+  background?: string;
+  backgroundMode?: CpBackgroundFillMode;
+  backgroundGradientFrom?: string;
+  backgroundGradientTo?: string;
+  backgroundGradientAngle?: number;
+  backgroundMedia?: string;          // absolute path to IMAGE or VIDEO file in media library
+  backgroundMediaType?: "IMAGE" | "VIDEO";
+  foreground?: string;
+  foregroundMode?: CpForegroundFillMode;
+  foregroundGradientFrom?: string;
+  foregroundGradientTo?: string;
+};
 
 export type CpProjectionCurrent = {
   kind: "EMPTY" | "TEXT" | "MEDIA";
@@ -19,6 +34,8 @@ export type CpProjectionCurrent = {
   mediaPath?: string;
   mediaType?: CpMediaType;
   metaSong?: CpSongMeta;
+  secondaryTexts?: Array<{ label: string; body: string }>;
+  backgroundOverride?: CpItemBackground;
 };
 
 export type CpProjectionState = {
@@ -26,6 +43,7 @@ export type CpProjectionState = {
   lowerThirdEnabled: boolean;
   transitionEnabled: boolean;
   textScale: number;
+  titleTextScale?: number;
   textFont: string;
   textFontPath?: string;
   background: string;
@@ -35,6 +53,8 @@ export type CpProjectionState = {
   backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  logoPosition?: CpLogoPosition;
+  logoOpacity?: number;
   foregroundMode?: CpForegroundFillMode;
   foregroundGradientFrom?: string;
   foregroundGradientTo?: string;
@@ -143,9 +163,12 @@ export type CpPlanItem = {
   kind: CpPlanItemKind;
   title?: string | null;
   content?: string | null;
+  notes?: string | null;
   refId?: string | null;
   refSubId?: string | null;
   mediaPath?: string | null;
+  secondaryContent?: string | null;
+  backgroundConfig?: string | null;
   updatedAt?: string | Date;
   createdAt?: string | Date;
 };
@@ -161,6 +184,7 @@ export type CpPlan = {
   id: string;
   date: string | Date;
   title?: string | null;
+  backgroundConfig?: string | null;
   items: CpPlanItem[];
   updatedAt?: string | Date;
   createdAt?: string | Date;
@@ -171,16 +195,19 @@ export type CpPlanAddItemPayload = {
   kind: CpPlanItemKind;
   title?: string;
   content?: string;
+  notes?: string;
   refId?: string;
   refSubId?: string;
   mediaPath?: string;
+  secondaryContent?: string;
+  backgroundConfig?: string;
 };
 
 export type CpPlanDuplicatePayload = { planId: string; dateIso?: string; title?: string };
 export type CpPlanCreatePayload = { dateIso: string; title?: string };
-export type CpPlanUpdatePayload = { planId: string; title?: string };
+export type CpPlanUpdatePayload = { planId: string; title?: string; backgroundConfig?: string | null };
 export type CpPlanUpdateResult = { ok: true };
-export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string };
+export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string; notes?: string; secondaryContent?: string | null; backgroundConfig?: string | null };
 export type CpPlanUpdateItemResult = { ok: true };
 export type CpPlanRemoveItemPayload = { planId: string; itemId: string };
 export type CpPlanReorderPayload = { planId: string; orderedItemIds: string[] };
@@ -209,7 +236,7 @@ export type CpDevtoolsTarget = "REGIE" | "PROJECTION" | "SCREEN_A" | "SCREEN_B" 
 export type CpDevtoolsOpenResult = { ok: true } | { ok: false; reason: "DISABLED_IN_PROD" };
 
 export type CpLibraryFileKind = CpMediaType | "DOCUMENT" | "FONT";
-export type CpLibraryFileFolder = "images" | "documents" | "fonts" | "root";
+export type CpLibraryFileFolder = "images" | "documents" | "fonts" | "videos" | "root";
 export type CpMediaFile = {
   name: string;
   path: string;
@@ -295,6 +322,7 @@ export type CpSettingsProfileDeleteResult = { ok: true; snapshot: CpSettingsProf
 
 export type CpProjectionSetAppearancePayload = {
   textScale?: number;
+  titleTextScale?: number;
   textFont?: string;
   textFontPath?: string;
   background?: string;
@@ -304,12 +332,14 @@ export type CpProjectionSetAppearancePayload = {
   backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  logoPosition?: CpLogoPosition;
+  logoOpacity?: number;
   foregroundMode?: CpForegroundFillMode;
   foregroundGradientFrom?: string;
   foregroundGradientTo?: string;
   foreground?: string;
 };
-export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta };
+export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta; secondaryTexts?: Array<{ label: string; body: string }>; backgroundOverride?: CpItemBackground };
 export type CpProjectionSetMediaPayload = { title?: string; mediaPath: string; mediaType: CpMediaType };
 export type CpLiveSetPayload = {
   planId?: string | null;
@@ -408,6 +438,7 @@ export interface CpApi {
     importJson: () => Promise<CpSongImportJsonResult>;
     importWordBatch: () => Promise<CpSongImportWordBatchResult>;
     importAuto: () => Promise<CpSongImportAutoResult>;
+    getFrequent: (limit?: number) => Promise<CpSongListItem[]>;
   };
   plans: {
     list: () => Promise<CpPlanListItem[]>;
@@ -443,6 +474,15 @@ export interface CpApi {
     resume: () => Promise<CpLiveState>;
     setLocked: (key: ScreenKey, locked: boolean) => Promise<CpLiveState>;
     onUpdate: (cb: (state: CpLiveState) => void) => () => void;
+    /** Free mode: called from projection window to forward arrow navigation to regie window */
+    freeNavigate: (dir: 1 | -1) => Promise<void>;
+    onFreeNavigate: (cb: (dir: 1 | -1) => void) => () => void;
+    /** Video control: regie sends PLAY/PAUSE; projection windows receive via onVideoControl */
+    videoControl: (action: "PLAY" | "PAUSE") => Promise<void>;
+    onVideoControl: (cb: (action: "PLAY" | "PAUSE") => void) => () => void;
+    /** Video volume: regie sends 0-1; projection windows receive via onVideoVolume */
+    videoVolume: (volume: number) => Promise<void>;
+    onVideoVolume: (cb: (volume: number) => void) => () => void;
   };
   sync: {
     start: (port?: number) => Promise<CpSyncStartResult>;

@@ -3,6 +3,12 @@ node_modules
 .env
 
 CLAUDE.md
+
+# Claude Code local settings (machine-specific)
+.claude/settings.local.json
+
+# Windows artifact when shell redirects to /dev/null
+nul
 /src/generated/prisma
 /data/app.db
 /data/dev.db

@@ -10,10 +10,12 @@ declare global {
   type CpMediaType = Shared.CpMediaType;
   type CpBackgroundFillMode = Shared.CpBackgroundFillMode;
   type CpForegroundFillMode = Shared.CpForegroundFillMode;
+  type CpLogoPosition = Shared.CpLogoPosition;
   type CpTheme = Shared.CpTheme;
   type CpSongMeta = Shared.CpSongMeta;
   type CpWindowState = Shared.CpWindowState;
 
+  type CpItemBackground = Shared.CpItemBackground;
   type CpProjectionCurrent = Shared.CpProjectionCurrent;
   type CpProjectionState = Shared.CpProjectionState;
   type CpScreenMeta = Shared.CpScreenMeta;

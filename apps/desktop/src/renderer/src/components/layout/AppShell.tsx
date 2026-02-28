@@ -1,42 +1,63 @@
-import React, { useState } from "react";
-import { Outlet } from "react-router-dom";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { useCallback, useEffect, useState } from "react";
+import { LiveProvider } from "@/contexts/LiveContext";
+import { PlanProvider } from "@/contexts/PlanContext";
 import { Toaster } from "@/components/ui/sonner";
-import { useTheme } from "@/hooks/useTheme";
+import { ShortcutsDialog } from "@/components/dialogs/ShortcutsDialog";
+import { QuickTextDialog } from "@/components/dialogs/QuickTextDialog";
+import { SettingsDialog } from "@/components/dialogs/SettingsDialog";
+import { useShortcuts } from "@/hooks/useShortcuts";
+import type { ShortcutAction } from "@/lib/shortcuts";
 import { Header } from "./Header";
 import { LiveBar } from "./LiveBar";
-import { SourcePanel } from "./SourcePanel";
-import { HistoryDialog } from "@/components/dialogs/HistoryDialog";
 
-export function AppShell() {
-  const { theme, toggle: toggleTheme } = useTheme();
-  const [planId, setPlanId] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
+interface AppShellProps {
+  children: React.ReactNode;
+}
+
+function AppShellInner({ children }: AppShellProps) {
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [quickTextOpen, setQuickTextOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Global shortcut: Ctrl+T → quick text
+  const handleGlobalShortcut = useCallback((action: ShortcutAction) => {
+    if (action === "toggleProjection") setQuickTextOpen((v) => !v);
+  }, []);
+  useShortcuts(handleGlobalShortcut, true);
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col h-screen overflow-hidden">
-        <Header
-          planId={planId}
-          onSelectPlan={setPlanId}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          onOpenHistory={() => setHistoryOpen(true)}
-        />
+    <div className="flex h-screen flex-col bg-bg-base overflow-hidden">
+      <Header
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <main className="flex flex-1 overflow-hidden">
+        {children}
+      </main>
+      <LiveBar />
+      <Toaster />
+      <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <QuickTextDialog open={quickTextOpen} onClose={() => setQuickTextOpen(false)} />
+      <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </div>
+  );
+}
 
-        <div className="flex flex-1 overflow-hidden">
-          <SourcePanel planId={planId} onSelectPlan={setPlanId} />
+export function AppShell({ children }: AppShellProps) {
+  // Apply saved theme on mount
+  useEffect(() => {
+    void window.cp.settings.getTheme().then((r) => {
+      if (r.ok && r.theme) {
+        document.documentElement.classList.toggle("theme-dark", r.theme === "dark");
+      }
+    });
+  }, []);
 
-          <main className="flex-1 overflow-auto p-4">
-            <Outlet context={{ planId, setPlanId }} />
-          </main>
-        </div>
-
-        <LiveBar />
-      </div>
-
-      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} />
-      <Toaster position="bottom-right" />
-    </TooltipProvider>
+  return (
+    <LiveProvider>
+      <PlanProvider>
+        <AppShellInner>{children}</AppShellInner>
+      </PlanProvider>
+    </LiveProvider>
   );
 }

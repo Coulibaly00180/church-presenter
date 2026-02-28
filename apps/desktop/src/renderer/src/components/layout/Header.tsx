@@ -1,278 +1,256 @@
-import React, { useEffect, useState } from "react";
-import { Monitor, MonitorOff, Moon, Sun, Settings, Palette, Keyboard, Plus, Bug } from "lucide-react";
-import { ProjectionSettings } from "@/components/dialogs/ProjectionSettings";
-import { ShortcutsDialog } from "@/components/dialogs/ShortcutsDialog";
-import { DebugDialog } from "@/components/dialogs/DebugDialog";
-import { hydrateShortcuts, matchAction } from "@/lib/shortcuts";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
-import { localNowYmd } from "@/lib/date";
+import { useCallback, useState } from "react";
+import { CalendarDays, ChevronDown, Circle, Copy, HelpCircle, Plus, Radio, Settings, Video } from "lucide-react";
 import { toast } from "sonner";
-import { getTemplates, type PlanTemplate } from "@/lib/templates";
-import { TemplatePickerDialog } from "@/components/dialogs/TemplatePickerDialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { CreatePlanDialog } from "@/components/dialogs/CreatePlanDialog";
+import { useLive } from "@/hooks/useLive";
+import { usePlan } from "@/hooks/usePlan";
+import { cn } from "@/lib/utils";
+import { localNowYmd, isoToYmd } from "@/lib/date";
+import { projectPlanItemToTarget } from "@/lib/projection";
+import type { PlanItem, LiveState } from "@/lib/types";
 
-type PlanListItem = {
-  id: string;
-  date: string | Date;
-  title?: string | null;
-};
-
-type HeaderProps = {
-  planId: string | null;
-  onSelectPlan: (id: string) => void;
-  theme: "light" | "dark";
-  onToggleTheme: () => void;
-  onOpenHistory?: () => void;
-};
-
-function formatPlanLabel(plan: PlanListItem) {
-  const d = typeof plan.date === "string" ? new Date(plan.date) : plan.date;
-  const dateStr = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
-  return `${dateStr} — ${plan.title || "Culte"}`;
+interface HeaderProps {
+  onOpenShortcuts?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export function Header({ planId, onSelectPlan, theme, onToggleTheme, onOpenHistory }: HeaderProps) {
-  const [plans, setPlans] = useState<PlanListItem[]>([]);
-  const [projOpen, setProjOpen] = useState(false);
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [newPlanTitle, setNewPlanTitle] = useState("Culte");
-  const [newPlanDate, setNewPlanDate] = useState(localNowYmd());
-  const [newPlanOpen, setNewPlanOpen] = useState(false);
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const [pendingNewDate, setPendingNewDate] = useState<string | null>(null);
-  const [pendingNewTitle, setPendingNewTitle] = useState("Culte");
-  const [debugOpen, setDebugOpen] = useState(false);
+function formatPlanDate(date: string | Date): string {
+  const ymd = isoToYmd(String(date));
+  if (!ymd) return "—";
+  const [y, m, d] = ymd.split("-");
+  const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+  return dateObj.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+}
 
-  const refreshPlans = () => window.cp.plans.list().then(setPlans).catch(() => null);
+function formatPlanLabel(plan: CpPlanListItem | { title?: string | null; date: string | Date } | undefined): string {
+  if (!plan) return "Aucun plan";
+  if (plan.title) return plan.title;
+  return formatPlanDate(plan.date);
+}
 
-  useEffect(() => {
-    refreshPlans();
-  }, []);
+function isTodayPlan(plan: { date: string | Date } | undefined): boolean {
+  if (!plan) return false;
+  return isoToYmd(String(plan.date)) === localNowYmd();
+}
 
-  useEffect(() => {
-    if (!window.cp.projectionWindow) return;
-    window.cp.projectionWindow.isOpen().then((r) => setProjOpen(!!r?.isOpen));
-    const off = window.cp.projectionWindow.onWindowState((p) => setProjOpen(!!p?.isOpen));
-    return () => off?.();
-  }, []);
+export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
+  const { live, toggle, startFreeMode } = useLive();
+  const { planList, selectedPlanId, plan, selectPlan, refreshList } = usePlan();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  useEffect(() => {
-    void hydrateShortcuts();
-  }, []);
+  const isPlanMode = live?.enabled === true && live.planId !== null;
+  const isFreeMode = live?.enabled === true && live.planId === null;
 
-  const toggleProjection = async () => {
-    if (!window.cp.projectionWindow) return;
-    if (projOpen) {
-      const r = await window.cp.projectionWindow.close();
-      setProjOpen(!!r?.isOpen);
+  // Mode Direct (plan) — binds a plan, resets cursor, auto-projects first item.
+  const handlePlanModeToggle = useCallback(async () => {
+    if (isPlanMode) {
+      await toggle();
     } else {
-      const r = await window.cp.projectionWindow.open();
-      setProjOpen(!!r?.isOpen);
-    }
-  };
-
-  // Projection shortcut (configurable)
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (matchAction(e) === "toggleProjection") {
-        e.preventDefault();
-        toggleProjection();
+      const liveState = await window.cp.live.set({ planId: selectedPlanId ?? null, enabled: true, cursor: 0 });
+      const firstItem = plan?.items[0];
+      if (firstItem) {
+        await projectPlanItemToTarget(liveState.target, firstItem as PlanItem, liveState as unknown as LiveState);
       }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [projOpen]);
-
-  const createPlanDirect = async (ymd: string, title: string) => {
-    const created = await window.cp.plans.create({ dateIso: ymd, title: title || "Culte" });
-    if (created?.id) {
-      toast.success("Plan cree");
-      await refreshPlans();
-      onSelectPlan(created.id);
     }
-  };
+  }, [isPlanMode, toggle, selectedPlanId, plan]);
 
-  const handleNewPlan = async () => {
-    const templates = await getTemplates();
-    if (templates.length > 0) {
-      setPendingNewDate(newPlanDate);
-      setPendingNewTitle(newPlanTitle);
-      setTemplatePickerOpen(true);
+  // Mode Libre — plan-less projection for rehearsals / bible studies.
+  // Auto-switches from Mode Direct if it was active.
+  const handleFreeToggle = useCallback(async () => {
+    if (isFreeMode) {
+      await toggle();
     } else {
-      await createPlanDirect(newPlanDate, newPlanTitle);
+      await startFreeMode();
     }
-    setNewPlanOpen(false);
-  };
+  }, [isFreeMode, toggle, startFreeMode]);
 
-  const handleTemplateSelect = async (template: PlanTemplate) => {
-    if (!pendingNewDate) return;
-    const created = await window.cp.plans.create({ dateIso: pendingNewDate, title: pendingNewTitle || "Culte" });
-    if (created?.id) {
-      for (const item of template.items) {
-        await window.cp.plans.addItem({
-          planId: created.id,
-          kind: item.kind,
-          title: item.title ?? undefined,
-          content: item.content ?? undefined,
-          refId: item.refId ?? undefined,
-          refSubId: item.refSubId ?? undefined,
-          mediaPath: item.mediaPath ?? undefined,
-        });
-      }
-      toast.success("Plan cree depuis template");
-      await refreshPlans();
-      onSelectPlan(created.id);
+  const handleDuplicate = useCallback(async () => {
+    if (!selectedPlanId) return;
+    const duplicated = await window.cp.plans.duplicate({ planId: selectedPlanId });
+    if (duplicated) {
+      await refreshList();
+      selectPlan(duplicated.id);
+      toast.success("Plan dupliqué");
     }
-    setPendingNewDate(null);
-  };
+  }, [selectedPlanId, refreshList, selectPlan]);
 
   return (
-    <header className="flex items-center gap-2 px-3 py-1.5 border-b border-border/60 bg-muted/50 dark:bg-secondary/30 shrink-0">
-      <h1 className="text-sm font-semibold whitespace-nowrap">Church Presenter</h1>
-
-      <Select value={planId ?? ""} onValueChange={onSelectPlan}>
-        <SelectTrigger className="w-[240px] h-8 text-xs">
-          <SelectValue placeholder="Choisir un plan..." />
-        </SelectTrigger>
-        <SelectContent>
-          {plans.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {formatPlanLabel(p)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Popover open={newPlanOpen} onOpenChange={setNewPlanOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon" className="h-8 w-8">
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Nouveau plan</TooltipContent>
-        </Tooltip>
-        <PopoverContent align="start" className="w-64 p-3">
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">Nouveau plan</Label>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Nom</Label>
-              <input
-                type="text"
-                title="Nom du plan"
-                placeholder="Culte du dimanche"
-                value={newPlanTitle}
-                onChange={(e) => setNewPlanTitle(e.target.value)}
-                className="w-full h-8 text-xs rounded-md border border-input bg-background px-2"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[10px] text-muted-foreground">Date</Label>
-              <input
-                type="date"
-                title="Date du plan"
-                value={newPlanDate}
-                onChange={(e) => setNewPlanDate(e.target.value)}
-                className="w-full h-8 text-xs rounded-md border border-input bg-background px-2"
-              />
-            </div>
-            <Button size="sm" className="w-full h-7 text-xs" onClick={handleNewPlan}>
-              Creer le plan
-            </Button>
+    <>
+      <header
+        className="flex items-center justify-between px-4 border-b border-border bg-bg-surface shrink-0 h-12"
+      >
+        {/* Left: Logo + Plan selector */}
+        <div className="flex items-center gap-2 min-w-0">
+          {/* Logo */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Video className="h-4 w-4 text-primary" />
+            <span className="font-semibold text-text-primary text-sm hidden sm:block">Church Presenter</span>
           </div>
-        </PopoverContent>
-      </Popover>
 
-      <div className="flex-1" />
+          <div className="w-px h-5 bg-border shrink-0" />
 
-      <Tooltip>
-        <TooltipTrigger asChild>
+          {/* Plan selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 max-w-[240px] h-8 px-2"
+              >
+                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                <span className="truncate text-sm font-medium">
+                  {plan ? formatPlanLabel(plan) : "Aucun plan"}
+                </span>
+                {plan && isTodayPlan(plan) && (
+                  <span className="text-[9px] font-semibold bg-success/15 text-success px-1 py-0.5 rounded shrink-0">
+                    Auj.
+                  </span>
+                )}
+                <ChevronDown className="h-3 w-3 shrink-0 text-text-muted ml-0.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72">
+              <DropdownMenuLabel className="text-xs">Plans de culte</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {planList.length === 0 ? (
+                <div className="px-3 py-4 text-center text-xs text-text-muted">
+                  Aucun plan disponible
+                </div>
+              ) : (
+                planList.map((p) => {
+                  const isSelected = selectedPlanId === p.id;
+                  const isToday = isTodayPlan(p);
+                  return (
+                    <DropdownMenuItem
+                      key={p.id}
+                      className={cn(isSelected && "bg-bg-elevated font-medium")}
+                      onClick={() => selectPlan(p.id)}
+                    >
+                      <CalendarDays className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate text-sm">{p.title ?? formatPlanDate(p.date)}</div>
+                        {p.title && (
+                          <div className="truncate text-xs text-text-muted">{formatPlanDate(p.date)}</div>
+                        )}
+                      </div>
+                      {isToday && (
+                        <span className="text-[9px] font-semibold bg-success/15 text-success px-1 py-0.5 rounded shrink-0">
+                          Auj.
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-hidden />
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })
+              )}
+              <DropdownMenuSeparator />
+              {plan && (
+                <DropdownMenuItem onClick={() => void handleDuplicate()}>
+                  <Copy className="h-3.5 w-3.5" />
+                  Dupliquer ce plan
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={() => setCreateDialogOpen(true)}>
+                <Plus className="h-3.5 w-3.5" />
+                Nouveau plan…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Mode Direct (plan) */}
           <Button
-            variant={projOpen ? "default" : "outline"}
+            variant={isPlanMode ? "destructive" : "default"}
             size="sm"
-            className="h-7 text-xs"
-            onClick={toggleProjection}
+            onClick={() => void handlePlanModeToggle()}
+            disabled={isFreeMode}
+            className={cn(
+              "gap-1.5 h-8 px-3 font-medium",
+              !isPlanMode && !isFreeMode && "bg-success hover:bg-success/90 text-white",
+            )}
+            aria-label={isPlanMode ? "Quitter le mode Direct" : "Passer en mode Direct"}
+            title={isFreeMode ? "Quitter d'abord le Mode Libre" : undefined}
           >
-            {projOpen ? <Monitor className="h-3.5 w-3.5 mr-1" /> : <MonitorOff className="h-3.5 w-3.5 mr-1" />}
-            Projection
+            {isPlanMode ? (
+              <>
+                <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
+                Direct
+              </>
+            ) : (
+              <>
+                <Video className="h-3.5 w-3.5" />
+                Mode Direct
+              </>
+            )}
           </Button>
-        </TooltipTrigger>
-        <TooltipContent>Ctrl+P pour basculer</TooltipContent>
-      </Tooltip>
 
-      <Badge variant={projOpen ? "default" : "secondary"} className="text-[10px]">
-        {projOpen ? "ON" : "OFF"}
-      </Badge>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggleTheme}>
-            {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          {/* Mode Libre (sans plan) */}
+          <Button
+            variant={isFreeMode ? "destructive" : "ghost"}
+            size="sm"
+            onClick={() => void handleFreeToggle()}
+            disabled={isPlanMode}
+            className={cn(
+              "gap-1.5 h-8 px-3 font-medium",
+              !isFreeMode && !isPlanMode && "text-text-secondary hover:text-text-primary",
+              isFreeMode && "bg-warning hover:bg-warning/90 text-white border-warning",
+            )}
+            aria-label={isFreeMode ? "Quitter le Mode Libre" : "Passer en Mode Libre"}
+            title={isPlanMode ? "Quitter d'abord le Mode Direct" : "Mode Libre — projection sans plan"}
+          >
+            {isFreeMode ? (
+              <>
+                <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
+                Libre
+              </>
+            ) : (
+              <>
+                <Radio className="h-3.5 w-3.5" />
+                Mode Libre
+              </>
+            )}
           </Button>
-        </TooltipTrigger>
-        <TooltipContent>{theme === "dark" ? "Mode clair" : "Mode sombre"}</TooltipContent>
-      </Tooltip>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-7 w-7">
-            <Settings className="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setAppearanceOpen(true)}>
-            <Palette className="h-3.5 w-3.5 mr-1.5" /> Apparence projection
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setShortcutsOpen(true)}>
-            <Keyboard className="h-3.5 w-3.5 mr-1.5" /> Raccourcis clavier
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onOpenHistory}>
-            Importer / Exporter
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => window.cp.devtools?.open?.("REGIE")}>
-            DevTools Regie
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => window.cp.devtools?.open?.("PROJECTION")}>
-            DevTools Projection
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setDebugOpen(true)}>
-            <Bug className="h-3.5 w-3.5 mr-1.5" /> Diagnostic debug
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          {onOpenSettings && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onOpenSettings}
+              aria-label="Paramètres"
+              className="h-8 w-8"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          )}
 
-      <ProjectionSettings open={appearanceOpen} onOpenChange={setAppearanceOpen} />
-      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-      <DebugDialog open={debugOpen} onOpenChange={setDebugOpen} />
-      <TemplatePickerDialog
-        open={templatePickerOpen}
-        onOpenChange={(v) => { setTemplatePickerOpen(v); if (!v) setPendingNewDate(null); }}
-        onSelect={handleTemplateSelect}
-        onSkip={() => { if (pendingNewDate) createPlanDirect(pendingNewDate, pendingNewTitle); setPendingNewDate(null); }}
-      />
-    </header>
+          {onOpenShortcuts && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onOpenShortcuts}
+              aria-label="Raccourcis clavier (?)"
+              className="h-8 w-8"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </header>
+
+      <CreatePlanDialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} />
+    </>
   );
 }

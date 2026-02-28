@@ -1,38 +1,27 @@
-import {
-  CircleCheckIcon,
-  InfoIcon,
-  Loader2Icon,
-  OctagonXIcon,
-  TriangleAlertIcon,
-} from "lucide-react"
-import { useTheme } from "next-themes"
-import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { Toaster as SonnerToaster } from "sonner";
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+type ToasterProps = React.ComponentProps<typeof SonnerToaster>;
 
-  return (
-    <Sonner
-      theme={theme as ToasterProps["theme"]}
-      className="toaster group"
-      icons={{
-        success: <CircleCheckIcon className="size-4" />,
-        info: <InfoIcon className="size-4" />,
-        warning: <TriangleAlertIcon className="size-4" />,
-        error: <OctagonXIcon className="size-4" />,
-        loading: <Loader2Icon className="size-4 animate-spin" />,
-      }}
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
-        } as React.CSSProperties
-      }
-      {...props}
-    />
-  )
-}
+const Toaster = ({ ...props }: ToasterProps) => (
+  <SonnerToaster
+    position="bottom-right"
+    toastOptions={{
+      classNames: {
+        toast:
+          "group toast bg-bg-surface border border-border text-text-primary shadow-lg rounded-lg",
+        title: "text-sm font-medium text-text-primary",
+        description: "text-xs text-text-secondary",
+        actionButton: "bg-primary text-primary-fg text-xs font-medium rounded-md px-3 py-1.5",
+        cancelButton: "bg-bg-elevated text-text-secondary text-xs font-medium rounded-md px-3 py-1.5",
+        closeButton: "bg-bg-elevated border border-border text-text-secondary",
+        success: "border-success/30",
+        error: "border-danger/30",
+        warning: "border-warning/30",
+        info: "border-primary/30",
+      },
+    }}
+    {...props}
+  />
+);
 
-export { Toaster }
+export { Toaster };

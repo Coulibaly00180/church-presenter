@@ -62,10 +62,13 @@ export async function createPlanItemWithRetry(
             kind: payload.kind,
             title: payload.title,
             content: payload.content,
+            notes: payload.notes,
             refId: payload.refId,
             refSubId: payload.refSubId,
             songId: payload.kind === "SONG_BLOCK" ? payload.refId : undefined,
             mediaPath: payload.mediaPath,
+            secondaryContent: payload.secondaryContent,
+            backgroundConfig: payload.backgroundConfig,
           },
         });
       });
@@ -181,7 +184,10 @@ export function registerPlansIpc() {
     const payload = parsePlanUpdatePayload(rawPayload);
     await prisma.servicePlan.update({
       where: { id: payload.planId },
-      data: { title: payload.title },
+      data: {
+        title: payload.title,
+        ...(payload.backgroundConfig !== undefined ? { backgroundConfig: payload.backgroundConfig } : {}),
+      },
     });
     return { ok: true };
   });
@@ -220,6 +226,9 @@ export function registerPlansIpc() {
       data: {
         ...(payload.title !== undefined ? { title: payload.title } : {}),
         ...(payload.content !== undefined ? { content: payload.content } : {}),
+        ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
+        ...(payload.secondaryContent !== undefined ? { secondaryContent: payload.secondaryContent } : {}),
+        ...(payload.backgroundConfig !== undefined ? { backgroundConfig: payload.backgroundConfig } : {}),
       },
     });
     return { ok: true };

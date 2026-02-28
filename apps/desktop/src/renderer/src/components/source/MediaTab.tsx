@@ -1,342 +1,129 @@
-import React, { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { FileImage, FileText, FileVideo, Loader2, Plus, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Upload, Trash2, Image as ImageIcon, FileText, FolderOpen, RefreshCw, Pencil, Check, X } from "lucide-react";
-import { toast } from "sonner";
+import { MediaPreviewDialog } from "@/components/dialogs/MediaPreviewDialog";
+import { usePlan } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
-import * as pdfjsLib from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+type MediaFilter = "ALL" | "IMAGE" | "PDF" | "VIDEO";
 
-type MediaTabProps = {
-  planId: string | null;
-};
+export function MediaTab() {
+  const { addItem } = usePlan();
+  const [files, setFiles] = useState<CpMediaFile[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filter, setFilter] = useState<MediaFilter>("ALL");
+  const [previewFile, setPreviewFile] = useState<CpMediaFile | null>(null);
 
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-export function MediaTab({ planId }: MediaTabProps) {
-  const [mediaFiles, setMediaFiles] = useState<CpMediaFile[]>([]);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [libraryDir, setLibraryDir] = useState<string>("");
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [pdfPreviewImage, setPdfPreviewImage] = useState<string | null>(null);
-  const [pdfPreviewLoading, setPdfPreviewLoading] = useState(false);
-  const [pdfPreviewError, setPdfPreviewError] = useState<string | null>(null);
-  const [renamingPath, setRenamingPath] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-
-  const loadMedia = async () => {
-    const result = await window.cp.files.listMedia();
-    if (!result.ok) {
-      toast.error(result.error || "Impossible de charger les medias.");
-      return;
-    }
-    setLibraryDir(result.rootDir);
-    setMediaFiles(result.files);
-    setSelectedPath((prev) => {
-      if (result.files.length === 0) return null;
-      if (prev && result.files.some((f) => f.path === prev)) return prev;
-      return result.files[0].path;
-    });
-  };
-
-  useEffect(() => { loadMedia(); }, []);
-
-  const pickMedia = async () => {
-    const result = await window.cp.files.pickMedia();
-    if (result?.ok) {
-      await loadMedia();
-      setSelectedPath(result.path);
-      toast.success("Fichier importe.");
-      return;
-    }
-    if (result && "error" in result) toast.error(result.error || "Import media echoue.");
-  };
-
-  const chooseLibraryDir = async () => {
-    const result = await window.cp.files.chooseLibraryDir();
-    if (result.ok) {
-      toast.success("Dossier par defaut mis a jour.");
-      await loadMedia();
-      return;
-    }
-    if ("error" in result) toast.error(result.error || "Impossible de definir le dossier.");
-  };
-
-  const addToPlan = async (file: CpMediaFile) => {
-    if (!planId) { toast.error("Selectionnez un plan d'abord."); return; }
-    if (file.kind === "DOCUMENT" || file.kind === "FONT") {
-      toast.info("Ce document n'est pas projetable pour le moment.");
-      return;
-    }
+  const loadFiles = useCallback(async () => {
+    setLoading(true);
     try {
-      await window.cp.plans.addItem({
-        planId,
-        kind: file.kind === "PDF" ? "ANNOUNCEMENT_PDF" : "ANNOUNCEMENT_IMAGE",
-        title: file.name,
-        mediaPath: file.path,
-      });
-      toast.success("Media ajoute au plan.");
-    } catch {
-      toast.error("Impossible d'ajouter ce media au plan.");
+      const result = await window.cp.files.listMedia();
+      if (result.ok) setFiles(result.files);
+      else toast.error("Impossible de charger les médias");
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const deleteMedia = async (file: CpMediaFile) => {
-    const result = await window.cp.files.deleteMedia({ path: file.path });
-    if (!result.ok) {
-      toast.error(result.error || "Suppression echouee.");
-      return;
-    }
-    await loadMedia();
-    toast.success("Fichier supprime.");
-  };
-
-  const startRename = (file: CpMediaFile) => {
-    setRenamingPath(file.path);
-    setRenameValue(file.name);
-  };
-
-  const commitRename = async () => {
-    if (!renamingPath || !renameValue.trim()) { setRenamingPath(null); return; }
-    const result = await window.cp.files.renameMedia({ path: renamingPath, name: renameValue.trim() });
-    if (!result.ok) {
-      toast.error("error" in result ? result.error : "Renommage echoue.");
-    } else {
-      await loadMedia();
-    }
-    setRenamingPath(null);
-  };
-
-  const selectedFile = mediaFiles.find((file) => file.path === selectedPath) ?? null;
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    let imageUrlToRevoke: string | null = null;
-    const loadPreview = async () => {
-      setImagePreviewUrl(null);
-      setPdfPreviewImage(null);
-      setPdfPreviewError(null);
-      setPdfPreviewLoading(false);
-      if (!selectedFile) return;
-      try {
-        const readResult = await window.cp.files.readMedia({ path: selectedFile.path });
-        if (!readResult.ok) {
-          if (selectedFile.kind === "PDF") setPdfPreviewError(readResult.error || "Lecture PDF impossible.");
-          return;
-        }
-        const bytes = base64ToUint8Array(readResult.base64);
-        if (selectedFile.kind === "IMAGE") {
-          const blobBytes = new Uint8Array(bytes.length);
-          blobBytes.set(bytes);
-          const blob = new Blob([blobBytes], { type: readResult.mimeType || "application/octet-stream" });
-          const url = URL.createObjectURL(blob);
-          imageUrlToRevoke = url;
-          if (!cancelled) setImagePreviewUrl(url);
-          return;
-        }
-        if (selectedFile.kind !== "PDF") return;
+    void loadFiles();
+  }, [loadFiles]);
 
-        setPdfPreviewLoading(true);
-        const pdf = await pdfjsLib.getDocument({ data: bytes }).promise;
-        const page = await pdf.getPage(1);
-        const baseViewport = page.getViewport({ scale: 1 });
-        const scale = Math.min(3, Math.max(1, 900 / baseViewport.width));
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas indisponible");
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        if (!cancelled) setPdfPreviewImage(canvas.toDataURL("image/png"));
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : String(e);
-        if (!cancelled) setPdfPreviewError(message);
-      } finally {
-        if (!cancelled) setPdfPreviewLoading(false);
-      }
-    };
-    void loadPreview();
-    return () => {
-      cancelled = true;
-      if (imageUrlToRevoke) URL.revokeObjectURL(imageUrlToRevoke);
-    };
-  }, [selectedFile?.path, selectedFile?.kind]);
+  const handleAdd = useCallback(async (file: CpMediaFile) => {
+    const kind =
+      file.kind === "IMAGE"
+        ? ("ANNOUNCEMENT_IMAGE" as const)
+        : file.kind === "VIDEO"
+          ? ("ANNOUNCEMENT_VIDEO" as const)
+          : ("ANNOUNCEMENT_PDF" as const);
+    const item = await addItem({
+      kind,
+      title: file.name,
+      mediaPath: file.path,
+    });
+    if (item) toast.success("Ajouté au plan");
+  }, [addItem]);
+
+  const filtered =
+    filter === "ALL"
+      ? files.filter((f) => f.kind === "IMAGE" || f.kind === "PDF" || f.kind === "VIDEO")
+      : files.filter((f) => f.kind === filter);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-1.5">
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={pickMedia}>
-          <Upload className="h-3 w-3 mr-1" /> Importer
-        </Button>
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={chooseLibraryDir}>
-          <FolderOpen className="h-3 w-3 mr-1" /> Dossier
-        </Button>
-        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={loadMedia}>
-          <RefreshCw className="h-3 w-3 mr-1" /> Scanner
+    <div className="flex flex-col h-full">
+      {/* Filter + refresh */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-border">
+        {(["ALL", "IMAGE", "PDF", "VIDEO"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            className={cn(
+              "px-2.5 py-1 rounded text-xs font-medium transition-colors",
+              filter === f
+                ? "bg-primary text-primary-fg"
+                : "text-text-secondary hover:bg-bg-elevated"
+            )}
+            onClick={() => setFilter(f)}
+          >
+            {f === "ALL" ? "Tous" : f}
+          </button>
+        ))}
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          className="ml-auto"
+          onClick={() => void loadFiles()}
+          aria-label="Actualiser"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      {libraryDir && (
-        <p className="text-[10px] text-muted-foreground truncate" title={libraryDir}>
-          Dossier: {libraryDir}
-        </p>
-      )}
-
-      {selectedFile && (
-        <div className="space-y-1.5">
-          <p className="text-[11px] font-medium truncate" title={selectedFile.name}>
-            Apercu: {selectedFile.name}
-          </p>
-          <div className="h-44 w-full rounded-md border bg-muted/20 overflow-hidden flex items-center justify-center">
-            {selectedFile.kind === "IMAGE" ? (
-              imagePreviewUrl ? (
-                <img
-                  src={imagePreviewUrl}
-                  alt={selectedFile.name}
-                  className="h-full w-full object-contain"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-muted-foreground px-2 text-center">
-                  <ImageIcon className="h-6 w-6" />
-                  <p className="text-xs">Apercu image indisponible</p>
-                </div>
-              )
-            ) : selectedFile.kind === "DOCUMENT" || selectedFile.kind === "FONT" ? (
-              <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-muted-foreground px-2 text-center">
-                <FileText className="h-6 w-6" />
-                <p className="text-xs">{selectedFile.kind === "FONT" ? "Police detectee" : "Document detecte"}</p>
-                <p className="text-[10px] opacity-80">Previsualisation non supportee</p>
-              </div>
-            ) : (
-              pdfPreviewImage ? (
-                <img
-                  src={pdfPreviewImage}
-                  alt={`${selectedFile.name} (PDF)`}
-                  className="h-full w-full object-contain"
-                />
-              ) : pdfPreviewLoading ? (
-                <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
-                  <FileText className="h-6 w-6" />
-                  <p className="text-xs">Chargement du PDF...</p>
-                </div>
-              ) : (
-                <div className="h-full w-full flex flex-col items-center justify-center gap-1 text-muted-foreground px-2 text-center">
-                  <FileText className="h-6 w-6" />
-                  <p className="text-xs">Apercu PDF indisponible</p>
-                  {pdfPreviewError ? <p className="text-[10px] opacity-80 truncate w-full">{pdfPreviewError}</p> : null}
-                </div>
-              )
-            )}
+      <ScrollArea className="flex-1">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
           </div>
-        </div>
-      )}
-
-      <ScrollArea className="max-h-[400px]">
-        <div className="space-y-1">
-          {mediaFiles.map((file) => {
-            const isRenaming = renamingPath === file.path;
-            const kindLabel = file.kind === "PDF" ? "PDF" : file.kind === "IMAGE" ? "Image" : file.kind === "FONT" ? "Police" : "Document";
-            const icon = file.kind === "PDF" || file.kind === "DOCUMENT" || file.kind === "FONT"
-              ? <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              : <ImageIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
-
-            if (isRenaming) {
-              return (
-                <div
-                  key={file.path}
-                  className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded-md border text-xs bg-card",
-                    selectedPath === file.path && "border-primary/50 bg-accent/40",
-                  )}
-                >
-                  {icon}
-                  <div className="flex-1 min-w-0">
-                    <input
-                      type="text"
-                      autoFocus
-                      title="Nouveau nom du fichier"
-                      placeholder="Nouveau nom..."
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") { e.preventDefault(); void commitRename(); }
-                        if (e.key === "Escape") setRenamingPath(null);
-                      }}
-                      className="w-full h-5 text-xs rounded border border-primary bg-background px-1 focus:outline-none"
-                    />
-                    <p className="text-[10px] text-muted-foreground">{kindLabel} - {file.folder}</p>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-5 w-5 text-primary" onClick={() => { void commitRename(); }}>
-                    <Check className="h-2.5 w-2.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setRenamingPath(null)}>
-                    <X className="h-2.5 w-2.5" />
-                  </Button>
-                </div>
-              );
-            }
-
-            return (
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2 text-text-muted">
+            <FileImage className="h-8 w-8 opacity-40" />
+            <p className="text-sm">Aucun média</p>
+          </div>
+        ) : (
+          <div className="py-1">
+            {filtered.map((file) => (
               <div
                 key={file.path}
-                onClick={() => setSelectedPath(file.path)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setSelectedPath(file.path);
-                  }
-                }}
-                className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 rounded-md border text-xs bg-card cursor-pointer",
-                  selectedPath === file.path && "border-primary/50 bg-accent/40",
-                )}
+                className="group flex items-center gap-2 px-3 py-2 hover:bg-bg-elevated transition-colors cursor-pointer"
+                onDoubleClick={() => setPreviewFile(file)}
+                title="Double-clic pour prévisualiser"
               >
-                {icon}
-                <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium" title={file.name}>{file.name}</p>
-                  <p className="text-[10px] text-muted-foreground">{kindLabel} - {file.folder}</p>
-                </div>
-                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={(e) => { e.stopPropagation(); startRename(file); }}>
-                  <Pencil className="h-2.5 w-2.5" />
-                </Button>
+                {file.kind === "IMAGE" ? (
+                  <FileImage className="h-4 w-4 shrink-0 text-kind-media" />
+                ) : file.kind === "VIDEO" ? (
+                  <FileVideo className="h-4 w-4 shrink-0 text-kind-media" />
+                ) : (
+                  <FileText className="h-4 w-4 shrink-0 text-kind-announcement" />
+                )}
+                <span className="flex-1 text-sm text-text-primary truncate">{file.name}</span>
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                  disabled={file.kind === "DOCUMENT" || file.kind === "FONT"}
-                  onClick={(e) => { e.stopPropagation(); addToPlan(file); }}
+                  size="icon-xs"
+                  className="opacity-0 group-hover:opacity-100"
+                  onClick={(e) => { e.stopPropagation(); void handleAdd(file); }}
+                  aria-label={`Ajouter ${file.name} au plan`}
                 >
-                  <Plus className="h-2.5 w-2.5" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5 text-destructive"
-                  onClick={(e) => { e.stopPropagation(); deleteMedia(file); }}
-                >
-                  <Trash2 className="h-2.5 w-2.5" />
+                  <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
-            );
-          })}
-          {mediaFiles.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">Aucun fichier media.</p>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </ScrollArea>
+
+      <MediaPreviewDialog file={previewFile} onClose={() => setPreviewFile(null)} />
     </div>
   );
 }

@@ -1,75 +1,105 @@
-import React, { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Plus, FileText } from "lucide-react";
+import { useCallback, useState } from "react";
+import { MessageSquarePlus, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { usePlan } from "@/hooks/usePlan";
 
-type AnnouncementsTabProps = {
-  planId: string | null;
-};
+export function AnnouncementsTab() {
+  const { addItem } = usePlan();
+  const [text, setText] = useState("");
+  const [title, setTitle] = useState("");
 
-export function AnnouncementsTab({ planId }: AnnouncementsTabProps) {
-  const [title, setTitle] = useState("Annonce");
-  const [content, setContent] = useState("");
-
-  const addTextToPlan = async () => {
-    if (!planId) { toast.error("Selectionnez un plan d'abord."); return; }
-    if (!content.trim()) { toast.error("Ecrivez du contenu."); return; }
-    await window.cp.plans.addItem({
-      planId,
+  const handleAddText = useCallback(async () => {
+    if (!text.trim()) return;
+    const item = await addItem({
       kind: "ANNOUNCEMENT_TEXT",
       title: title.trim() || "Annonce",
-      content: content.trim(),
+      content: text.trim(),
     });
-    toast.success("Annonce ajoutee au plan.");
-    setContent("");
-  };
+    if (item) {
+      toast.success("Annonce ajoutée au plan");
+      setText("");
+      setTitle("");
+    }
+  }, [addItem, text, title]);
 
-  const importPdf = async () => {
-    if (!planId) { toast.error("Selectionnez un plan d'abord."); return; }
+  const handleAddImage = useCallback(async () => {
     const result = await window.cp.files.pickMedia();
-    if (!result?.ok || !result.path) return;
-    const isPdf = result.path.toLowerCase().endsWith(".pdf");
-    await window.cp.plans.addItem({
-      planId,
-      kind: isPdf ? "ANNOUNCEMENT_PDF" : "ANNOUNCEMENT_IMAGE",
-      title: result.path.split(/[\\/]/).pop() || "Media",
+    if (!result.ok || "canceled" in result) return;
+    const item = await addItem({
+      kind: "ANNOUNCEMENT_IMAGE",
+      title: result.path.split(/[\\/]/).pop() ?? "Image",
       mediaPath: result.path,
     });
-    toast.success("Media ajoute au plan.");
-  };
+    if (item) toast.success("Image ajoutée au plan");
+  }, [addItem]);
+
+  const handleAddPdf = useCallback(async () => {
+    const result = await window.cp.files.pickMedia();
+    if (!result.ok || "canceled" in result) return;
+    const item = await addItem({
+      kind: "ANNOUNCEMENT_PDF",
+      title: result.path.split(/[\\/]/).pop() ?? "PDF",
+      mediaPath: result.path,
+    });
+    if (item) toast.success("PDF ajouté au plan");
+  }, [addItem]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <h3 className="text-xs font-medium flex items-center gap-1.5">
-        <FileText className="h-3.5 w-3.5" /> Annonce texte
-      </h3>
+    <div className="flex flex-col gap-4 p-3">
+      {/* Text announcement */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-text-secondary">Annonce texte</p>
+        <input
+          type="text"
+          placeholder="Titre (optionnel)"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        <textarea
+          placeholder="Texte de l'annonce…"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={4}
+          className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-1.5"
+          disabled={!text.trim()}
+          onClick={() => void handleAddText()}
+        >
+          <Plus className="h-4 w-4" />
+          Ajouter au plan
+        </Button>
+      </div>
 
-      <Input
-        className="h-7 text-xs"
-        placeholder="Titre de l'annonce"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-
-      <textarea
-        className="w-full rounded-md border bg-background px-3 py-2 text-xs min-h-[100px] resize-y focus:outline-none focus:ring-1 focus:ring-ring"
-        placeholder="Contenu de l'annonce..."
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-      />
-
-      <Button size="sm" className="h-7 text-xs" onClick={addTextToPlan}>
-        <Plus className="h-3 w-3 mr-1" /> Ajouter au plan
-      </Button>
-
-      <Separator />
-
-      <h3 className="text-xs font-medium">PDF / Image</h3>
-      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={importPdf}>
-        Importer un fichier...
-      </Button>
+      {/* Media */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-text-secondary">Médias</p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1.5"
+            onClick={() => void handleAddImage()}
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            Image
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1.5"
+            onClick={() => void handleAddPdf()}
+          >
+            <MessageSquarePlus className="h-4 w-4" />
+            PDF
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

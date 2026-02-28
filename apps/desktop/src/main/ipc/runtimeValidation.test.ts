@@ -66,7 +66,11 @@ describe("runtime validation", () => {
       mediaPath: "/tmp/a.pdf",
       mediaType: "PDF",
     });
-    expect(() => parseProjectionSetMediaPayload({ mediaPath: "/tmp/a.pdf", mediaType: "VIDEO" })).toThrow(
+    expect(parseProjectionSetMediaPayload({ mediaPath: "/tmp/a.mp4", mediaType: "VIDEO" })).toMatchObject({
+      mediaPath: "/tmp/a.mp4",
+      mediaType: "VIDEO",
+    });
+    expect(() => parseProjectionSetMediaPayload({ mediaPath: "/tmp/a.pdf", mediaType: "AUDIO" })).toThrow(
       "must be one of"
     );
   });

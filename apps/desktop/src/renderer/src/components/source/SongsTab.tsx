@@ -1,340 +1,268 @@
-import React, { useState } from "react";
-import { Input } from "@/components/ui/input";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Heart, Loader2, Music2, Plus, Search, TrendingUp, Upload, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Plus, Play, Search, Trash2, Music, Pencil, FileJson, FileUp, FileDown, Loader2, CalendarDays, Wand2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { localNowYmd } from "@/lib/date";
-import { useSongsState } from "../../pages/songs/useSongsState";
-import { projectTextToScreen } from "../../projection/target";
-import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
 
-type SongsTabProps = {
-  planId: string | null;
-};
-
-function formatPlanOption(p: { id: string; date?: string | Date; title?: string | null }) {
-  if (!p.date) return p.title || "Culte";
-  const d = p.date instanceof Date ? p.date : new Date(p.date);
-  if (isNaN(d.getTime())) return p.title || "Culte";
-  const dateStr = d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
-  return `${dateStr} — ${p.title || "Culte"}`;
+const FAVORITES_KEY = "cp_favorite_songs";
+function loadFavorites(): Set<string> {
+  try {
+    const raw = localStorage.getItem(FAVORITES_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch { return new Set(); }
+}
+function saveFavorites(ids: Set<string>) {
+  localStorage.setItem(FAVORITES_KEY, JSON.stringify([...ids]));
 }
 
-export function SongsTab({ planId }: SongsTabProps) {
-  const state = useSongsState();
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [showNewPlan, setShowNewPlan] = useState(false);
-  const [newPlanDate, setNewPlanDate] = useState(localNowYmd());
-  const [creatingPlan, setCreatingPlan] = useState(false);
+interface SongsTabProps {
+  onCreateSong?: () => void;
+  onSelectSong?: (id: string) => void;
+}
 
-  // Override planId from parent
-  React.useEffect(() => {
-    if (planId) state.setPlanId(planId);
-  }, [planId]);
+export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
+  const [query, setQuery] = useState("");
+  const [songs, setSongs] = useState<CpSongListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(() => loadFavorites());
+  const [frequentSongs, setFrequentSongs] = useState<CpSongListItem[]>([]);
 
-  const createPlanForDate = async () => {
-    if (!newPlanDate) return;
-    setCreatingPlan(true);
+  const loadSongs = useCallback(async (q: string) => {
+    setLoading(true);
     try {
-      const created = await window.cp.plans.create({ dateIso: newPlanDate, title: "Culte" });
-      if (created?.id) {
-        await state.refreshPlans();
-        state.setPlanId(created.id);
-        setShowNewPlan(false);
-      }
+      const list = await window.cp.songs.list(q || undefined);
+      setSongs(list);
     } catch {
-      // ignore
+      toast.error("Impossible de charger les chants");
     } finally {
-      setCreatingPlan(false);
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void loadSongs("");
+  }, [loadSongs]);
+
+  useEffect(() => {
+    window.cp.songs.getFrequent(8).then(setFrequentSongs).catch(() => null);
+  }, []);
+
+  // 150ms debounce per UX spec
+  const handleSearch = useCallback((value: string) => {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => void loadSongs(value), 150);
+  }, [loadSongs]);
+
+  const handleClearSearch = useCallback(() => {
+    setQuery("");
+    void loadSongs("");
+  }, [loadSongs]);
+
+  const handleImport = useCallback(async () => {
+    const result = await window.cp.songs.importAuto();
+    if (!result.ok) return;
+    if (result.imported === 0) { toast.info("Aucun chant importé"); return; }
+    toast.success(`${result.imported} chant${result.imported !== 1 ? "s" : ""} importé${result.imported !== 1 ? "s" : ""}`);
+    void loadSongs(query);
+  }, [loadSongs, query]);
+
+  const handleToggleFavorite = useCallback((songId: string) => {
+    setFavoriteIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(songId)) next.delete(songId);
+      else next.add(songId);
+      saveFavorites(next);
+      return next;
+    });
+  }, []);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="relative shrink-0">
-        <Search className="absolute left-2 top-2 h-3.5 w-3.5 text-muted-foreground" />
-        <Input
-          className="h-8 text-xs pl-7"
-          placeholder="Rechercher par titre, artiste ou paroles..."
-          value={state.q}
-          onChange={(e) => state.setQ(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Escape") e.currentTarget.blur(); }}
-        />
-      </div>
-
-      <div className="flex gap-1.5 shrink-0">
-        <Input
-          className="h-7 text-xs flex-1"
-          placeholder="Nouveau chant..."
-          value={state.newSongTitle}
-          onChange={(e) => state.setNewSongTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && state.onCreate()}
-        />
-        <Button size="sm" className="h-7 text-xs px-2" onClick={state.onCreate}>
-          <Plus className="h-3 w-3" />
-        </Button>
-      </div>
-
-      <div className="flex gap-1.5 shrink-0">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs flex-1"
-          onClick={state.onImportWord}
-          disabled={state.importing}
-        >
-          {state.importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileUp className="h-3 w-3 mr-1" />}
-          Word
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs flex-1"
-          onClick={state.onImportJson}
-          disabled={state.importing}
-        >
-          {state.importing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <FileJson className="h-3 w-3 mr-1" />}
-          JSON
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs shrink-0"
-          title="Exporter tous les chants en Word (ZIP)"
-          onClick={async () => {
-            const r = await window.cp.songs.exportWordPack();
-            if (r.ok) { /* toast shown by ipc */ }
-          }}
-        >
-          <FileDown className="h-3 w-3" />
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs shrink-0"
-          title="Import auto"
-          onClick={state.onImportAuto}
-          disabled={state.importing}
-        >
-          {state.importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-        </Button>
-      </div>
-
-      {/* Plan selector */}
-      <div className="shrink-0 space-y-1">
-        <div className="flex items-center gap-1.5">
-          <CalendarDays className="h-3 w-3 text-muted-foreground shrink-0" />
-          {state.plans.length > 0 ? (
-            <select
-              value={state.planId}
-              onChange={(e) => state.setPlanId(e.target.value)}
-              className="flex-1 h-7 text-xs rounded-md border border-input bg-background px-2 cursor-pointer"
-              title="Plan actif"
+    <div className="flex flex-col h-full">
+      {/* Search */}
+      <div className="px-3 py-2 border-b border-border">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
+          <Input
+            placeholder="Rechercher un chant…"
+            value={query}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="pl-8 pr-7 h-8 text-sm"
+          />
+          {query && (
+            <button
+              type="button"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+              onClick={handleClearSearch}
+              aria-label="Effacer la recherche"
             >
-              {state.plans.map((p) => (
-                <option key={p.id} value={p.id}>{formatPlanOption(p)}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="flex-1 text-xs text-muted-foreground italic">Aucun plan</span>
+              <X className="h-3.5 w-3.5" />
+            </button>
           )}
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 shrink-0"
-            onClick={() => setShowNewPlan((v) => !v)}
-            title="Nouveau plan"
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
         </div>
-        {showNewPlan && (
-          <div className="flex items-center gap-1.5 pl-5">
-            <input
-              type="date"
-              title="Date du nouveau plan"
-              value={newPlanDate}
-              onChange={(e) => setNewPlanDate(e.target.value)}
-              className="flex-1 h-7 text-xs rounded-md border border-input bg-background px-2"
-            />
-            <Button size="sm" className="h-7 text-xs px-2" onClick={createPlanForDate} disabled={creatingPlan}>
-              {creatingPlan ? <Loader2 className="h-3 w-3 animate-spin" /> : "Creer"}
-            </Button>
+      </div>
+
+      {/* List */}
+      <ScrollArea className="flex-1">
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
+          </div>
+        ) : songs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 text-text-muted px-4 text-center">
+            <Music2 className="h-10 w-10 opacity-30" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-text-secondary">
+                {query ? "Aucun résultat" : "Aucun chant"}
+              </p>
+              <p className="text-xs leading-relaxed">
+                {query
+                  ? `Aucun chant trouvé pour « ${query} »`
+                  : "Crée ton premier chant ou importe une bibliothèque."}
+              </p>
+            </div>
+            {!query && (
+              <div className="flex gap-2 mt-1 flex-wrap justify-center">
+                {onCreateSong && (
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={onCreateSong}>
+                    <Plus className="h-3.5 w-3.5" />
+                    Nouveau chant
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" className="gap-1.5 text-text-secondary" onClick={() => void handleImport()}>
+                  <Upload className="h-3.5 w-3.5" />
+                  Importer
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="py-1">
+            {/* Favoris section */}
+            {!query && favoriteIds.size > 0 && (() => {
+              const favSongs = songs.filter((s) => favoriteIds.has(s.id));
+              if (favSongs.length === 0) return null;
+              return (
+                <>
+                  <p className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    <Heart className="h-2.5 w-2.5 fill-danger text-danger" />
+                    Favoris
+                  </p>
+                  {favSongs.map((song) => (
+                    <SongRow
+                      key={`fav-${song.id}`}
+                      song={song}
+                      isFavorite={true}
+                      onSelect={() => onSelectSong?.(song.id)}
+                      onToggleFavorite={() => handleToggleFavorite(song.id)}
+                    />
+                  ))}
+                  <div className="border-t border-border/50 my-1" />
+                </>
+              );
+            })()}
+
+            {/* Fréquents section */}
+            {!query && frequentSongs.length > 0 && (() => {
+              const nonFav = frequentSongs.filter((s) => !favoriteIds.has(s.id));
+              if (nonFav.length === 0) return null;
+              return (
+                <>
+                  <p className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    <TrendingUp className="h-2.5 w-2.5" />
+                    Fréquents
+                  </p>
+                  {nonFav.slice(0, 5).map((song) => (
+                    <SongRow
+                      key={`freq-${song.id}`}
+                      song={song}
+                      isFavorite={favoriteIds.has(song.id)}
+                      onSelect={() => onSelectSong?.(song.id)}
+                      onToggleFavorite={() => handleToggleFavorite(song.id)}
+                    />
+                  ))}
+                  <div className="border-t border-border/50 my-1" />
+                </>
+              );
+            })()}
+
+            {/* Full list */}
+            {(!query
+              ? songs.filter((s) => !favoriteIds.has(s.id))
+              : songs
+            ).map((song) => (
+              <SongRow
+                key={song.id}
+                song={song}
+                isFavorite={favoriteIds.has(song.id)}
+                onSelect={() => onSelectSong?.(song.id)}
+                onToggleFavorite={() => handleToggleFavorite(song.id)}
+              />
+            ))}
           </div>
         )}
-      </div>
+      </ScrollArea>
 
-      <Separator className="shrink-0" />
-
-      {/* Target screen selector */}
-      <div className="shrink-0 flex items-center gap-1.5">
-        <span className="text-[10px] text-muted-foreground">Ecran :</span>
-        {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-          <Button
-            key={k}
-            variant={state.target === k ? "default" : "outline"}
-            size="sm"
-            className="h-6 w-6 p-0 text-[10px] font-semibold"
-            onClick={() => state.setTarget(k)}
-          >
-            {k}
+      {/* Footer */}
+      <div className="px-3 py-2 border-t border-border flex items-center justify-between shrink-0">
+        <span className="text-xs text-text-muted">
+          {loading ? "…" : query
+            ? `${songs.length} résultat${songs.length !== 1 ? "s" : ""}`
+            : `${songs.length} chant${songs.length !== 1 ? "s" : ""}`}
+        </span>
+        <div className="flex items-center gap-0.5">
+          <Button variant="ghost" size="xs" className="gap-1 text-text-muted hover:text-text-secondary" onClick={() => void handleImport()} title="Importer JSON / Word" aria-label="Importer des chants">
+            <Upload className="h-3 w-3" />
           </Button>
-        ))}
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-3">
-        <div className="space-y-0.5">
-          {state.filtered.map((s) => (
-            <div key={s.id} className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => state.loadSong(s.id)}
-                className={cn(
-                  "flex-1 min-w-0 text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors",
-                  state.selectedId === s.id ? "bg-primary/15 text-primary" : "hover:bg-accent",
-                )}
-              >
-                <Music className="h-3 w-3 shrink-0 text-muted-foreground" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{s.title}</div>
-                  {s.artist && <div className="text-[10px] text-muted-foreground truncate">{s.artist}</div>}
-                  {s.matchSnippet && <div className="text-[10px] text-muted-foreground/70 truncate italic">&#9835; {s.matchSnippet}</div>}
-                </div>
-              </button>
-              <button
-                type="button"
-                title="Ajouter au plan"
-                onClick={() => { void state.quickAddSongToPlan(s.id); }}
-                className="shrink-0 h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-primary hover:bg-accent transition-colors"
-              >
-                <Plus className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-          {state.filtered.length === 0 && (
-            <p className="text-xs text-muted-foreground text-center py-4">Aucun chant trouve.</p>
+          {onCreateSong && (
+            <Button variant="ghost" size="xs" className="gap-1 text-text-secondary" onClick={onCreateSong}>
+              <Plus className="h-3 w-3" />
+              Nouveau
+            </Button>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
 
-        {state.song && (
-          <>
-            <Separator />
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium truncate">{state.song.title}</span>
-              <div className="flex gap-1 shrink-0">
-                <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => setEditorOpen(true)}>
-                  <Pencil className="h-2.5 w-2.5 mr-0.5" /> Editer
-                </Button>
-                <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={() => state.addAllBlocksToPlan()}>
-                  <Plus className="h-2.5 w-2.5 mr-0.5" /> Tout ajouter
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  title="Exporter ce chant en Word"
-                  onClick={() => { void window.cp.songs.exportWord(state.song!.id); }}
-                >
-                  <FileDown className="h-2.5 w-2.5" />
-                </Button>
-                <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive" onClick={state.onDelete}>
-                  <Trash2 className="h-2.5 w-2.5" />
-                </Button>
-              </div>
-            </div>
+interface SongRowProps {
+  song: CpSongListItem;
+  isFavorite: boolean;
+  onSelect: () => void;
+  onToggleFavorite: () => void;
+}
 
-            <div className="max-h-[260px] overflow-y-auto pr-1">
-              <div className="space-y-1">
-                {state.song.blocks.map((block, i) => (
-                  <div
-                    key={block.id || i}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("application/cp-item", JSON.stringify({
-                        kind: "SONG_BLOCK",
-                        title: `${state.song!.title} - ${block.title || block.type}`,
-                        content: block.content,
-                        refId: state.song!.id,
-                        refSubId: block.id,
-                      }));
-                      e.dataTransfer.effectAllowed = "copy";
-                    }}
-                    className="flex items-start gap-2 px-2 py-1.5 rounded-md border text-xs bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="outline" className="text-[9px] px-1 py-0">{block.type}</Badge>
-                        <span className="font-medium text-[11px]">{block.title || block.type}</span>
-                      </div>
-                      <p className="text-muted-foreground mt-0.5 line-clamp-2 whitespace-pre-line">
-                        {block.content.slice(0, 100)}{block.content.length > 100 ? "..." : ""}
-                      </p>
-                    </div>
-                    {/* draggable={false} + onMouseDown stop prevent drag from stealing clicks */}
-                    <div className="flex flex-col gap-0.5 shrink-0" draggable={false} onMouseDown={(e) => e.stopPropagation()}>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => state.addBlockToPlan(i)}
-                      >
-                        <Plus className="h-2.5 w-2.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => projectTextToScreen({
-                          target: state.target,
-                          title: `${state.song!.title} - ${block.title || block.type}`,
-                          body: block.content,
-                        })}
-                      >
-                        <Play className="h-2.5 w-2.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
+function SongRow({ song, isFavorite, onSelect, onToggleFavorite }: SongRowProps) {
+  return (
+    <div className="group/song flex items-center hover:bg-bg-elevated transition-colors">
+      <button
+        type="button"
+        className="flex flex-1 min-w-0 items-center gap-2 px-3 py-2 text-left"
+        onClick={onSelect}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-text-primary truncate leading-snug">{song.title}</p>
+          {song.artist && (
+            <p className="text-xs text-text-muted truncate leading-snug">{song.artist}</p>
+          )}
+        </div>
+      </button>
+      <button
+        type="button"
+        className={cn(
+          "shrink-0 opacity-0 group-hover/song:opacity-100 transition-opacity p-0.5 rounded mr-2",
+          isFavorite && "opacity-100"
         )}
-      </div>
-
-      <div className="shrink-0">
-        {state.err && <p className="text-xs text-destructive">{state.err}</p>}
-        {state.info && <p className={cn("text-xs", state.info.kind === "success" ? "text-green-600" : "text-muted-foreground")}>{state.info.text}</p>}
-      </div>
-
-      {/* Song editor dialog */}
-      {state.song && (
-        <SongEditorDialog
-          open={editorOpen}
-          onOpenChange={setEditorOpen}
-          song={state.song}
-          target={state.target}
-          planId={state.planId}
-          title={state.title}
-          onSetTitle={state.setTitle}
-          artist={state.artist}
-          onSetArtist={state.setArtist}
-          album={state.album}
-          onSetAlbum={state.setAlbum}
-          year={state.year}
-          onSetYear={state.setYear}
-          saving={state.saving}
-          onSaveMeta={state.onSaveMeta}
-          onSaveBlocks={state.onSaveBlocks}
-          onDelete={state.onDelete}
-          onAddBlock={state.addBlock}
-          onRemoveBlock={state.removeBlock}
-          onUpdateBlock={state.updateBlock}
-          onAddBlockToPlan={state.addBlockToPlan}
-          onAddAllBlocksToPlan={state.addAllBlocksToPlan}
-        />
-      )}
+        onClick={onToggleFavorite}
+        aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+        aria-pressed={isFavorite || undefined}
+      >
+        <Heart className={cn("h-3 w-3", isFavorite ? "fill-danger text-danger" : "text-text-muted")} />
+      </button>
     </div>
   );
 }

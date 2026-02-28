@@ -42,6 +42,8 @@ export function createDefaultProjectionState(): CpProjectionState {
     backgroundGradientAngle: 135,
     backgroundImage: "",
     logoPath: "",
+    logoPosition: "top-right",
+    logoOpacity: 80,
     foregroundMode: "SOLID",
     foregroundGradientFrom: "#ffffff",
     foregroundGradientTo: "#93c5fd",
@@ -104,7 +106,7 @@ export function setContentText(
   ctx.screenStates[key] = {
     ...ctx.screenStates[key],
     mode: "NORMAL",
-    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong },
+    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong, secondaryTexts: payload.secondaryTexts, backgroundOverride: payload.backgroundOverride },
     updatedAt: Date.now(),
   };
   ctx.broadcast(key);
@@ -156,6 +158,7 @@ export function setAppearance(
   ctx.screenStates[key] = {
     ...ctx.screenStates[key],
     textScale: patch.textScale ?? ctx.screenStates[key].textScale ?? 1,
+    titleTextScale: patch.titleTextScale !== undefined ? patch.titleTextScale : ctx.screenStates[key].titleTextScale,
     textFont: patch.textFont ?? ctx.screenStates[key].textFont ?? "system-ui",
     textFontPath: patch.textFontPath ?? ctx.screenStates[key].textFontPath ?? "",
     background: patch.background ?? ctx.screenStates[key].background ?? "#050505",
@@ -165,6 +168,8 @@ export function setAppearance(
     backgroundGradientAngle: patch.backgroundGradientAngle ?? ctx.screenStates[key].backgroundGradientAngle ?? 135,
     backgroundImage: patch.backgroundImage ?? ctx.screenStates[key].backgroundImage ?? "",
     logoPath: patch.logoPath ?? ctx.screenStates[key].logoPath ?? "",
+    logoPosition: patch.logoPosition ?? ctx.screenStates[key].logoPosition ?? "top-right",
+    logoOpacity: patch.logoOpacity ?? ctx.screenStates[key].logoOpacity ?? 80,
     foregroundMode: patch.foregroundMode ?? ctx.screenStates[key].foregroundMode ?? "SOLID",
     foregroundGradientFrom: patch.foregroundGradientFrom ?? ctx.screenStates[key].foregroundGradientFrom ?? "#ffffff",
     foregroundGradientTo: patch.foregroundGradientTo ?? ctx.screenStates[key].foregroundGradientTo ?? "#93c5fd",

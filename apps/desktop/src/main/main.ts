@@ -4,6 +4,7 @@ import { constants as fsConstants } from "fs";
 import { join, basename, dirname, extname } from "path";
 import { access, copyFile, mkdir, readdir, readFile, stat, unlink, writeFile, rename } from "fs/promises";
 import { registerSongsIpc } from "./ipc/songs";
+import type { RegisterSongsIpcOptions } from "./ipc/songs";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
@@ -110,6 +111,7 @@ type TemplatesConfig = CpPlanTemplate[];
 
 type ProjectionAppearancePrefs = {
   textScale?: number;
+  titleTextScale?: number;
   textFont?: string;
   textFontPath?: string;
   background?: string;
@@ -119,6 +121,8 @@ type ProjectionAppearancePrefs = {
   backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  logoPosition?: CpProjectionState["logoPosition"];
+  logoOpacity?: number;
   foreground?: string;
   foregroundMode?: CpProjectionState["foregroundMode"];
   foregroundGradientFrom?: string;
@@ -405,6 +409,7 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
   const out: ProjectionAppearancePrefs = {};
 
   if (typeof rec.textScale === "number" && Number.isFinite(rec.textScale)) out.textScale = rec.textScale;
+  if (typeof rec.titleTextScale === "number" && Number.isFinite(rec.titleTextScale)) out.titleTextScale = rec.titleTextScale;
   if (typeof rec.textFont === "string") out.textFont = rec.textFont;
   if (typeof rec.textFontPath === "string") out.textFontPath = rec.textFontPath;
   if (typeof rec.background === "string") out.background = rec.background;
@@ -418,6 +423,8 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
   }
   if (typeof rec.backgroundImage === "string") out.backgroundImage = rec.backgroundImage;
   if (typeof rec.logoPath === "string") out.logoPath = rec.logoPath;
+  if (rec.logoPosition === "bottom-right" || rec.logoPosition === "bottom-left" || rec.logoPosition === "top-right" || rec.logoPosition === "top-left" || rec.logoPosition === "center") out.logoPosition = rec.logoPosition;
+  if (typeof rec.logoOpacity === "number" && Number.isFinite(rec.logoOpacity)) out.logoOpacity = rec.logoOpacity;
   if (typeof rec.foreground === "string") out.foreground = rec.foreground;
   if (rec.foregroundMode === "SOLID" || rec.foregroundMode === "GRADIENT") out.foregroundMode = rec.foregroundMode;
   if (typeof rec.foregroundGradientFrom === "string") out.foregroundGradientFrom = rec.foregroundGradientFrom;
@@ -429,6 +436,7 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
 function pickProjectionAppearancePrefs(state: CpProjectionState): ProjectionAppearancePrefs {
   return {
     textScale: state.textScale,
+    titleTextScale: state.titleTextScale,
     textFont: state.textFont,
     textFontPath: state.textFontPath,
     background: state.background,
@@ -438,6 +446,8 @@ function pickProjectionAppearancePrefs(state: CpProjectionState): ProjectionAppe
     backgroundGradientAngle: state.backgroundGradientAngle,
     backgroundImage: state.backgroundImage,
     logoPath: state.logoPath,
+    logoPosition: state.logoPosition,
+    logoOpacity: state.logoOpacity,
     foreground: state.foreground,
     foregroundMode: state.foregroundMode,
     foregroundGradientFrom: state.foregroundGradientFrom,
@@ -777,6 +787,8 @@ type LibraryDirs = {
   imagesDir: string;
   documentsDir: string;
   fontsDir: string;
+  videosDir: string;
+  songsJsonDir: string;
 };
 
 function buildLibraryDirs(rootDir: string): LibraryDirs {
@@ -785,6 +797,8 @@ function buildLibraryDirs(rootDir: string): LibraryDirs {
     imagesDir: join(rootDir, "images"),
     documentsDir: join(rootDir, "documents"),
     fontsDir: join(rootDir, "fonts"),
+    videosDir: join(rootDir, "videos"),
+    songsJsonDir: join(rootDir, "songs"),
   };
 }
 
@@ -794,6 +808,8 @@ async function ensureLibraryDirs(rootDir: string): Promise<LibraryDirs> {
   await mkdir(dirs.imagesDir, { recursive: true });
   await mkdir(dirs.documentsDir, { recursive: true });
   await mkdir(dirs.fontsDir, { recursive: true });
+  await mkdir(dirs.videosDir, { recursive: true });
+  await mkdir(dirs.songsJsonDir, { recursive: true });
   return dirs;
 }
 
@@ -866,7 +882,7 @@ async function validateFontFilePath(filePath: string): Promise<{ valid: boolean;
   }
 }
 
-async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "fonts" | "root"): Promise<CpMediaFile[]> {
+async function listLibraryFilesInDir(dirPath: string, folder: "images" | "documents" | "fonts" | "videos" | "root"): Promise<CpMediaFile[]> {
   if (!(await pathExists(dirPath))) return [];
   const entries = await readdir(dirPath);
   const filesRaw = await Promise.all(
@@ -936,6 +952,9 @@ function createRegieWindow() {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
+      // Allow file:// URLs for media preview in development (same policy as projection windows).
+      webSecurity: app.isPackaged,
+      allowRunningInsecureContent: !app.isPackaged,
     },
   });
 
@@ -945,9 +964,20 @@ function createRegieWindow() {
   if (base) void regieWin.loadURL(`${base}/#/regie`);
   else void regieWin.loadFile(join(__dirname, "../renderer/index.html"), { hash: "/regie" });
 
-  if (!app.isPackaged) {
-    regieWin.webContents.openDevTools({ mode: "detach" });
-  }
+  // DevTools auto-open disabled — open manually via Ctrl+Shift+I or devtools:open IPC.
+  // if (!app.isPackaged) regieWin.webContents.openDevTools({ mode: "detach" });
+
+  // Forward renderer console messages to the terminal (main process stdout).
+  regieWin.webContents.on("console-message", (_evt, level, message, line, sourceId) => {
+    const labels = ["[renderer:debug]", "[renderer:log]", "[renderer:warn]", "[renderer:error]"];
+    const label = labels[level] ?? "[renderer]";
+    const src = sourceId ? ` (${sourceId.split("/").pop() ?? sourceId}:${line})` : "";
+    if (level >= 2) {
+      console.error(`${label}${src}`, message);
+    } else {
+      console.log(`${label}${src}`, message);
+    }
+  });
 
   regieWin.webContents.on("did-finish-load", () => {
     // push initial states + window state
@@ -1034,9 +1064,20 @@ function createScreenWindow(key: ScreenKey) {
     sendScreenState(key);
   });
 
-  if (!app.isPackaged && isMain) {
-    win.webContents.openDevTools({ mode: "detach" });
-  }
+  // DevTools auto-open disabled — open manually via devtools:open IPC.
+  // if (!app.isPackaged && isMain) win.webContents.openDevTools({ mode: "detach" });
+
+  // Forward projection window console messages to the terminal.
+  win.webContents.on("console-message", (_evt, level, message, line, sourceId) => {
+    const labels = ["[proj:debug]", "[proj:log]", "[proj:warn]", "[proj:error]"];
+    const label = (labels[level] ?? "[proj]") + `[${key}]`;
+    const src = sourceId ? ` (${sourceId.split("/").pop() ?? sourceId}:${line})` : "";
+    if (level >= 2) {
+      console.error(`${label}${src}`, message);
+    } else {
+      console.log(`${label}${src}`, message);
+    }
+  });
 
   win.on("closed", () => {
     delete projWins[key];
@@ -1088,7 +1129,13 @@ void app.whenReady().then(async () => {
   }
 
   try {
-    registerSongsIpc();
+    const songsIpcOptions: RegisterSongsIpcOptions = {
+      getSongsJsonDir: async () => {
+        const dirs = await getActiveLibraryDirs();
+        return dirs.songsJsonDir;
+      },
+    };
+    registerSongsIpc(songsIpcOptions);
   } catch (e) {
     console.error("registerSongsIpc failed", e);
   }
@@ -1188,11 +1235,12 @@ ipcMain.handle("devtools:open", (_evt, rawTarget: unknown) => {
 ipcMain.handle("diagnostics:getState", async () => {
   try {
     const dirs = await getActiveLibraryDirs();
-    const [root, images, documents, fonts] = await Promise.all([
+    const [root, images, documents, fonts, videos] = await Promise.all([
       getFolderDiagnostics(dirs.rootDir),
       getFolderDiagnostics(dirs.imagesDir),
       getFolderDiagnostics(dirs.documentsDir),
       getFolderDiagnostics(dirs.fontsDir),
+      getFolderDiagnostics(dirs.videosDir),
     ]);
 
     const screens = (["A", "B", "C"] as ScreenKey[]).map((key) => ({
@@ -1212,7 +1260,7 @@ ipcMain.handle("diagnostics:getState", async () => {
         userDataDir: app.getPath("userData"),
         libraryDir: dirs.rootDir,
         screens,
-        folders: { root, images, documents, fonts },
+        folders: { root, images, documents, fonts, videos },
       },
     };
   } catch (e: unknown) {
@@ -1389,9 +1437,9 @@ ipcMain.handle("settings:deleteProfile", async (_evt, rawPayload: unknown) => {
 
 ipcMain.handle("files:pickMedia", async () => {
   const res = await dialog.showOpenDialog({
-    title: "Choisir un fichier media (image / PDF)",
+    title: "Choisir un fichier media (image / PDF / vidéo)",
     filters: [
-      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf"] },
+      { name: "Media", extensions: ["png", "jpg", "jpeg", "gif", "webp", "pdf", "mp4", "webm", "mov", "avi", "mkv"] },
       { name: "All", extensions: ["*"] },
     ],
     properties: ["openFile"],
@@ -1402,7 +1450,7 @@ ipcMain.handle("files:pickMedia", async () => {
   if (!mediaType) return { ok: false, error: "Unsupported media extension" };
 
   const dirs = await getActiveLibraryDirs();
-  const targetDir = mediaType === "IMAGE" ? dirs.imagesDir : dirs.documentsDir;
+  const targetDir = mediaType === "IMAGE" ? dirs.imagesDir : mediaType === "PDF" ? dirs.documentsDir : dirs.videosDir;
   const target = join(targetDir, basename(p));
   try {
     await copyFile(p, target);
@@ -1445,14 +1493,15 @@ ipcMain.handle("files:pickFont", async () => {
 ipcMain.handle("files:listMedia", async () => {
   try {
     const dirs = await getActiveLibraryDirs();
-    const [imagesFiles, documentFiles, fontFiles, legacyRootFiles] = await Promise.all([
+    const [imagesFiles, documentFiles, fontFiles, videoFiles, legacyRootFiles] = await Promise.all([
       listLibraryFilesInDir(dirs.imagesDir, "images"),
       listLibraryFilesInDir(dirs.documentsDir, "documents"),
       listLibraryFilesInDir(dirs.fontsDir, "fonts"),
+      listLibraryFilesInDir(dirs.videosDir, "videos"),
       listLibraryFilesInDir(dirs.rootDir, "root"),
     ]);
     const filesByPath = new Map<string, CpMediaFile>();
-    [...imagesFiles, ...documentFiles, ...fontFiles, ...legacyRootFiles].forEach((file) => {
+    [...imagesFiles, ...documentFiles, ...fontFiles, ...videoFiles, ...legacyRootFiles].forEach((file) => {
       filesByPath.set(file.path, file);
     });
     const files = Array.from(filesByPath.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));
@@ -1756,4 +1805,26 @@ ipcMain.handle("live:setLocked", (_evt, rawPayload: unknown) => {
   const payload = parseLiveSetLockedPayload(rawPayload);
   const next = { ...screenCtx.liveState.lockedScreens, [payload.key]: payload.locked };
   return _mergeLive(screenCtx, { lockedScreens: next });
+});
+
+// Free mode: projection window forwards arrow keys to regie window
+ipcMain.handle("live:freeNavigate", (_evt, rawDir: unknown) => {
+  const dir: 1 | -1 = rawDir === 1 ? 1 : -1;
+  regieWin?.webContents.send("live:freeNavigate", dir);
+});
+
+// Video control: regie sends PLAY/PAUSE, main broadcasts to all projection windows
+ipcMain.handle("live:videoControl", (_evt, rawAction: unknown) => {
+  const action: "PLAY" | "PAUSE" = rawAction === "PLAY" ? "PLAY" : "PAUSE";
+  (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
+    projWins[k]?.webContents.send("live:videoControl", action);
+  });
+});
+
+// Video volume: regie sends 0-1, main broadcasts to all projection windows
+ipcMain.handle("live:videoVolume", (_evt, rawVolume: unknown) => {
+  const volume = typeof rawVolume === "number" ? Math.max(0, Math.min(1, rawVolume)) : 1;
+  (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
+    projWins[k]?.webContents.send("live:videoVolume", volume);
+  });
 });

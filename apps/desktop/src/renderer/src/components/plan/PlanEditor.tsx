@@ -1,189 +1,332 @@
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   DndContext,
-  closestCenter,
-  KeyboardSensor,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
   PointerSensor,
+  closestCenter,
   useSensor,
   useSensors,
-  type DragEndEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ClipboardList, Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PlanItem } from "./PlanItem";
-import { cn } from "@/lib/utils";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { usePlan } from "@/hooks/usePlan";
+import { useLive } from "@/hooks/useLive";
 import { reorderPlanItems } from "@/lib/reorder";
-import type { PlanItem as PlanItemType } from "@/lib/types";
-import { isCpPlanItemKind } from "../../../../shared/planKinds";
+import type { PlanItem } from "@/lib/types";
+import { AddItemDialog } from "@/components/dialogs/AddItemDialog";
+import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
+import { EditItemDialog } from "@/components/dialogs/EditItemDialog";
+import { ServicePreviewDialog } from "@/components/dialogs/ServicePreviewDialog";
+import { PlanItemCard, PlanItemCardGhost } from "./PlanItemCard";
+import { PlanToolbar } from "./PlanToolbar";
+import { Dashboard } from "./Dashboard";
 
-type PlanEditorProps = {
-  items: PlanItemType[];
-  liveCursor: number;
-  liveEnabled?: boolean;
-  selectedIndex: number;
-  onSelect: (index: number) => void;
-  onProject: (item: PlanItemType) => void;
-  onProjectToScreen?: (item: PlanItemType, screen: "A" | "B" | "C") => void;
-  onDuplicate: (item: PlanItemType) => void;
-  onEdit: (item: PlanItemType) => void;
-  onRemove: (item: PlanItemType) => void;
-  onReorder: (orderedItemIds: string[], newItems: PlanItemType[]) => void;
-  onAddItem?: () => void;
-  onDropItem?: (data: { kind: CpPlanItemKind; title?: string; content?: string; refId?: string; refSubId?: string; mediaPath?: string }) => void;
-};
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
-export function PlanEditor({
-  items,
-  liveCursor,
-  liveEnabled = false,
-  selectedIndex,
-  onSelect,
-  onProject,
-  onProjectToScreen,
-  onDuplicate,
-  onEdit,
-  onRemove,
-  onReorder,
-  onAddItem,
-  onDropItem,
-}: PlanEditorProps) {
-  const [dropHover, setDropHover] = useState(false);
+export function PlanEditor() {
+  const { plan, reorder, loadingPlan, addItem, duplicateItem, removeItems } = usePlan();
+  const { live } = useLive();
+  const [activeItem, setActiveItem] = useState<CpPlanItem | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editSongId, setEditSongId] = useState<string | null>(null);
+  const [songEditorOpen, setSongEditorOpen] = useState(false);
+  const [editItem, setEditItem] = useState<CpPlanItem | null>(null);
+  const [editItemOpen, setEditItemOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const handleNativeDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDropHover(false);
-    const raw = e.dataTransfer.getData("application/cp-item");
-    if (!raw || !onDropItem) return;
-    try {
-      const data = JSON.parse(raw) as {
-        kind?: unknown;
-        title?: string;
-        content?: string;
-        refId?: string;
-        refSubId?: string;
-        mediaPath?: string;
-      };
-      if (!isCpPlanItemKind(data.kind)) return;
-      onDropItem({
-        kind: data.kind,
-        title: data.title,
-        content: data.content,
-        refId: data.refId,
-        refSubId: data.refSubId,
-        mediaPath: data.mediaPath,
-      });
-    } catch { /* ignore invalid data */ }
-  }, [onDropItem]);
+  const toggleItemSelection = useCallback((id: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes("application/cp-item")) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
-      setDropHover(true);
+  const handleBatchDelete = useCallback(async () => {
+    const ids = [...selectedItemIds];
+    setSelectedItemIds(new Set());
+    await removeItems(ids);
+  }, [selectedItemIds, removeItems]);
+
+  const handleDuplicate = useCallback((id: string) => {
+    void duplicateItem(id);
+  }, [duplicateItem]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const item = plan?.items.find((i) => i.id === event.active.id);
+    setActiveItem(item ?? null);
+  }, [plan]);
+
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    setActiveItem(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id || !plan) return;
+
+    const result = reorderPlanItems({
+      items: plan.items as PlanItem[],
+      visibleItems: plan.items as PlanItem[],
+      filterSongsOnly: false,
+      activeId: String(active.id),
+      overId: String(over.id),
+    });
+
+    if (result) {
+      await reorder(result.orderedItemIds);
+    }
+  }, [plan, reorder]);
+
+  const handleEdit = useCallback((item: CpPlanItem) => {
+    if (item.kind === "SONG_BLOCK" && item.refId) {
+      setEditSongId(item.refId);
+      setSongEditorOpen(true);
+    } else if (
+      item.kind === "TIMER" ||
+      item.kind === "ANNOUNCEMENT_TEXT" ||
+      item.kind === "VERSE_MANUAL"
+    ) {
+      setEditItem(item);
+      setEditItemOpen(true);
     }
   }, []);
 
-  const handleDragLeave = useCallback(() => setDropHover(false), []);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const handleEditBackground = useCallback((item: CpPlanItem) => {
+    setEditItem(item);
+    setEditItemOpen(true);
+  }, []);
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      if (liveEnabled) return;
-      const { active, over } = event;
-      if (!over || active.id === over.id) return;
+  const handleSelectKind = useCallback(async (kind: CpPlanItemKind) => {
+    if (kind === "SONG_BLOCK") {
+      setEditSongId(null);
+      setSongEditorOpen(true);
+    } else {
+      await addItem({ kind });
+    }
+  }, [addItem]);
 
-      const result = reorderPlanItems({
-        items,
-        visibleItems: items,
-        filterSongsOnly: false,
-        activeId: String(active.id),
-        overId: String(over.id),
-      });
-
-      if (result) {
-        onReorder(result.orderedItemIds, result.newItems);
-      }
-    },
-    [items, liveEnabled, onReorder],
-  );
-
-  if (items.length === 0) {
+  if (!plan) {
     return (
-      <div
-        className={cn(
-          "flex flex-col items-center justify-center py-12 text-muted-foreground transition-colors",
-          dropHover && "bg-primary/10 border-2 border-dashed border-primary rounded-lg",
-        )}
-        onDrop={handleNativeDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        <p className="text-sm">{dropHover ? "Deposez ici pour ajouter" : "Aucun element dans ce plan."}</p>
-        <p className="text-xs mt-1 mb-3">Ajoutez des chants, versets ou annonces pour commencer.</p>
-        {onAddItem && (
-          <Button variant="outline" size="sm" className="text-xs" onClick={onAddItem}>
-            <Plus className="h-3 w-3 mr-1" /> Ajouter un element
-          </Button>
-        )}
-      </div>
+      <>
+        <Dashboard />
+        <AddItemDialog
+          open={addDialogOpen}
+          onClose={() => setAddDialogOpen(false)}
+          onSelect={(kind) => void handleSelectKind(kind)}
+        />
+      </>
     );
   }
 
+  const currentCursor = live?.enabled && live.planId === plan.id ? live.cursor : -1;
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredItems = normalizedQuery
+    ? plan.items.filter((item) => {
+        const title = item.title?.toLowerCase() ?? "";
+        const content = item.content?.toLowerCase() ?? "";
+        return title.includes(normalizedQuery) || content.includes(normalizedQuery);
+      })
+    : plan.items;
+
   return (
-    <div
-      className={cn("flex flex-col flex-1 min-h-0", dropHover && "ring-2 ring-primary/50 ring-dashed rounded-lg")}
-      onDrop={handleNativeDrop}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-    >
-      <div className="px-1 pb-1">
-        <div className={cn("rounded-md border px-2 py-1.5 text-[11px]", liveEnabled ? "border-amber-400/40 bg-amber-500/10 text-amber-700 dark:text-amber-300" : "border-muted bg-muted/30 text-muted-foreground")}>
-          {liveEnabled
-            ? "Live actif: la reorganisation est temporairement verrouillee pour garder le curseur stable."
-            : "Astuce: double-clic ou bouton Projeter pour envoyer l'element en direct."}
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <PlanToolbar onAddItem={() => setAddDialogOpen(true)} onPreview={() => setPreviewOpen(true)} />
+
+      {/* Search bar */}
+      {plan.items.length > 0 && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-bg-surface shrink-0">
+          <Search className="h-3.5 w-3.5 text-text-muted shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher dans le plan…"
+            className="flex-1 text-xs bg-transparent outline-none text-text-primary placeholder:text-text-muted"
+            aria-label="Rechercher dans le plan"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="text-text-muted hover:text-text-primary"
+              aria-label="Effacer la recherche"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-      </div>
-      <ScrollArea className="flex-1">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-1 p-1">
-              {items.map((item, index) => (
-                <PlanItem
-                  key={item.id}
-                  item={item}
-                  isLiveCursor={liveCursor === item.order}
-                  isSelected={selectedIndex === index}
-                  onSelect={() => onSelect(index)}
-                  onProject={() => onProject(item)}
-                  onProjectToScreen={onProjectToScreen ? (screen) => onProjectToScreen(item, screen) : undefined}
-                  onDuplicate={() => onDuplicate(item)}
-                  onEdit={() => onEdit(item)}
-                  onRemove={() => onRemove(item)}
-                  dragDisabled={liveEnabled}
-                />
-              ))}
+      )}
+
+      {loadingPlan ? (
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-sm text-text-muted animate-pulse">Chargement…</div>
+        </div>
+      ) : plan.items.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-text-muted px-8 text-center">
+          <ClipboardList className="h-14 w-14 opacity-20" />
+          <div className="space-y-1.5">
+            <p className="text-sm font-medium text-text-secondary">Plan vide</p>
+            <p className="text-xs leading-relaxed">
+              Ajoute du contenu depuis le panneau de gauche : chants, versets bibliques,
+              annonces, médias ou minuterie.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setAddDialogOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Ajouter un élément
+          </Button>
+        </div>
+      ) : (
+        <>
+          <ScrollArea className="flex-1">
+            {normalizedQuery ? (
+              // Search mode: plain list, no DnD
+              <div className="flex flex-col gap-1 p-3">
+                {filteredItems.length === 0 ? (
+                  <p className="text-xs text-text-muted text-center py-6">Aucun résultat pour « {searchQuery} »</p>
+                ) : (
+                  filteredItems.map((item) => {
+                    const originalIndex = plan.items.indexOf(item);
+                    return (
+                      <PlanItemCard
+                        key={item.id}
+                        item={item}
+                        index={originalIndex}
+                        isCurrentLive={originalIndex === currentCursor}
+                        isSelected={selectedItemIds.has(item.id)}
+                        onEdit={handleEdit}
+                        onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
+                        onDuplicate={handleDuplicate}
+                        onToggleSelect={toggleItemSelection}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis]}
+                onDragStart={handleDragStart}
+                onDragEnd={(e) => void handleDragEnd(e)}
+              >
+                <SortableContext
+                  items={plan.items.map((i) => i.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="flex flex-col gap-1 p-3">
+                    {plan.items.map((item, index) => (
+                      <PlanItemCard
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        isCurrentLive={index === currentCursor}
+                        isSelected={selectedItemIds.has(item.id)}
+                        onEdit={handleEdit}
+                        onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
+                        onDuplicate={handleDuplicate}
+                        onToggleSelect={toggleItemSelection}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+
+                <DragOverlay>
+                  {activeItem && <PlanItemCardGhost item={activeItem} />}
+                </DragOverlay>
+              </DndContext>
+            )}
+          </ScrollArea>
+
+          {/* Footer — selection mode or normal */}
+          {selectedItemIds.size > 0 ? (
+            <div className="flex items-center justify-between px-4 py-2 border-t border-danger/30 bg-danger/5 shrink-0">
+              <span className="text-xs text-danger font-medium">
+                {selectedItemIds.size} élément{selectedItemIds.size > 1 ? "s" : ""} sélectionné{selectedItemIds.size > 1 ? "s" : ""}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="text-text-secondary"
+                  onClick={() => setSelectedItemIds(new Set())}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="xs"
+                  className="gap-1"
+                  onClick={() => void handleBatchDelete()}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Supprimer
+                </Button>
+              </div>
             </div>
-          </SortableContext>
-        </DndContext>
-      </ScrollArea>
-      {onAddItem && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full mt-1.5 text-xs border-dashed"
-          onClick={onAddItem}
-        >
-          <Plus className="h-3 w-3 mr-1" /> Ajouter un element
-        </Button>
+          ) : (
+            <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-bg-surface shrink-0">
+              <span className="text-xs text-text-muted">
+                {plan.items.length} élément{plan.items.length !== 1 ? "s" : ""}
+              </span>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="gap-1 text-text-secondary"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Ajouter
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+
+      <AddItemDialog
+        open={addDialogOpen}
+        onClose={() => setAddDialogOpen(false)}
+        onSelect={(kind) => void handleSelectKind(kind)}
+      />
+
+      <SongEditorDialog
+        songId={editSongId ?? undefined}
+        open={songEditorOpen}
+        onClose={() => { setSongEditorOpen(false); setEditSongId(null); }}
+      />
+
+      <EditItemDialog
+        item={editItem}
+        open={editItemOpen}
+        onClose={() => { setEditItemOpen(false); setEditItem(null); }}
+      />
+
+      {plan && (
+        <ServicePreviewDialog
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          plan={plan}
+        />
       )}
     </div>
   );

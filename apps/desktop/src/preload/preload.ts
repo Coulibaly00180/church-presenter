@@ -116,6 +116,7 @@ const cpApi: CpApi = {
     importJson: () => ipcRenderer.invoke("songs:importJson"),
     importWordBatch: () => ipcRenderer.invoke("songs:importWordBatch"),
     importAuto: () => ipcRenderer.invoke("songs:importAuto"),
+    getFrequent: (limit?: number) => ipcRenderer.invoke("songs:getFrequent", limit),
   },
 
   plans: {
@@ -163,6 +164,24 @@ const cpApi: CpApi = {
       const handler = (_: unknown, payload: CpLiveState) => cb(payload);
       ipcRenderer.on("live:update", handler);
       return () => ipcRenderer.removeListener("live:update", handler);
+    },
+    freeNavigate: (dir: 1 | -1) => ipcRenderer.invoke("live:freeNavigate", dir),
+    onFreeNavigate: (cb: (dir: 1 | -1) => void) => {
+      const handler = (_: unknown, dir: 1 | -1) => cb(dir);
+      ipcRenderer.on("live:freeNavigate", handler);
+      return () => ipcRenderer.removeListener("live:freeNavigate", handler);
+    },
+    videoControl: (action: "PLAY" | "PAUSE") => ipcRenderer.invoke("live:videoControl", action),
+    onVideoControl: (cb: (action: "PLAY" | "PAUSE") => void) => {
+      const handler = (_: unknown, action: "PLAY" | "PAUSE") => cb(action);
+      ipcRenderer.on("live:videoControl", handler);
+      return () => ipcRenderer.removeListener("live:videoControl", handler);
+    },
+    videoVolume: (volume: number) => ipcRenderer.invoke("live:videoVolume", volume),
+    onVideoVolume: (cb: (volume: number) => void) => {
+      const handler = (_: unknown, volume: number) => cb(volume);
+      ipcRenderer.on("live:videoVolume", handler);
+      return () => ipcRenderer.removeListener("live:videoVolume", handler);
     },
   },
 

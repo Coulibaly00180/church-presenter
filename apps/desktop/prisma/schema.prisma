@@ -43,6 +43,7 @@ model ServicePlan {
   id        String      @id @default(cuid())
   date      DateTime    @unique
   title     String?     // ex: "Culte du dimanche"
+  backgroundConfig String?   // JSON: CpItemBackground (défaut pour tous les items)
   deletedAt DateTime?
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
@@ -60,7 +61,10 @@ model ServiceItem {
   songId    String?     // FK vers Song pour SONG_BLOCK (ON DELETE SET NULL)
   title     String?
   content   String?     // texte annonce / verset / etc
+  notes     String?     // notes privées régie (non projetées)
   mediaPath String?     // chemin local image (MVP)
+  secondaryContent String?   // JSON: [{label, body}, ...] pour multi-traduction Bible
+  backgroundConfig String?   // JSON: CpItemBackground (surcharge le fond du plan)
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 

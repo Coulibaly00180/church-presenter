@@ -1,715 +1,440 @@
-import React, { useEffect, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  MonitorSmartphone,
-  Lock,
-  Unlock,
-  RotateCcw,
-  MessageSquarePlus,
-  Palette,
-  ImagePlus,
-  Trash2,
-  Wifi,
-  WifiOff,
-  FileText,
-  Type,
-} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Circle, Clock, Monitor, MoonStar, Pause, Play, Square, Sun, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Label } from "@/components/ui/label";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { SlidePreview } from "@/components/live/SlidePreview";
+import { NavControls } from "@/components/live/NavControls";
+import { ScreenSelector } from "@/components/live/ScreenSelector";
+import { KindBadge } from "@/components/ui/badge";
+import { useLive } from "@/hooks/useLive";
+import { usePlan } from "@/hooks/usePlan";
+import { useShortcuts } from "@/hooks/useShortcuts";
+import { projectPlanItemToTarget } from "@/lib/projection";
+import { getPlanKindDefaultTitle } from "@/lib/planKinds";
+import { estimateItemDurationSeconds, formatMinutes } from "@/lib/planDuration";
 import { cn } from "@/lib/utils";
-import { QuickProjectDialog } from "@/components/dialogs/QuickProjectDialog";
-import { hydrateShortcuts, matchAction } from "@/lib/shortcuts";
-
-function isTypingTarget(el: EventTarget | null) {
-  const t = el as HTMLElement | null;
-  if (!t) return false;
-  const tag = t.tagName?.toLowerCase();
-  return tag === "input" || tag === "textarea" || tag === "select" || t.isContentEditable;
-}
-
-/** Return true when a keyboard shortcut should yield to native element behavior. */
-function shouldYieldToElement(e: KeyboardEvent): boolean {
-  const t = e.target as HTMLElement | null;
-  if (!t) return false;
-  const tag = t.tagName?.toLowerCase();
-  const isButton = tag === "button" || tag === "a" || t.getAttribute("role") === "button";
-  // Space / Enter activate buttons natively — don't steal them
-  if (isButton && (e.key === " " || e.key === "Enter")) return true;
-  return false;
-}
-
-function toFileUrl(path?: string) {
-  if (!path) return "";
-  if (path.startsWith("file://") || path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) return path;
-  const [pathOnly, frag] = path.split("#");
-  const base =
-    pathOnly.startsWith("\\\\")
-      ? `file:${pathOnly.replace(/\\/g, "/")}`
-      : `file:///${pathOnly.replace(/\\/g, "/")}`;
-  return frag ? `${base}#${frag}` : base;
-}
-
-function projectionBackground(state: CpProjectionState | null) {
-  if (!state) return "#050505";
-  if (state.mode === "BLACK") return "#000000";
-  if (state.mode === "WHITE") return "#ffffff";
-
-  const bgMode = state.backgroundMode || "SOLID";
-  const from = state.backgroundGradientFrom || "#2563eb";
-  const to = state.backgroundGradientTo || "#7c3aed";
-  const angle = state.backgroundGradientAngle ?? 135;
-
-  if (bgMode === "GRADIENT_LINEAR") return `linear-gradient(${angle}deg, ${from} 0%, ${to} 100%)`;
-  if (bgMode === "GRADIENT_RADIAL") return `radial-gradient(circle at center, ${from} 0%, ${to} 100%)`;
-  return state.background || "#050505";
-}
-
-function modeLabel(mode: CpProjectionMode) {
-  if (mode === "BLACK") return "Noir";
-  if (mode === "WHITE") return "Blanc";
-  return "Normal";
-}
-
-function currentPreview(current: CpProjectionCurrent) {
-  if (current.kind === "TEXT") {
-    const title = (current.title || "").trim() || "Texte";
-    const body = String(current.body || "").trim();
-    return { title, body: body.slice(0, 120), kind: "TEXT" as const };
-  }
-  if (current.kind === "MEDIA") {
-    const fileName = current.mediaPath?.split(/[\\/]/).pop() || "";
-    if (current.mediaType === "IMAGE") {
-      return {
-        title: (current.title || "").trim() || "Image",
-        body: fileName,
-        kind: "MEDIA_IMAGE" as const,
-      };
-    }
-    return {
-      title: (current.title || "").trim() || "PDF",
-      body: fileName,
-      kind: "MEDIA_PDF" as const,
-    };
-  }
-  return { title: "Vide", body: "", kind: "EMPTY" as const };
-}
-
-type ScreenMiniCardProps = {
-  screen: ScreenKey;
-  state: CpProjectionState | null;
-  isTarget: boolean;
-  isOpen: boolean;
-  isLocked: boolean;
-  disabled: boolean;
-  onClick: () => void;
-  onDoubleClick: () => void;
-};
-
-function ScreenMiniCard({
-  screen,
-  state,
-  isTarget,
-  isOpen,
-  isLocked,
-  disabled,
-  onClick,
-  onDoubleClick,
-}: ScreenMiniCardProps) {
-  const mode = state?.mode || "NORMAL";
-  const current = currentPreview(state?.current ?? { kind: "EMPTY" });
-  const bg = projectionBackground(state);
-  const textColor = mode === "WHITE" ? "#111111" : "#ffffff";
-  const isImage = current.kind === "MEDIA_IMAGE" && state?.current.kind === "MEDIA" && state.current.mediaPath;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      disabled={disabled}
-      className={cn(
-        "group w-[132px] rounded-md border overflow-hidden text-left transition-colors",
-        isTarget ? "border-primary ring-1 ring-primary/40" : "border-border/60 hover:border-primary/50",
-        !isOpen && "opacity-65",
-        disabled && "pointer-events-none opacity-55",
-      )}
-      title={`Ecran ${screen} - ${isOpen ? "ouvert" : "ferme"} - double clic pour ouvrir/fermer`}
-    >
-      <div className="flex items-center justify-between px-1.5 py-0.5 border-b border-border/60 bg-muted/50">
-        <span className="text-[10px] font-semibold tracking-wide">ECRAN {screen}</span>
-        <div className="flex items-center gap-1">
-          {isLocked && <Lock className="h-2.5 w-2.5 text-destructive" />}
-          <span className="text-[9px] text-muted-foreground">{modeLabel(mode)}</span>
-        </div>
-      </div>
-
-      <div className="relative aspect-video" style={{ background: bg, color: textColor }}>
-        {isImage && (
-          <img
-            src={toFileUrl(state.current.mediaPath)}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        )}
-        <div className="absolute inset-0 p-1.5 flex flex-col justify-center bg-black/25">
-          <div className="text-[10px] font-semibold truncate leading-tight">{current.title}</div>
-          {current.body ? (
-            <div className="text-[9px] opacity-90 line-clamp-2 leading-tight mt-0.5">{current.body}</div>
-          ) : null}
-        </div>
-
-        <div className="absolute top-1 right-1 rounded-sm bg-black/40 px-1 py-0.5">
-          {current.kind === "TEXT" && <Type className="h-2.5 w-2.5 text-white/90" />}
-          {current.kind === "MEDIA_PDF" && <FileText className="h-2.5 w-2.5 text-white/90" />}
-          {current.kind === "MEDIA_IMAGE" && <ImagePlus className="h-2.5 w-2.5 text-white/90" />}
-        </div>
-      </div>
-    </button>
-  );
-}
+import type { PlanItem } from "@/lib/types";
+import type { CpItemBackground } from "../../../../shared/ipc";
 
 export function LiveBar() {
-  const [live, setLive] = useState<CpLiveState | null>(null);
-  const [screens, setScreens] = useState<CpScreenMeta[]>([]);
-  const [screenStates, setScreenStates] = useState<Record<ScreenKey, CpProjectionState | null>>({
-    A: null,
-    B: null,
-    C: null,
-  });
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [bg, setBg] = useState("#050505");
-  const [fg, setFg] = useState("#ffffff");
-  const [scale, setScale] = useState(1);
-  const [bgImage, setBgImage] = useState("");
-  const [syncStatus, setSyncStatus] = useState<CpSyncStatus | null>(null);
+  const { live, toggle, toggleBlack, toggleWhite, resume } = useLive();
+  const { plan } = usePlan();
+  const [currentState, setCurrentState] = useState<CpProjectionState | null>(null);
+  const [nextState, setNextState] = useState<CpProjectionState | null>(null);
 
+  const isEnabled = live?.enabled ?? false;
+  const isPlanMode = isEnabled && live?.planId !== null;
+  const isFreeMode = isEnabled && live?.planId === null;
+
+  // Auto-advance
+  const AUTO_INTERVALS = [5, 10, 15, 20, 30, 60] as const;
+  type AutoInterval = (typeof AUTO_INTERVALS)[number];
+  const [autoEnabled, setAutoEnabled] = useState(false);
+  const [autoInterval, setAutoInterval] = useState<AutoInterval>(15);
+  const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Reset auto-advance when live mode changes
   useEffect(() => {
-    if (!window.cp.live) return;
-    window.cp.live.get().then(setLive).catch(() => null);
-    const off = window.cp.live.onUpdate(setLive);
-    return () => off?.();
-  }, []);
+    if (!isEnabled) setAutoEnabled(false);
+  }, [isEnabled]);
 
+  // Auto-advance interval
   useEffect(() => {
-    if (!window.cp.screens) return;
-    window.cp.screens.list().then(setScreens);
-    const offs = (["A", "B", "C"] as ScreenKey[]).map((k) =>
-      window.cp.screens.onWindowState(k, (p) =>
-        setScreens((prev) => prev.map((s) => (s.key === k ? { ...s, isOpen: !!p.isOpen } : s)))
-      )
-    );
-    return () => offs.forEach((off) => off?.());
-  }, []);
-
-  useEffect(() => {
-    if (!window.cp.screens) return;
-    const keys = ["A", "B", "C"] as ScreenKey[];
-    let canceled = false;
-
-    void Promise.all(keys.map(async (key) => ({ key, state: await window.cp.screens.getState(key) })))
-      .then((rows) => {
-        if (canceled) return;
-        setScreenStates((prev) => {
-          const next = { ...prev };
-          rows.forEach(({ key, state }) => {
-            next[key] = state;
-          });
-          return next;
-        });
-      })
-      .catch(() => null);
-
-    const offs = keys.map((key) =>
-      window.cp.screens.onState(key, (state) => {
-        setScreenStates((prev) => ({ ...prev, [key]: state }));
-      })
-    );
-
+    if (autoTimerRef.current) clearInterval(autoTimerRef.current);
+    if (!autoEnabled || !isEnabled) return;
+    autoTimerRef.current = setInterval(() => {
+      void window.cp.live.next();
+    }, autoInterval * 1000);
     return () => {
-      canceled = true;
-      offs.forEach((off) => off?.());
+      if (autoTimerRef.current) clearInterval(autoTimerRef.current);
     };
-  }, []);
+  }, [autoEnabled, autoInterval, isEnabled]);
 
-  // Keyboard shortcuts (global)
-  useEffect(() => {
-    void hydrateShortcuts();
-  }, []);
+  // Live timer countdown in the top strip
+  const [timerCountdown, setTimerCountdown] = useState<string | null>(null);
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) return;
-      if (shouldYieldToElement(e)) return;
-      if (!window.cp.live) return;
-
-      const liveLocked = live?.lockedScreens ?? { A: false, B: false, C: false };
-      const liveTarget = live?.target ?? "A";
-      const action = matchAction(e);
-      if (!action || action === "toggleProjection") return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      switch (action) {
-        case "targetA": if (!liveLocked.A) window.cp.live.setTarget("A"); break;
-        case "targetB": if (!liveLocked.B) window.cp.live.setTarget("B"); break;
-        case "targetC": if (!liveLocked.C) window.cp.live.setTarget("C"); break;
-        case "toggleBlack": if (!(liveLocked[liveTarget])) window.cp.live.toggleBlack(); break;
-        case "toggleWhite": if (!(liveLocked[liveTarget])) window.cp.live.toggleWhite(); break;
-        case "resume": if (!(liveLocked[liveTarget])) window.cp.live.resume(); break;
-        case "prev": window.cp.live.prev(); break;
-        case "next": window.cp.live.next(); break;
-      }
-    };
-    window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [live]);
-
-  // Sync status
-  useEffect(() => {
-    if (!window.cp.sync) return;
-    window.cp.sync.status().then(setSyncStatus).catch(() => null);
-    const off = window.cp.sync.onStatusChange(setSyncStatus);
-    return () => off?.();
-  }, []);
-
-  // Load projection appearance
-  useEffect(() => {
-    window.cp.projection.getState().then((s) => {
-      setBg(s.background || "#050505");
-      setFg(s.foreground || "#ffffff");
-      setScale(s.textScale || 1);
-      setBgImage(s.backgroundImage || "");
-    });
-    const off = window.cp.projection.onState((s) => {
-      setBg(s.background || "#050505");
-      setFg(s.foreground || "#ffffff");
-      setScale(s.textScale || 1);
-      setBgImage(s.backgroundImage || "");
-    });
-    return () => off?.();
-  }, []);
-
-  const applyAppearance = (patch: { background?: string; foreground?: string; textScale?: number; backgroundImage?: string }) => {
-    if (target === "A") {
-      window.cp.projection.setAppearance(patch);
-    } else {
-      window.cp.screens.setAppearance(target, patch);
-    }
-  };
-
-  const pickBgImage = async () => {
-    const result = await window.cp.files.pickMedia();
-    if (result.ok && "path" in result) {
-      setBgImage(result.path);
-      applyAppearance({ backgroundImage: result.path });
-    }
-  };
-
-  const clearBgImage = () => {
-    setBgImage("");
-    applyAppearance({ backgroundImage: "" });
-  };
-
-  const target = live?.target ?? "A";
-
-  // Sync appearance controls when target changes
-  useEffect(() => {
-    const s = screenStates[target];
-    setBg(s?.background || "#050505");
-    setFg(s?.foreground || "#ffffff");
-    setScale(s?.textScale || 1);
-    setBgImage(s?.backgroundImage || "");
-  }, [target, screenStates]);
-  const locked = live?.lockedScreens ?? { A: false, B: false, C: false };
-  const isTargetLocked = !!locked[target];
-  const targetState = screenStates[target];
-  const lowerThirdEnabled = !!targetState?.lowerThirdEnabled;
-  const liveMode: CpProjectionMode = live?.black ? "BLACK" : live?.white ? "WHITE" : (targetState?.mode ?? "NORMAL");
-  const liveStatus = live?.enabled ? "ACTIF" : "INACTIF";
-
-  const openScreen = async (key: ScreenKey) => {
-    if (locked[key]) return;
-    const meta = screens.find((s) => s.key === key);
-    if (key === "A") {
-      if (meta?.isOpen) {
-        await window.cp.projectionWindow.close();
-      } else {
-        await window.cp.projectionWindow.open();
-      }
-    } else {
-      if (meta?.isOpen) {
-        await window.cp.screens.close(key);
-      } else {
-        await window.cp.screens.open(key);
-      }
-    }
-  };
-
-  const setTarget = async (key: ScreenKey) => {
-    if (locked[key]) return;
-    await window.cp.live?.setTarget(key);
-  };
-
-  const toggleLowerThird = async () => {
-    if (isTargetLocked) return;
-    const next = !lowerThirdEnabled;
-    if (target === "A") {
-      await window.cp.projection.setState({ lowerThirdEnabled: next });
+    const isTimerActive =
+      currentState?.current?.kind === "TEXT" &&
+      currentState.current.title?.startsWith("TIMER:");
+    if (!isTimerActive || !currentState) {
+      setTimerCountdown(null);
       return;
     }
-    await window.cp.screens.setState(target, { lowerThirdEnabled: next });
-  };
+    const body = currentState.current.body ?? "0:00";
+    const parts = body.split(":");
+    const totalSecs =
+      (parseInt(parts[0] ?? "0", 10) || 0) * 60 +
+      (parseInt(parts[1] ?? "0", 10) || 0);
+    const startedAt = currentState.updatedAt;
+    const calc = () => {
+      const remaining = Math.max(0, totalSecs - (Date.now() - startedAt) / 1000);
+      const s = Math.floor(remaining);
+      setTimerCountdown(
+        `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`
+      );
+    };
+    calc();
+    const id = setInterval(calc, 250);
+    return () => clearInterval(id);
+  }, [currentState]);
+
+  // Video play/pause + volume state
+  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+  const [videoVolume, setVideoVolume] = useState(1);
+
+  // Reset to playing when a new video starts
+  useEffect(() => {
+    if (currentState?.current?.mediaType === "VIDEO") {
+      setIsVideoPlaying(true);
+    }
+  }, [currentState?.current?.mediaPath]);
+
+  const handleVideoToggle = useCallback(async () => {
+    const next = !isVideoPlaying;
+    setIsVideoPlaying(next);
+    await window.cp.live.videoControl(next ? "PLAY" : "PAUSE");
+  }, [isVideoPlaying]);
+
+  const handleVideoVolume = useCallback(async (v: number) => {
+    setVideoVolume(v);
+    await window.cp.live.videoVolume(v);
+  }, []);
+
+  // Load projection states
+  useEffect(() => {
+    if (!isEnabled) return;
+    void window.cp.projection.getState().then(setCurrentState);
+    const unsub = window.cp.projection.onState(setCurrentState);
+    return unsub;
+  }, [isEnabled]);
+
+  // Precompute "next" item's projection state (visual preview only)
+  useEffect(() => {
+    if (!live || !plan) return;
+    const nextItem = plan.items[live.cursor + 1];
+    if (!nextItem) { setNextState(null); return; }
+    setNextState({
+      mode: "NORMAL",
+      lowerThirdEnabled: false,
+      transitionEnabled: false,
+      textScale: 1,
+      textFont: "",
+      background: "#000",
+      foreground: "#fff",
+      current: {
+        kind: "TEXT",
+        title: nextItem.title?.trim() || getPlanKindDefaultTitle(nextItem.kind),
+        body: nextItem.content ?? "",
+      },
+      updatedAt: 0,
+    } as CpProjectionState);
+  }, [live, plan]);
+
+  const handleItemClick = useCallback(async (item: CpPlanItem, index: number) => {
+    await window.cp.live.setCursor(index);
+    if (live) {
+      const planBg = (() => {
+        if (!plan?.backgroundConfig) return undefined;
+        try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
+        catch { return undefined; }
+      })();
+      await projectPlanItemToTarget(live.target, item as PlanItem, live, planBg);
+    }
+  }, [live, plan]);
+
+  const handleNavigate = useCallback(async (dir: 1 | -1) => {
+    const currentCursor = live?.cursor ?? 0;
+    const itemCount = plan?.items.length ?? 0;
+    const nextCursor = Math.max(0, Math.min(currentCursor + dir, itemCount - 1));
+    console.log("[live] navigate", dir, "cursor:", currentCursor, "→", nextCursor, "items:", itemCount, "planId:", live?.planId);
+    if (dir > 0) await window.cp.live.next();
+    else await window.cp.live.prev();
+    const item = plan?.items[nextCursor];
+    if (item && live) {
+      const planBg = (() => {
+        if (!plan?.backgroundConfig) return undefined;
+        try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
+        catch { return undefined; }
+      })();
+      await projectPlanItemToTarget(live.target, item as PlanItem, live, planBg);
+    } else {
+      console.warn("[live] navigate: no item or no live state", { item: !!item, live: !!live, nextCursor });
+    }
+  }, [live, plan]);
+
+  // Keyboard shortcuts — all hooks must be before early returns
+  useShortcuts(
+    useCallback((action) => {
+      switch (action) {
+        case "next": void handleNavigate(1); break;
+        case "prev": void handleNavigate(-1); break;
+        case "toggleBlack": void toggleBlack(); break;
+        case "toggleWhite": void toggleWhite(); break;
+        case "resume": void resume(); break;
+        case "targetA": void window.cp.live.setTarget("A"); break;
+        case "targetB": void window.cp.live.setTarget("B"); break;
+        case "targetC": void window.cp.live.setTarget("C"); break;
+      }
+    }, [handleNavigate, toggleBlack, toggleWhite, resume]),
+    isEnabled
+  );
+
+  if (!isEnabled || !live) return null;
+
+  const isBlack = live.black;
+  const isWhite = live.white;
+  const currentItem = plan?.items[live.cursor];
+  const nextItem = plan?.items[live.cursor + 1];
+
+  // Duration-based progress
+  const itemDurations = plan?.items.map(estimateItemDurationSeconds) ?? [];
+  const totalDurationSeconds = itemDurations.reduce((sum, d) => sum + d, 0);
+  const completedSeconds = itemDurations.slice(0, live.cursor).reduce((sum, d) => sum + d, 0);
+  const progressPercent = totalDurationSeconds > 0 ? (completedSeconds / totalDurationSeconds) * 100 : 0;
+  const remainingSeconds = totalDurationSeconds - completedSeconds;
+  const remainingLabel = totalDurationSeconds > 0 ? formatMinutes(remainingSeconds) : null;
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-t border-border/60 bg-muted/50 dark:bg-secondary/30 shrink-0 flex-wrap">
-      <div className="flex items-center gap-1.5 rounded-md border border-border/70 bg-background/70 px-2 py-1">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button type="button" onClick={() => window.cp.live?.toggle()} className="cursor-pointer">
-              <Badge variant={live?.enabled ? "default" : "secondary"} className="h-7 px-2 font-semibold cursor-pointer hover:opacity-80 transition-opacity">
-                LIVE {liveStatus}
-              </Badge>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Activer / desactiver le live</TooltipContent>
-        </Tooltip>
-        <Badge variant="outline" className="h-7 px-2 font-semibold">
-          ECRAN {target}
-        </Badge>
-        <Badge variant={liveMode === "NORMAL" ? "secondary" : "outline"} className="h-7 px-2 font-semibold">
-          MODE {modeLabel(liveMode).toUpperCase()}
-        </Badge>
-      </div>
-      {/* Transport */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon-sm" className="h-9 w-9" onClick={() => window.cp.live?.prev()}>
-            <ChevronLeft className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Precedent (Q / Left)</TooltipContent>
-      </Tooltip>
-
-      <Badge variant="outline" className="font-mono text-sm min-w-[3.2rem] h-9 justify-center">
-        {live?.cursor ?? 0}
-      </Badge>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="icon-sm" className="h-9 w-9" onClick={() => window.cp.live?.next()}>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Suivant (D / Right / Space)</TooltipContent>
-      </Tooltip>
-
-      <Separator orientation="vertical" className="h-5 mx-0.5" />
-
-      {/* Screen target */}
-      {(["A", "B", "C"] as ScreenKey[]).map((k) => {
-        const meta = screens.find((s) => s.key === k);
-        const isOpen = !!meta?.isOpen;
-        return (
-          <Tooltip key={k}>
-            <TooltipTrigger asChild>
-              <Button
-                variant={target === k ? "default" : "outline"}
-                size="sm"
-                className={cn("h-9 px-3 text-xs font-semibold", !isOpen && "opacity-50")}
-                onClick={() => { void setTarget(k); }}
-                onDoubleClick={() => { void openScreen(k); }}
-                disabled={!!locked[k]}
-              >
-                <MonitorSmartphone className="h-3 w-3" />
-                {k}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Ecran {k} {isOpen ? "(ouvert)" : "(ferme)"} - dbl-clic pour ouvrir/fermer
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
-
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {(["A", "B", "C"] as ScreenKey[]).map((k) => {
-          const meta = screens.find((s) => s.key === k);
-          return (
-            <ScreenMiniCard
-              key={`mini-${k}`}
-              screen={k}
-              state={screenStates[k]}
-              isTarget={target === k}
-              isOpen={!!meta?.isOpen}
-              isLocked={!!locked[k]}
-              disabled={!!locked[k]}
-              onClick={() => { void setTarget(k); }}
-              onDoubleClick={() => { void openScreen(k); }}
-            />
-          );
-        })}
-      </div>
-
-      <Separator orientation="vertical" className="h-5 mx-0.5" />
-
-      <div className="flex items-center gap-1">
-        {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-          <Badge key={`lock-badge-${k}`} variant={locked[k] ? "destructive" : "secondary"} className="text-xs px-2 h-7">
-            {k}:{locked[k] ? "FIXE" : "LIBRE"}
-          </Badge>
-        ))}
-      </div>
-
-      <Separator orientation="vertical" className="h-5 mx-0.5" />
-
-      {/* Mode buttons */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant={live?.black ? "destructive" : "outline"}
-            size="sm"
-            className="h-9 px-4 font-semibold"
-            onClick={() => window.cp.live?.toggleBlack()}
-            disabled={isTargetLocked}
+    <div
+      className="flex flex-col bg-bg-base border-t border-border overflow-hidden h-[var(--live-bar-height)] min-h-[var(--live-bar-height)]"
+      role="region"
+      aria-label="Barre Mode Direct"
+    >
+      {/* Top strip: status + controls */}
+      <div className="flex items-center gap-3 px-4 h-10 shrink-0 border-b border-border">
+        {/* Live indicator */}
+        <div className="flex items-center gap-1.5">
+          <Circle
+            className={cn(
+              "h-2.5 w-2.5 animate-pulse",
+              isFreeMode ? "fill-warning text-warning" : "fill-live-indicator text-live-indicator",
+            )}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "text-xs font-semibold uppercase tracking-wide",
+              isFreeMode ? "text-warning" : "text-live-indicator",
+            )}
           >
+            {isFreeMode ? "Libre" : "Direct"}
+          </span>
+        </div>
+
+        {/* Screen mode buttons */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant={isBlack ? "default" : "ghost"}
+            size="xs"
+            onClick={() => void toggleBlack()}
+            className={cn("gap-1", isBlack && "bg-text-primary text-bg-base")}
+            aria-pressed={isBlack}
+          >
+            <MoonStar className="h-3.5 w-3.5" />
             Noir
           </Button>
-        </TooltipTrigger>
-        <TooltipContent>Ecran noir (B)</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
           <Button
-            variant={live?.white ? "secondary" : "outline"}
-            size="sm"
-            className="h-9 px-4 font-semibold"
-            onClick={() => window.cp.live?.toggleWhite()}
-            disabled={isTargetLocked}
+            variant={isWhite ? "default" : "ghost"}
+            size="xs"
+            onClick={() => void toggleWhite()}
+            className={cn("gap-1", isWhite && "bg-white text-black border border-border")}
+            aria-pressed={isWhite}
           >
+            <Sun className="h-3.5 w-3.5" />
             Blanc
           </Button>
-        </TooltipTrigger>
-        <TooltipContent>Ecran blanc (W)</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="sm" className="h-9 px-4 font-semibold" onClick={() => window.cp.live?.resume()} disabled={isTargetLocked}>
-            Normal
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Reprendre (R)</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant={lowerThirdEnabled ? "default" : "outline"} size="sm" className="h-9 px-3" onClick={toggleLowerThird} disabled={isTargetLocked}>
-            Bas de page
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Bas de page</TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="sm" className="h-9 px-3" onClick={() => window.cp.live?.setCursor(live?.cursor ?? 0)} disabled={isTargetLocked}>
-            <RotateCcw className="h-3 w-3" />
-            Reprojeter
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Reprojeter l'item en cours</TooltipContent>
-      </Tooltip>
-
-      <Separator orientation="vertical" className="h-5 mx-0.5" />
-
-      {/* Appearance popover */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="h-9 px-3">
-            <Palette className="h-3 w-3" />
-            Style
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent side="top" align="start" className="w-64 p-3">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Fond</Label>
-              <input
-                type="color"
-                title="Couleur de fond"
-                value={bg}
-                onChange={(e) => { setBg(e.target.value); applyAppearance({ background: e.target.value }); }}
-                className="h-7 w-10 rounded border cursor-pointer"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Texte</Label>
-              <input
-                type="color"
-                title="Couleur du texte"
-                value={fg}
-                onChange={(e) => { setFg(e.target.value); applyAppearance({ foreground: e.target.value }); }}
-                className="h-7 w-10 rounded border cursor-pointer"
-              />
-            </div>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">Taille</Label>
-                <span className="text-[10px] text-muted-foreground font-mono">{scale.toFixed(1)}x</span>
-              </div>
-              <input
-                type="range"
-                title="Taille du texte"
-                min={0.5}
-                max={3}
-                step={0.1}
-                value={scale}
-                onChange={(e) => { const v = parseFloat(e.target.value); setScale(v); applyAppearance({ textScale: v }); }}
-                className="w-full accent-primary"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Image de fond</Label>
-              <div className="flex items-center gap-1.5">
-                <Button variant="outline" size="sm" className="h-6 text-[10px]" onClick={pickBgImage}>
-                  <ImagePlus className="h-2.5 w-2.5 mr-0.5" /> Choisir
-                </Button>
-                {bgImage && (
-                  <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive" onClick={clearBgImage}>
-                    <Trash2 className="h-2.5 w-2.5" />
-                  </Button>
-                )}
-                {bgImage && <span className="text-[9px] text-muted-foreground truncate flex-1">{bgImage.split(/[\\/]/).pop()}</span>}
-              </div>
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      <Separator orientation="vertical" className="h-5 mx-0.5" />
-
-      {/* Lock buttons */}
-      {(["A", "B", "C"] as ScreenKey[]).map((k) => (
-        <Tooltip key={`lock-${k}`}>
-          <TooltipTrigger asChild>
+          {(isBlack || isWhite) && (
             <Button
               variant="ghost"
-              size="icon-sm"
-              onClick={() => window.cp.live?.setLocked(k, !locked[k])}
+              size="xs"
+              onClick={() => void resume()}
+              className="gap-1 text-success"
             >
-              {locked[k]
-                ? <Lock className="h-3 w-3 text-destructive" />
-                : <Unlock className="h-3 w-3 text-muted-foreground" />}
+              <Monitor className="h-3.5 w-3.5" />
+              Reprendre
             </Button>
-          </TooltipTrigger>
-          <TooltipContent>{locked[k] ? `Deverrouiller ${k}` : `Verrouiller ${k}`}</TooltipContent>
-        </Tooltip>
-      ))}
+          )}
+        </div>
 
-      <Separator orientation="vertical" className="h-5 mx-0.5" />
+        {/* Video play/pause + volume — shown when a video is currently projected */}
+        {currentState?.current?.mediaType === "VIDEO" && (
+          <div className="flex items-center gap-1.5 ml-2">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => void handleVideoToggle()}
+              className="gap-1"
+              aria-label={isVideoPlaying ? "Mettre en pause la vidéo" : "Lire la vidéo"}
+            >
+              {isVideoPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              {isVideoPlaying ? "Pause" : "Lire"}
+            </Button>
+            <button
+              type="button"
+              className="text-text-muted hover:text-text-primary transition-colors"
+              onClick={() => void handleVideoVolume(videoVolume > 0 ? 0 : 1)}
+              aria-label={videoVolume > 0 ? "Couper le son" : "Rétablir le son"}
+            >
+              {videoVolume > 0
+                ? <Volume2 className="h-3.5 w-3.5" />
+                : <VolumeX className="h-3.5 w-3.5" />
+              }
+            </button>
+            <input
+              type="range"
+              aria-label="Volume vidéo"
+              min={0}
+              max={1}
+              step={0.05}
+              value={videoVolume}
+              onChange={(e) => void handleVideoVolume(Number(e.target.value))}
+              className="w-16 accent-primary"
+            />
+          </div>
+        )}
 
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="outline" size="sm" className="h-9 px-3" onClick={() => setQuickOpen(true)}>
-            <MessageSquarePlus className="h-3 w-3" />
-            Rapide
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Projeter un texte ou image libre</TooltipContent>
-      </Tooltip>
-
-      <Separator orientation="vertical" className="h-5 mx-0.5" />
-
-      {/* Sync */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant={syncStatus?.running ? "default" : "outline"}
-            size="sm"
-            className="h-9 px-3"
-          >
-            {syncStatus?.running
-              ? <><Wifi className="h-3 w-3" /> Sync ({syncStatus.clients})</>
-              : <><WifiOff className="h-3 w-3" /> Sync</>}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent side="top" align="end" className="w-64 p-3">
-          <div className="space-y-2">
-            <p className="text-xs font-medium">Synchronisation reseau</p>
-            <p className="text-[10px] text-muted-foreground">
-              Permet a d'autres postes de suivre et controler la projection via le reseau local.
-            </p>
-            {syncStatus?.running ? (
-              <>
-                <div className="text-xs space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Port</span>
-                    <span className="font-mono">{syncStatus.port}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Clients</span>
-                    <span className="font-mono">{syncStatus.clients}</span>
-                  </div>
-                  {syncStatus.addresses.length > 0 && (
-                    <div>
-                      <span className="text-muted-foreground">Adresses :</span>
-                      {syncStatus.addresses.map((addr) => (
-                        <div key={addr} className="font-mono text-[10px] ml-2">
-                          ws://{addr}:{syncStatus.port}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  className="w-full h-7 text-xs"
-                  onClick={async () => {
-                    await window.cp.sync.stop();
-                    const s = await window.cp.sync.status();
-                    setSyncStatus(s);
-                  }}
-                >
-                  Arreter le serveur
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="sm"
-                className="w-full h-7 text-xs"
-                onClick={async () => {
-                  const result = await window.cp.sync.start();
-                  if (result.ok) {
-                    const s = await window.cp.sync.status();
-                    setSyncStatus(s);
-                  }
-                }}
+        {/* Auto-advance — plan mode only */}
+        {isPlanMode && (
+          <div className="flex items-center gap-1 ml-2">
+            <Button
+              variant={autoEnabled ? "default" : "ghost"}
+              size="xs"
+              onClick={() => setAutoEnabled((v) => !v)}
+              className={cn("gap-1", autoEnabled && "bg-accent text-white")}
+              aria-pressed={autoEnabled}
+              aria-label="Auto-avance"
+            >
+              {autoEnabled ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              Auto
+            </Button>
+            {autoEnabled && (
+              <select
+                value={autoInterval}
+                onChange={(e) => setAutoInterval(Number(e.target.value) as AutoInterval)}
+                className="text-xs bg-bg-elevated border border-border rounded px-1 py-0.5 text-text-primary h-6"
+                aria-label="Intervalle auto-avance"
               >
-                Demarrer le serveur
-              </Button>
+                {AUTO_INTERVALS.map((s) => (
+                  <option key={s} value={s}>{s}s</option>
+                ))}
+              </select>
             )}
           </div>
-        </PopoverContent>
-      </Popover>
+        )}
 
-      <div className="flex-1" />
+        {/* Navigation — plan mode only */}
+        {isPlanMode && (
+          <NavControls
+            className="ml-auto"
+            onPrev={() => void handleNavigate(-1)}
+            onNext={() => void handleNavigate(1)}
+          />
+        )}
 
-      <span className="text-[10px] text-muted-foreground hidden sm:inline">
-        1/2/3=ecrans  B/W/R=modes  fleches=nav
-      </span>
+        {/* Progress counter + remaining time — plan mode only */}
+        {isPlanMode && plan && (
+          <span className="text-xs tabular-nums text-text-muted font-medium px-1 flex items-center gap-1.5">
+            <span>{live.cursor + 1} / {plan.items.length}</span>
+            {remainingLabel && (
+              <span className="text-text-muted/70">· {remainingLabel}</span>
+            )}
+          </span>
+        )}
 
-      <QuickProjectDialog open={quickOpen} onOpenChange={setQuickOpen} />
+        {/* Timer countdown badge */}
+        {timerCountdown && (
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/15 border border-warning/30">
+            <Clock className="h-3 w-3 text-warning shrink-0" />
+            <span className="text-xs tabular-nums font-bold text-warning">
+              {timerCountdown}
+            </span>
+          </div>
+        )}
+
+        {/* Screen selector — pushed right in free mode (no NavControls to provide ml-auto) */}
+        <ScreenSelector className={cn(isFreeMode && "ml-auto")} />
+
+        {/* Quit */}
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={() => void toggle()}
+          className="gap-1 text-text-secondary ml-1"
+          aria-label={isFreeMode ? "Quitter le Mode Libre" : "Quitter le mode Direct"}
+        >
+          <X className="h-3.5 w-3.5" />
+          Quitter
+        </Button>
+      </div>
+
+      {/* Progress bar */}
+      {totalDurationSeconds > 0 && (
+        <div className="h-0.5 bg-border shrink-0">
+          <div
+            className="h-full bg-primary/60 transition-[width] duration-500 ease-out"
+            ref={(el) => { if (el) el.style.width = `${progressPercent}%`; }}
+          />
+        </div>
+      )}
+
+      {/* Bottom: slide previews + mini plan list */}
+      <div className="flex flex-1 items-stretch overflow-hidden gap-3 px-4 py-2">
+        {/* Current slide preview — both modes */}
+        <SlidePreview
+          projectionState={currentState}
+          variant="current"
+          label={currentItem?.title?.trim() || "En cours"}
+          className="w-[120px] shrink-0"
+        />
+
+        {/* Next slide preview — plan mode only */}
+        {isPlanMode && (
+          <SlidePreview
+            projectionState={nextState}
+            variant="next"
+            label={nextItem ? (nextItem.title?.trim() || getPlanKindDefaultTitle(nextItem.kind)) : "—"}
+            className="w-[80px] shrink-0"
+            onClick={nextItem ? () => void handleItemClick(nextItem, live.cursor + 1) : undefined}
+          />
+        )}
+
+        {/* Mini plan list — plan mode only */}
+        {isPlanMode && plan && (
+          <ScrollArea className="flex-1">
+            <div className="flex gap-1.5 items-center h-full">
+              {plan.items.map((item, index) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={cn(
+                    "flex-shrink-0 flex flex-col items-center gap-0.5 px-2 py-1 rounded transition-colors",
+                    "hover:bg-bg-elevated cursor-pointer",
+                    index === live.cursor && "bg-bg-elevated ring-1 ring-primary/60"
+                  )}
+                  onClick={() => void handleItemClick(item, index)}
+                  aria-current={index === live.cursor ? "true" : undefined}
+                  aria-label={`${index + 1}. ${item.title ?? getPlanKindDefaultTitle(item.kind)}`}
+                >
+                  <KindBadge kind={item.kind as CpPlanItemKind} className="text-[9px] px-1 py-0" />
+                  <span className="text-[9px] text-text-muted max-w-[60px] truncate">
+                    {item.title?.trim() || getPlanKindDefaultTitle(item.kind)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+
+        {/* Free mode hint */}
+        {isFreeMode && (
+          <div className="flex flex-1 items-center justify-center">
+            <p className="text-xs text-text-muted">
+              Cliquez un chant ou naviguez la Bible — les flèches ← → projettent le contenu
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

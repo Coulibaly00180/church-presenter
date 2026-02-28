@@ -4,6 +4,8 @@ import type {
   CpDataImportMode,
   CpDevtoolsTarget,
   CpForegroundFillMode,
+  CpItemBackground,
+  CpLogoPosition,
   CpLiveSetPayload,
   CpMediaType,
   CpPlanAddItemPayload,
@@ -32,7 +34,8 @@ const SCREEN_KEYS = ["A", "B", "C"] as const;
 const PROJECTION_MODES = ["NORMAL", "BLACK", "WHITE"] as const;
 const BACKGROUND_FILL_MODES = ["SOLID", "GRADIENT_LINEAR", "GRADIENT_RADIAL"] as const;
 const FOREGROUND_FILL_MODES = ["SOLID", "GRADIENT"] as const;
-const MEDIA_TYPES = ["IMAGE", "PDF"] as const;
+const LOGO_POSITIONS = ["bottom-right", "bottom-left", "top-right", "top-left", "center"] as const;
+const MEDIA_TYPES = ["IMAGE", "PDF", "VIDEO"] as const;
 const DEVTOOLS_TARGETS = ["REGIE", "PROJECTION", "SCREEN_A", "SCREEN_B", "SCREEN_C"] as const;
 const DATA_IMPORT_MODES = ["MERGE", "REPLACE"] as const;
 const DATA_IMPORT_ATOMICITY = ["ENTITY", "STRICT"] as const;
@@ -137,6 +140,23 @@ function parseSongMeta(value: unknown, label: string): CpSongMeta | undefined {
   };
 }
 
+function parseCpItemBackground(value: unknown): CpItemBackground {
+  const rec = expectRecord(value, "CpItemBackground");
+  const bg: CpItemBackground = {};
+  if (rec.background != null) bg.background = expectString(rec.background, "CpItemBackground.background", { allowEmpty: true });
+  if (rec.backgroundMode != null) bg.backgroundMode = expectEnum(rec.backgroundMode, "CpItemBackground.backgroundMode", BACKGROUND_FILL_MODES);
+  if (rec.backgroundGradientFrom != null) bg.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "CpItemBackground.backgroundGradientFrom", { allowEmpty: true });
+  if (rec.backgroundGradientTo != null) bg.backgroundGradientTo = expectString(rec.backgroundGradientTo, "CpItemBackground.backgroundGradientTo", { allowEmpty: true });
+  if (rec.backgroundGradientAngle != null) bg.backgroundGradientAngle = expectNumber(rec.backgroundGradientAngle, "CpItemBackground.backgroundGradientAngle");
+  if (rec.backgroundMedia != null) bg.backgroundMedia = expectString(rec.backgroundMedia, "CpItemBackground.backgroundMedia");
+  if (rec.backgroundMediaType != null) bg.backgroundMediaType = expectEnum(rec.backgroundMediaType, "CpItemBackground.backgroundMediaType", ["IMAGE", "VIDEO"] as const);
+  if (rec.foreground != null) bg.foreground = expectString(rec.foreground, "CpItemBackground.foreground", { allowEmpty: true });
+  if (rec.foregroundMode != null) bg.foregroundMode = expectEnum(rec.foregroundMode, "CpItemBackground.foregroundMode", FOREGROUND_FILL_MODES);
+  if (rec.foregroundGradientFrom != null) bg.foregroundGradientFrom = expectString(rec.foregroundGradientFrom, "CpItemBackground.foregroundGradientFrom", { allowEmpty: true });
+  if (rec.foregroundGradientTo != null) bg.foregroundGradientTo = expectString(rec.foregroundGradientTo, "CpItemBackground.foregroundGradientTo", { allowEmpty: true });
+  return bg;
+}
+
 function parseProjectionCurrent(value: unknown, label: string): CpProjectionCurrent {
   const rec = expectRecord(value, label);
   const kind = expectEnum(rec.kind, `${label}.kind`, CURRENT_KINDS);
@@ -174,6 +194,10 @@ export function parseBackgroundFillMode(value: unknown, label = "backgroundMode"
 
 export function parseForegroundFillMode(value: unknown, label = "foregroundMode"): CpForegroundFillMode {
   return expectEnum(value, label, FOREGROUND_FILL_MODES);
+}
+
+export function parseLogoPosition(value: unknown, label = "logoPosition"): CpLogoPosition {
+  return expectEnum(value, label, LOGO_POSITIONS);
 }
 
 export function parseMediaType(value: unknown, label = "mediaType"): CpMediaType {
@@ -231,6 +255,7 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
   const patch: CpProjectionSetAppearancePayload = {};
 
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setAppearance.textScale");
+  if (rec.titleTextScale !== undefined) patch.titleTextScale = expectNumber(rec.titleTextScale, "projection:setAppearance.titleTextScale");
   if (rec.textFont !== undefined) patch.textFont = expectString(rec.textFont, "projection:setAppearance.textFont");
   if (rec.textFontPath !== undefined) patch.textFontPath = expectString(rec.textFontPath, "projection:setAppearance.textFontPath", { allowEmpty: true });
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setAppearance.background");
@@ -238,8 +263,10 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
   if (rec.backgroundGradientFrom !== undefined) patch.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "projection:setAppearance.backgroundGradientFrom");
   if (rec.backgroundGradientTo !== undefined) patch.backgroundGradientTo = expectString(rec.backgroundGradientTo, "projection:setAppearance.backgroundGradientTo");
   if (rec.backgroundGradientAngle !== undefined) patch.backgroundGradientAngle = expectNumber(rec.backgroundGradientAngle, "projection:setAppearance.backgroundGradientAngle");
-  if (rec.backgroundImage !== undefined) patch.backgroundImage = expectString(rec.backgroundImage, "projection:setAppearance.backgroundImage");
+  if (rec.backgroundImage !== undefined) patch.backgroundImage = expectString(rec.backgroundImage, "projection:setAppearance.backgroundImage", { allowEmpty: true });
   if (rec.logoPath !== undefined) patch.logoPath = expectString(rec.logoPath, "projection:setAppearance.logoPath", { allowEmpty: true });
+  if (rec.logoPosition !== undefined) patch.logoPosition = parseLogoPosition(rec.logoPosition, "projection:setAppearance.logoPosition");
+  if (rec.logoOpacity !== undefined) patch.logoOpacity = expectNumber(rec.logoOpacity, "projection:setAppearance.logoOpacity");
   if (rec.foregroundMode !== undefined) patch.foregroundMode = parseForegroundFillMode(rec.foregroundMode, "projection:setAppearance.foregroundMode");
   if (rec.foregroundGradientFrom !== undefined) patch.foregroundGradientFrom = expectString(rec.foregroundGradientFrom, "projection:setAppearance.foregroundGradientFrom");
   if (rec.foregroundGradientTo !== undefined) patch.foregroundGradientTo = expectString(rec.foregroundGradientTo, "projection:setAppearance.foregroundGradientTo");
@@ -250,10 +277,27 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
 
 export function parseProjectionSetTextPayload(value: unknown): CpProjectionSetTextPayload {
   const rec = expectRecord(value, "projection:setContentText payload");
+  let secondaryTexts: Array<{ label: string; body: string }> | undefined;
+  if (Array.isArray(rec.secondaryTexts)) {
+    secondaryTexts = (rec.secondaryTexts as unknown[])
+      .filter((x): x is { label: string; body: string } =>
+        typeof x === "object" && x !== null &&
+        typeof (x as Record<string, unknown>).body === "string")
+      .map((x) => ({
+        label: String((x as Record<string, unknown>).label ?? ""),
+        body: String((x as Record<string, unknown>).body),
+      }));
+  }
+  const backgroundOverride =
+    typeof rec.backgroundOverride === "object" && rec.backgroundOverride !== null
+      ? parseCpItemBackground(rec.backgroundOverride)
+      : undefined;
   return {
     title: expectOptionalString(rec.title, "projection:setContentText.title", { trim: false, allowEmpty: true }),
     body: expectString(rec.body, "projection:setContentText.body", { trim: false, allowEmpty: true }),
     metaSong: parseSongMeta(rec.metaSong, "projection:setContentText.metaSong"),
+    secondaryTexts,
+    backgroundOverride,
   };
 }
 
@@ -381,6 +425,7 @@ export function parsePlanUpdatePayload(value: unknown): CpPlanUpdatePayload {
   return {
     planId: expectString(rec.planId, "plans:update.planId"),
     title: expectOptionalString(rec.title, "plans:update.title"),
+    backgroundConfig: rec.backgroundConfig === null ? null : expectOptionalString(rec.backgroundConfig, "plans:update.backgroundConfig", { trim: false, allowEmpty: true }),
   };
 }
 
@@ -391,6 +436,9 @@ export function parsePlanUpdateItemPayload(value: unknown): CpPlanUpdateItemPayl
     itemId: expectString(rec.itemId, "plans:updateItem.itemId"),
     title: expectOptionalString(rec.title, "plans:updateItem.title", { trim: false, allowEmpty: true }),
     content: expectOptionalString(rec.content, "plans:updateItem.content", { trim: false, allowEmpty: true }),
+    notes: expectOptionalString(rec.notes, "plans:updateItem.notes", { trim: false, allowEmpty: true }),
+    secondaryContent: expectOptionalString(rec.secondaryContent, "plans:updateItem.secondaryContent", { trim: false, allowEmpty: true }),
+    backgroundConfig: rec.backgroundConfig === null ? null : expectOptionalString(rec.backgroundConfig, "plans:updateItem.backgroundConfig", { trim: false, allowEmpty: true }),
   };
 }
 
@@ -401,9 +449,12 @@ export function parsePlanAddItemPayload(value: unknown): CpPlanAddItemPayload {
     kind: expectEnum(rec.kind, "plans:addItem.kind", CP_PLAN_ITEM_KIND_VALUES),
     title: expectOptionalString(rec.title, "plans:addItem.title", { trim: false, allowEmpty: true }),
     content: expectOptionalString(rec.content, "plans:addItem.content", { trim: false, allowEmpty: true }),
+    notes: expectOptionalString(rec.notes, "plans:addItem.notes", { trim: false, allowEmpty: true }),
     refId: expectOptionalString(rec.refId, "plans:addItem.refId"),
     refSubId: expectOptionalString(rec.refSubId, "plans:addItem.refSubId"),
     mediaPath: expectOptionalString(rec.mediaPath, "plans:addItem.mediaPath"),
+    secondaryContent: expectOptionalString(rec.secondaryContent, "plans:addItem.secondaryContent", { trim: false, allowEmpty: true }),
+    backgroundConfig: expectOptionalString(rec.backgroundConfig, "plans:addItem.backgroundConfig", { trim: false, allowEmpty: true }),
   };
 }
 

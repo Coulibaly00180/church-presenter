@@ -1,137 +1,205 @@
-import React, { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useCallback, useEffect, useState } from "react";
+import { Keyboard, RotateCcw } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   SHORTCUT_DEFS,
-  hydrateShortcuts,
+  formatBinding,
   getBindings,
   setBindings,
   resetBindings,
   resetAll,
-  formatBinding,
   type ShortcutAction,
   type KeyBinding,
 } from "@/lib/shortcuts";
+import { cn } from "@/lib/utils";
 
-type Props = { open: boolean; onOpenChange: (v: boolean) => void };
+interface ShortcutsDialogProps {
+  open: boolean;
+  onClose: () => void;
+}
 
-export function ShortcutsDialog({ open, onOpenChange }: Props) {
-  const [recording, setRecording] = useState<ShortcutAction | null>(null);
-  const [current, setCurrent] = useState<Record<string, KeyBinding[]>>({});
+const SHORTCUT_GROUPS = [
+  { label: "Navigation", actions: ["prev", "next"] },
+  { label: "Écrans", actions: ["targetA", "targetB", "targetC"] },
+  {
+    label: "Affichage",
+    actions: ["toggleBlack", "toggleWhite", "resume", "toggleProjection"],
+  },
+] as const;
 
+export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
+  // version counter force re-render après setBindings (cache niveau module)
+  const [version, setVersion] = useState(0);
+  const [capturing, setCapturing] = useState<ShortcutAction | null>(null);
+
+  // Annule la capture à la fermeture du dialog
   useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    const load = async () => {
-      await hydrateShortcuts();
-      if (cancelled) return;
-      const state: Record<string, KeyBinding[]> = {};
-      for (const def of SHORTCUT_DEFS) {
-        state[def.action] = getBindings(def.action);
-      }
-      setCurrent(state);
-      setRecording(null);
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    if (!open) setCapturing(null);
   }, [open]);
 
+  // Écoute globale clavier pendant la capture
   useEffect(() => {
-    if (!recording) return;
+    if (!capturing) return;
+
     const handler = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
+
+      // Ignore les touches modificatrices seules
+      if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+
       if (e.key === "Escape") {
-        setRecording(null);
+        setCapturing(null);
         return;
       }
-      // Ignore lone modifier keys
-      if (["Control", "Shift", "Meta", "Alt"].includes(e.key)) return;
 
-      const binding: KeyBinding = {
-        key: e.key,
-        ...(e.ctrlKey || e.metaKey ? { ctrlKey: true } : {}),
-        ...(e.shiftKey ? { shiftKey: true } : {}),
-      };
-      setBindings(recording, [binding]);
-      setCurrent((prev) => ({ ...prev, [recording]: [binding] }));
-      setRecording(null);
+      const binding: KeyBinding = { key: e.key };
+      if (e.ctrlKey) binding.ctrlKey = true;
+      if (e.shiftKey) binding.shiftKey = true;
+
+      setBindings(capturing, [binding]);
+      toast.success("Raccourci mis à jour");
+      setCapturing(null);
+      setVersion((v) => v + 1);
     };
-    window.addEventListener("keydown", handler, true);
-    return () => window.removeEventListener("keydown", handler, true);
-  }, [recording]);
 
-  const handleReset = (action: ShortcutAction) => {
+    window.addEventListener("keydown", handler, { capture: true });
+    return () => window.removeEventListener("keydown", handler, { capture: true });
+  }, [capturing]);
+
+  const handleReset = useCallback((action: ShortcutAction) => {
     resetBindings(action);
-    const def = SHORTCUT_DEFS.find((d) => d.action === action);
-    setCurrent((prev) => ({ ...prev, [action]: def?.defaults ?? [] }));
-  };
+    setVersion((v) => v + 1);
+    toast.success("Raccourci réinitialisé");
+  }, []);
 
-  const handleResetAll = () => {
+  const handleResetAll = useCallback(() => {
     resetAll();
-    const state: Record<string, KeyBinding[]> = {};
-    for (const def of SHORTCUT_DEFS) {
-      state[def.action] = def.defaults;
-    }
-    setCurrent(state);
-  };
+    setVersion((v) => v + 1);
+    toast.success("Tous les raccourcis réinitialisés");
+  }, []);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Raccourcis clavier</DialogTitle>
-          <DialogDescription>Cliquez sur un raccourci pour le modifier. Echap pour annuler.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            <Keyboard className="h-5 w-5" />
+            Raccourcis clavier
+          </DialogTitle>
         </DialogHeader>
-        <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
-          {SHORTCUT_DEFS.map((def) => (
-            <div key={def.action} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-accent">
-              <span className="text-sm">{def.label}</span>
-              <div className="flex items-center gap-1">
-                {recording === def.action ? (
-                  <Badge variant="destructive" className="text-[10px] animate-pulse">
-                    Appuyez...
-                  </Badge>
-                ) : (
-                  (current[def.action] ?? []).map((b, i) => (
-                    <Badge
-                      key={i}
-                      variant="outline"
-                      className="text-[10px] cursor-pointer"
-                      onClick={() => setRecording(def.action)}
+
+        {/* Bannière capture active */}
+        {capturing && (
+          <div className="rounded-md bg-primary/10 border border-primary/30 px-3 py-2 text-sm text-primary text-center animate-pulse">
+            Appuyez sur une touche… (Échap pour annuler)
+          </div>
+        )}
+
+        <div className="py-1 space-y-4" key={version}>
+          {SHORTCUT_GROUPS.map((group, gi) => (
+            <div key={gi}>
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+                {group.label}
+              </p>
+              <div className="space-y-1">
+                {SHORTCUT_DEFS.filter((def) =>
+                  (group.actions as readonly string[]).includes(def.action)
+                ).map((def) => {
+                  const bindings = getBindings(def.action);
+                  const isCapturing = capturing === def.action;
+
+                  return (
+                    <div
+                      key={def.action}
+                      className={cn(
+                        "flex items-center gap-2 py-1 rounded px-1",
+                        isCapturing && "bg-primary/5 ring-1 ring-primary/30"
+                      )}
                     >
-                      {formatBinding(b)}
-                    </Badge>
-                  ))
-                )}
-                {recording !== def.action && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-[10px] px-1.5"
-                    onClick={() => setRecording(def.action)}
-                  >
-                    Modifier
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-[10px] px-1.5"
-                  onClick={() => handleReset(def.action)}
-                >
-                  Défaut
-                </Button>
+                      <span className="text-sm text-text-primary flex-1 min-w-0">
+                        {def.label}
+                      </span>
+
+                      {/* Affichage de la touche ou prompt capture */}
+                      <div className="flex gap-1 items-center">
+                        {isCapturing ? (
+                          <span className="text-xs text-primary font-medium px-2">
+                            En attente…
+                          </span>
+                        ) : (
+                          bindings.slice(0, 2).map((b, bi) => (
+                            <kbd
+                              key={bi}
+                              className="px-2 py-0.5 text-xs rounded border border-border bg-bg-elevated font-mono"
+                            >
+                              {formatBinding(b)}
+                            </kbd>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Boutons d'action */}
+                      <div className="flex gap-0.5 shrink-0">
+                        {isCapturing ? (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            onClick={() => setCapturing(null)}
+                          >
+                            Annuler
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => setCapturing(def.action)}
+                              aria-label={`Modifier : ${def.label}`}
+                            >
+                              Modifier
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => handleReset(def.action)}
+                              aria-label={`Réinitialiser : ${def.label}`}
+                              className="px-1.5 text-text-muted"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+              {gi < SHORTCUT_GROUPS.length - 1 && <Separator className="mt-3" />}
             </div>
           ))}
         </div>
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={handleResetAll}>
-            Tout reinitialiser
+
+        <div className="flex items-center justify-between pt-2 border-t border-border">
+          <p className="text-xs text-text-muted">
+            Actifs uniquement hors champs de texte
+          </p>
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={handleResetAll}
+            className="gap-1 text-text-muted hover:text-danger"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Tout réinitialiser
           </Button>
         </div>
       </DialogContent>
