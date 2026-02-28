@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { MessageSquarePlus, Plus } from "lucide-react";
+import { FileImage, FileText, FileVideo, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { usePlan } from "@/hooks/usePlan";
@@ -45,6 +45,17 @@ export function AnnouncementsTab() {
     if (item) toast.success("PDF ajouté au plan");
   }, [addItem]);
 
+  const handleAddVideo = useCallback(async () => {
+    const result = await window.cp.files.pickMedia();
+    if (!result.ok || "canceled" in result) return;
+    const item = await addItem({
+      kind: "ANNOUNCEMENT_VIDEO",
+      title: result.path.split(/[\\/]/).pop() ?? "Vidéo",
+      mediaPath: result.path,
+    });
+    if (item) toast.success("Vidéo ajoutée au plan");
+  }, [addItem]);
+
   return (
     <div className="flex flex-col gap-4 p-3">
       {/* Text announcement */}
@@ -86,7 +97,7 @@ export function AnnouncementsTab() {
             className="flex-1 gap-1.5"
             onClick={() => void handleAddImage()}
           >
-            <MessageSquarePlus className="h-4 w-4" />
+            <FileImage className="h-4 w-4" />
             Image
           </Button>
           <Button
@@ -95,8 +106,17 @@ export function AnnouncementsTab() {
             className="flex-1 gap-1.5"
             onClick={() => void handleAddPdf()}
           >
-            <MessageSquarePlus className="h-4 w-4" />
+            <FileText className="h-4 w-4" />
             PDF
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 gap-1.5"
+            onClick={() => void handleAddVideo()}
+          >
+            <FileVideo className="h-4 w-4" />
+            Vidéo
           </Button>
         </div>
       </div>
