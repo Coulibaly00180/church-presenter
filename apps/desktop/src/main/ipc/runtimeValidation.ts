@@ -411,6 +411,7 @@ export function parsePlanAddItemPayload(value: unknown): CpPlanAddItemPayload {
     kind: expectEnum(rec.kind, "plans:addItem.kind", CP_PLAN_ITEM_KIND_VALUES),
     title: expectOptionalString(rec.title, "plans:addItem.title", { trim: false, allowEmpty: true }),
     content: expectOptionalString(rec.content, "plans:addItem.content", { trim: false, allowEmpty: true }),
+    notes: expectOptionalString(rec.notes, "plans:addItem.notes", { trim: false, allowEmpty: true }),
     refId: expectOptionalString(rec.refId, "plans:addItem.refId"),
     refSubId: expectOptionalString(rec.refSubId, "plans:addItem.refSubId"),
     mediaPath: expectOptionalString(rec.mediaPath, "plans:addItem.mediaPath"),

@@ -177,6 +177,12 @@ const cpApi: CpApi = {
       ipcRenderer.on("live:videoControl", handler);
       return () => ipcRenderer.removeListener("live:videoControl", handler);
     },
+    videoVolume: (volume: number) => ipcRenderer.invoke("live:videoVolume", volume),
+    onVideoVolume: (cb: (volume: number) => void) => {
+      const handler = (_: unknown, volume: number) => cb(volume);
+      ipcRenderer.on("live:videoVolume", handler);
+      return () => ipcRenderer.removeListener("live:videoVolume", handler);
+    },
   },
 
   sync: {

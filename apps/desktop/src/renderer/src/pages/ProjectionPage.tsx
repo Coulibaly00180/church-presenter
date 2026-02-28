@@ -160,13 +160,16 @@ function MediaContent({ state }: { state: ProjectionState }) {
   const { current } = state;
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Listen for play/pause commands from the control window
+  // Listen for play/pause and volume commands from the control window
   useEffect(() => {
-    const unsub = window.cp.live.onVideoControl((action) => {
+    const unsubControl = window.cp.live.onVideoControl((action) => {
       if (action === "PLAY") void videoRef.current?.play();
       else videoRef.current?.pause();
     });
-    return unsub;
+    const unsubVolume = window.cp.live.onVideoVolume((volume) => {
+      if (videoRef.current) videoRef.current.volume = volume;
+    });
+    return () => { unsubControl(); unsubVolume(); };
   }, []);
 
   if (!current.mediaPath) return null;

@@ -176,6 +176,7 @@ export type CpPlanAddItemPayload = {
   kind: CpPlanItemKind;
   title?: string;
   content?: string;
+  notes?: string;
   refId?: string;
   refSubId?: string;
   mediaPath?: string;
@@ -458,6 +459,9 @@ export interface CpApi {
     /** Video control: regie sends PLAY/PAUSE; projection windows receive via onVideoControl */
     videoControl: (action: "PLAY" | "PAUSE") => Promise<void>;
     onVideoControl: (cb: (action: "PLAY" | "PAUSE") => void) => () => void;
+    /** Video volume: regie sends 0-1; projection windows receive via onVideoVolume */
+    videoVolume: (volume: number) => Promise<void>;
+    onVideoVolume: (cb: (volume: number) => void) => () => void;
   };
   sync: {
     start: (port?: number) => Promise<CpSyncStartResult>;

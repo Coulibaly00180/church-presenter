@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Circle, Clock, Monitor, MoonStar, Pause, Play, Square, Sun, X } from "lucide-react";
+import { Circle, Clock, Monitor, MoonStar, Pause, Play, Square, Sun, Volume2, VolumeX, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SlidePreview } from "@/components/live/SlidePreview";
@@ -78,8 +78,9 @@ export function LiveBar() {
     return () => clearInterval(id);
   }, [currentState]);
 
-  // Video play/pause state — starts as playing (videos autoPlay)
+  // Video play/pause + volume state
   const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+  const [videoVolume, setVideoVolume] = useState(1);
 
   // Reset to playing when a new video starts
   useEffect(() => {
@@ -93,6 +94,11 @@ export function LiveBar() {
     setIsVideoPlaying(next);
     await window.cp.live.videoControl(next ? "PLAY" : "PAUSE");
   }, [isVideoPlaying]);
+
+  const handleVideoVolume = useCallback(async (v: number) => {
+    setVideoVolume(v);
+    await window.cp.live.videoVolume(v);
+  }, []);
 
   // Load projection states
   useEffect(() => {
@@ -240,18 +246,41 @@ export function LiveBar() {
           )}
         </div>
 
-        {/* Video play/pause — shown when a video is currently projected */}
+        {/* Video play/pause + volume — shown when a video is currently projected */}
         {currentState?.current?.mediaType === "VIDEO" && (
-          <Button
-            variant="ghost"
-            size="xs"
-            onClick={() => void handleVideoToggle()}
-            className="gap-1 ml-2"
-            aria-label={isVideoPlaying ? "Mettre en pause la vidéo" : "Lire la vidéo"}
-          >
-            {isVideoPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-            {isVideoPlaying ? "Pause" : "Lire"}
-          </Button>
+          <div className="flex items-center gap-1.5 ml-2">
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => void handleVideoToggle()}
+              className="gap-1"
+              aria-label={isVideoPlaying ? "Mettre en pause la vidéo" : "Lire la vidéo"}
+            >
+              {isVideoPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+              {isVideoPlaying ? "Pause" : "Lire"}
+            </Button>
+            <button
+              type="button"
+              className="text-text-muted hover:text-text-primary transition-colors"
+              onClick={() => void handleVideoVolume(videoVolume > 0 ? 0 : 1)}
+              aria-label={videoVolume > 0 ? "Couper le son" : "Rétablir le son"}
+            >
+              {videoVolume > 0
+                ? <Volume2 className="h-3.5 w-3.5" />
+                : <VolumeX className="h-3.5 w-3.5" />
+              }
+            </button>
+            <input
+              type="range"
+              aria-label="Volume vidéo"
+              min={0}
+              max={1}
+              step={0.05}
+              value={videoVolume}
+              onChange={(e) => void handleVideoVolume(Number(e.target.value))}
+              className="w-16 accent-primary"
+            />
+          </div>
         )}
 
         {/* Auto-advance — plan mode only */}

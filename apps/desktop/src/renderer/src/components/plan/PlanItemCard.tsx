@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { Check, Copy, GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KindBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ interface PlanItemCardProps {
   isSelected?: boolean;
   onEdit?: (item: CpPlanItem) => void;
   onToggleSelect?: (id: string) => void;
+  onDuplicate?: (id: string) => void;
 }
 
 /** Returns a short subtitle describing the item content. */
@@ -44,7 +45,7 @@ function getItemSubtitle(item: CpPlanItem): string | null {
   }
 }
 
-export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onToggleSelect }: PlanItemCardProps) {
+export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onToggleSelect, onDuplicate }: PlanItemCardProps) {
   const { live } = useLive();
   const { removeItem } = usePlan();
 
@@ -74,6 +75,11 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
     e.stopPropagation();
     onEdit?.(item);
   }, [item, onEdit]);
+
+  const handleDuplicate = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDuplicate?.(item.id);
+  }, [item.id, onDuplicate]);
 
   return (
     <div
@@ -173,6 +179,17 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
             className="h-6 w-6"
           >
             <Pencil className="h-3 w-3" />
+          </Button>
+        )}
+        {onDuplicate && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleDuplicate}
+            aria-label="Dupliquer"
+            className="h-6 w-6"
+          >
+            <Copy className="h-3 w-3" />
           </Button>
         )}
         <Button

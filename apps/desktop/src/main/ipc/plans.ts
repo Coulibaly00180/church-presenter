@@ -62,6 +62,7 @@ export async function createPlanItemWithRetry(
             kind: payload.kind,
             title: payload.title,
             content: payload.content,
+            notes: payload.notes,
             refId: payload.refId,
             refSubId: payload.refSubId,
             songId: payload.kind === "SONG_BLOCK" ? payload.refId : undefined,

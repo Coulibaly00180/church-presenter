@@ -11,6 +11,7 @@ interface PlanContextValue {
   refreshList: () => Promise<void>;
   refreshPlan: () => Promise<void>;
   addItem: (payload: Omit<CpPlanAddItemPayload, "planId">) => Promise<CpPlanItem | null>;
+  duplicateItem: (itemId: string) => Promise<void>;
   updateItem: (itemId: string, patch: { title?: string; content?: string; notes?: string }) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   removeItems: (itemIds: string[]) => Promise<void>;
@@ -80,6 +81,27 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
   }, [selectedPlanId, refreshPlan]);
+
+  const duplicateItem = useCallback(async (itemId: string) => {
+    if (!selectedPlanId) return;
+    const item = plan?.items.find((i) => i.id === itemId);
+    if (!item) return;
+    try {
+      await window.cp.plans.addItem({
+        planId: selectedPlanId,
+        kind: item.kind as CpPlanItemKind,
+        title: item.title ?? undefined,
+        content: item.content ?? undefined,
+        notes: item.notes ?? undefined,
+        refId: item.refId ?? undefined,
+        refSubId: item.refSubId ?? undefined,
+        mediaPath: item.mediaPath ?? undefined,
+      });
+      await refreshPlan();
+    } catch {
+      toast.error("Impossible de dupliquer l'élément");
+    }
+  }, [selectedPlanId, plan, refreshPlan]);
 
   const updateItem = useCallback(async (itemId: string, patch: { title?: string; content?: string; notes?: string }) => {
     if (!selectedPlanId) return;
@@ -180,6 +202,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     refreshList,
     refreshPlan,
     addItem,
+    duplicateItem,
     updateItem,
     removeItem,
     removeItems,

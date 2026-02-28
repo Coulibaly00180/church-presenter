@@ -14,7 +14,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ClipboardList, Plus, Trash2 } from "lucide-react";
+import { ClipboardList, Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlan } from "@/hooks/usePlan";
@@ -32,7 +32,7 @@ import { Dashboard } from "./Dashboard";
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
 export function PlanEditor() {
-  const { plan, reorder, loadingPlan, addItem, removeItems } = usePlan();
+  const { plan, reorder, loadingPlan, addItem, duplicateItem, removeItems } = usePlan();
   const { live } = useLive();
   const [activeItem, setActiveItem] = useState<CpPlanItem | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -42,6 +42,7 @@ export function PlanEditor() {
   const [editItemOpen, setEditItemOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
   const toggleItemSelection = useCallback((id: string) => {
     setSelectedItemIds((prev) => {
@@ -57,6 +58,10 @@ export function PlanEditor() {
     setSelectedItemIds(new Set());
     await removeItems(ids);
   }, [selectedItemIds, removeItems]);
+
+  const handleDuplicate = useCallback((id: string) => {
+    void duplicateItem(id);
+  }, [duplicateItem]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -123,9 +128,43 @@ export function PlanEditor() {
 
   const currentCursor = live?.enabled && live.planId === plan.id ? live.cursor : -1;
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredItems = normalizedQuery
+    ? plan.items.filter((item) => {
+        const title = item.title?.toLowerCase() ?? "";
+        const content = item.content?.toLowerCase() ?? "";
+        return title.includes(normalizedQuery) || content.includes(normalizedQuery);
+      })
+    : plan.items;
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <PlanToolbar onAddItem={() => setAddDialogOpen(true)} onPreview={() => setPreviewOpen(true)} />
+
+      {/* Search bar */}
+      {plan.items.length > 0 && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-bg-surface shrink-0">
+          <Search className="h-3.5 w-3.5 text-text-muted shrink-0" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher dans le plan…"
+            className="flex-1 text-xs bg-transparent outline-none text-text-primary placeholder:text-text-muted"
+            aria-label="Rechercher dans le plan"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="text-text-muted hover:text-text-primary"
+              aria-label="Effacer la recherche"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {loadingPlan ? (
         <div className="flex flex-1 items-center justify-center">
@@ -154,36 +193,62 @@ export function PlanEditor() {
       ) : (
         <>
           <ScrollArea className="flex-1">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              modifiers={[restrictToVerticalAxis]}
-              onDragStart={handleDragStart}
-              onDragEnd={(e) => void handleDragEnd(e)}
-            >
-              <SortableContext
-                items={plan.items.map((i) => i.id)}
-                strategy={verticalListSortingStrategy}
+            {normalizedQuery ? (
+              // Search mode: plain list, no DnD
+              <div className="flex flex-col gap-1 p-3">
+                {filteredItems.length === 0 ? (
+                  <p className="text-xs text-text-muted text-center py-6">Aucun résultat pour « {searchQuery} »</p>
+                ) : (
+                  filteredItems.map((item) => {
+                    const originalIndex = plan.items.indexOf(item);
+                    return (
+                      <PlanItemCard
+                        key={item.id}
+                        item={item}
+                        index={originalIndex}
+                        isCurrentLive={originalIndex === currentCursor}
+                        isSelected={selectedItemIds.has(item.id)}
+                        onEdit={handleEdit}
+                        onDuplicate={handleDuplicate}
+                        onToggleSelect={toggleItemSelection}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToVerticalAxis]}
+                onDragStart={handleDragStart}
+                onDragEnd={(e) => void handleDragEnd(e)}
               >
-                <div className="flex flex-col gap-1 p-3">
-                  {plan.items.map((item, index) => (
-                    <PlanItemCard
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      isCurrentLive={index === currentCursor}
-                      isSelected={selectedItemIds.has(item.id)}
-                      onEdit={handleEdit}
-                      onToggleSelect={toggleItemSelection}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
+                <SortableContext
+                  items={plan.items.map((i) => i.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="flex flex-col gap-1 p-3">
+                    {plan.items.map((item, index) => (
+                      <PlanItemCard
+                        key={item.id}
+                        item={item}
+                        index={index}
+                        isCurrentLive={index === currentCursor}
+                        isSelected={selectedItemIds.has(item.id)}
+                        onEdit={handleEdit}
+                        onDuplicate={handleDuplicate}
+                        onToggleSelect={toggleItemSelection}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
 
-              <DragOverlay>
-                {activeItem && <PlanItemCardGhost item={activeItem} />}
-              </DragOverlay>
-            </DndContext>
+                <DragOverlay>
+                  {activeItem && <PlanItemCardGhost item={activeItem} />}
+                </DragOverlay>
+              </DndContext>
+            )}
           </ScrollArea>
 
           {/* Footer — selection mode or normal */}

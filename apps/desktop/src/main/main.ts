@@ -111,6 +111,7 @@ type TemplatesConfig = CpPlanTemplate[];
 
 type ProjectionAppearancePrefs = {
   textScale?: number;
+  titleTextScale?: number;
   textFont?: string;
   textFontPath?: string;
   background?: string;
@@ -120,6 +121,8 @@ type ProjectionAppearancePrefs = {
   backgroundGradientAngle?: number;
   backgroundImage?: string;
   logoPath?: string;
+  logoPosition?: CpProjectionState["logoPosition"];
+  logoOpacity?: number;
   foreground?: string;
   foregroundMode?: CpProjectionState["foregroundMode"];
   foregroundGradientFrom?: string;
@@ -406,6 +409,7 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
   const out: ProjectionAppearancePrefs = {};
 
   if (typeof rec.textScale === "number" && Number.isFinite(rec.textScale)) out.textScale = rec.textScale;
+  if (typeof rec.titleTextScale === "number" && Number.isFinite(rec.titleTextScale)) out.titleTextScale = rec.titleTextScale;
   if (typeof rec.textFont === "string") out.textFont = rec.textFont;
   if (typeof rec.textFontPath === "string") out.textFontPath = rec.textFontPath;
   if (typeof rec.background === "string") out.background = rec.background;
@@ -419,6 +423,8 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
   }
   if (typeof rec.backgroundImage === "string") out.backgroundImage = rec.backgroundImage;
   if (typeof rec.logoPath === "string") out.logoPath = rec.logoPath;
+  if (rec.logoPosition === "bottom-right" || rec.logoPosition === "bottom-left" || rec.logoPosition === "top-right" || rec.logoPosition === "top-left" || rec.logoPosition === "center") out.logoPosition = rec.logoPosition;
+  if (typeof rec.logoOpacity === "number" && Number.isFinite(rec.logoOpacity)) out.logoOpacity = rec.logoOpacity;
   if (typeof rec.foreground === "string") out.foreground = rec.foreground;
   if (rec.foregroundMode === "SOLID" || rec.foregroundMode === "GRADIENT") out.foregroundMode = rec.foregroundMode;
   if (typeof rec.foregroundGradientFrom === "string") out.foregroundGradientFrom = rec.foregroundGradientFrom;
@@ -430,6 +436,7 @@ function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearance
 function pickProjectionAppearancePrefs(state: CpProjectionState): ProjectionAppearancePrefs {
   return {
     textScale: state.textScale,
+    titleTextScale: state.titleTextScale,
     textFont: state.textFont,
     textFontPath: state.textFontPath,
     background: state.background,
@@ -439,6 +446,8 @@ function pickProjectionAppearancePrefs(state: CpProjectionState): ProjectionAppe
     backgroundGradientAngle: state.backgroundGradientAngle,
     backgroundImage: state.backgroundImage,
     logoPath: state.logoPath,
+    logoPosition: state.logoPosition,
+    logoOpacity: state.logoOpacity,
     foreground: state.foreground,
     foregroundMode: state.foregroundMode,
     foregroundGradientFrom: state.foregroundGradientFrom,
@@ -1809,5 +1818,13 @@ ipcMain.handle("live:videoControl", (_evt, rawAction: unknown) => {
   const action: "PLAY" | "PAUSE" = rawAction === "PLAY" ? "PLAY" : "PAUSE";
   (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
     projWins[k]?.webContents.send("live:videoControl", action);
+  });
+});
+
+// Video volume: regie sends 0-1, main broadcasts to all projection windows
+ipcMain.handle("live:videoVolume", (_evt, rawVolume: unknown) => {
+  const volume = typeof rawVolume === "number" ? Math.max(0, Math.min(1, rawVolume)) : 1;
+  (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
+    projWins[k]?.webContents.send("live:videoVolume", volume);
   });
 });
