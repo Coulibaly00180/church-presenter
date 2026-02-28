@@ -64,6 +64,15 @@ export function BibleTab() {
   // always see the latest cursor value and never get stuck repeating the same verse.
   const cursorVerseNumRef = useRef<number | null>(null);
 
+  // Synchronous refs — updated during render so callbacks reading them are always fresh
+  // without needing a useEffect-based ref update (which is async and can cause stale closures).
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const selectedBookRef = useRef(selectedBook);
+  selectedBookRef.current = selectedBook;
+  const selectedChapterRef = useRef(selectedChapter);
+  selectedChapterRef.current = selectedChapter;
+
   // ── Search state ──────────────────────────────────────────────────────────────
   const [translation, setTranslation] = useState("FRLSG");
   const [translations, setTranslations] = useState<TranslationEntry[]>(FALLBACK_TRANSLATIONS);
@@ -183,11 +192,17 @@ export function BibleTab() {
 
   // ── Projection helpers ────────────────────────────────────────────────────────
 
-  /** Project a single verse immediately */
+  /** Project a single verse immediately.
+   * Stable callback (empty deps) — reads live/book/chapter from refs to avoid stale
+   * closures when rapid keypresses fire before React re-renders after a live state update.
+   */
   const handleProjectSingle = useCallback(async (verse: OfflineVerse) => {
-    if (!live?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
-    if (!selectedBook || selectedChapter === null) return;
-    const title = `${selectedBook.name} ${selectedChapter}:${verse.verse}`;
+    const currentLive = liveRef.current;
+    const currentBook = selectedBookRef.current;
+    const currentChapter = selectedChapterRef.current;
+    if (!currentLive?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
+    if (!currentBook || currentChapter === null) return;
+    const title = `${currentBook.name} ${currentChapter}:${verse.verse}`;
     const fakeItem: PlanItem = {
       id: "bible-temp",
       order: 0,
@@ -195,8 +210,8 @@ export function BibleTab() {
       title,
       content: `${verse.verse}. ${verse.text}`,
     };
-    await projectPlanItemToTarget(live.target, fakeItem, live);
-  }, [live, selectedBook, selectedChapter]);
+    await projectPlanItemToTarget(currentLive.target, fakeItem, currentLive);
+  }, []); // stable — reads live/book/chapter from refs
 
   /** Called when user clicks a verse in verse-mode + live: project + select + set cursor */
   const handleVerseClickInVerseMode = useCallback(async (verse: OfflineVerse) => {
@@ -404,7 +419,8 @@ export function BibleTab() {
   }, [addItem, getBookName, translation]);
 
   const handleProjectVerse = useCallback(async (verse: BollsVerse) => {
-    if (!live) { toast.error("Mode Direct inactif"); return; }
+    const currentLive = liveRef.current;
+    if (!currentLive?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
     const bookName = getBookName(verse.book);
     const fakeItem: PlanItem = {
       id: "bible-search-temp",
@@ -413,8 +429,8 @@ export function BibleTab() {
       title: `${bookName} ${verse.chapter}:${verse.verse}`,
       content: `${verse.verse}. ${verse.text}`,
     };
-    await projectPlanItemToTarget(live.target, fakeItem, live);
-  }, [live, getBookName]);
+    await projectPlanItemToTarget(currentLive.target, fakeItem, currentLive);
+  }, [getBookName]); // live removed — read via ref
 
   // ─────────────────────────────────────────────────────────────────────────────
 

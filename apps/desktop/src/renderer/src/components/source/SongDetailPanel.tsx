@@ -43,6 +43,13 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
   const [blockCursor, setBlockCursor] = useState<number | null>(null);
   const blockCursorRef = useRef<number | null>(null);
 
+  // Synchronous refs — updated during render so the keydown callback always reads
+  // fresh values without needing a useEffect-based ref update (which is async).
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const songRef = useRef(song);
+  songRef.current = song;
+
   const loadSong = useCallback(async () => {
     setLoading(true);
     try {
@@ -124,26 +131,34 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
     [live, song],
   );
 
-  /** Move keyboard cursor by dir (+1 next, -1 prev) and project the block. */
+  /** Move keyboard cursor by dir (+1 next, -1 prev) and project the block.
+   * Reads liveRef/songRef so this callback is stable (empty deps) and never
+   * becomes stale when live state updates after each projection.
+   */
   const handleBlockCursorMove = useCallback(
     async (dir: 1 | -1) => {
-      if (!song || !live?.enabled) return;
+      const currentLive = liveRef.current;
+      const currentSong = songRef.current;
+      if (!currentSong || !currentLive?.enabled) return;
       const curIdx = blockCursorRef.current ?? -1;
-      const nextIdx = Math.max(0, Math.min(song.blocks.length - 1, curIdx + dir));
-      const block = song.blocks[nextIdx];
+      const nextIdx = Math.max(0, Math.min(currentSong.blocks.length - 1, curIdx + dir));
+      const block = currentSong.blocks[nextIdx];
       if (!block) return;
-      blockCursorRef.current = nextIdx; // synchronous update — rapid keypresses read correct value
+      blockCursorRef.current = nextIdx; // synchronous — rapid keypresses read correct value
       setBlockCursor(nextIdx);
-      await handleProjectBlock(block);
+      const fakeItem: PlanItem = {
+        id: block.id,
+        order: 0,
+        kind: "SONG_BLOCK",
+        title: currentSong.title,
+        content: block.content,
+        refId: currentSong.id,
+        refSubId: block.id,
+      };
+      await projectPlanItemToTarget(currentLive.target, fakeItem, currentLive);
     },
-    [song, live, handleProjectBlock],
+    [], // stable — reads live/song from refs
   );
-
-  // Stable ref to avoid re-registering keydown listener on every cursor change
-  const handleBlockCursorMoveRef = useRef(handleBlockCursorMove);
-  useEffect(() => {
-    handleBlockCursorMoveRef.current = handleBlockCursorMove;
-  }, [handleBlockCursorMove]);
 
   // Arrow key capture — active when song is loaded and any live mode is on (capture phase)
   useEffect(() => {
@@ -158,16 +173,16 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
       if (e.key === "ArrowRight" || e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
-        void handleBlockCursorMoveRef.current(1);
+        void handleBlockCursorMove(1);
       } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
         e.preventDefault();
         e.stopPropagation();
-        void handleBlockCursorMoveRef.current(-1);
+        void handleBlockCursorMove(-1);
       }
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [song?.id, live?.enabled]); // intentionally omits handleBlockCursorMove — use ref above
+  }, [song?.id, live?.enabled, handleBlockCursorMove]); // handleBlockCursorMove is stable (empty deps)
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden bg-bg-base">
