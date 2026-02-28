@@ -18,12 +18,14 @@ export type PlanItem = {
   songId?: string | null;
   mediaPath?: string | null;
   secondaryContent?: string | null;
+  backgroundConfig?: string | null;
 };
 
 export type Plan = {
   id: string;
   date: string | Date;
   title?: string | null;
+  backgroundConfig?: string | null;
   items: PlanItem[];
 };
 

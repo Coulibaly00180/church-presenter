@@ -4,6 +4,7 @@ import type {
   CpDataImportMode,
   CpDevtoolsTarget,
   CpForegroundFillMode,
+  CpItemBackground,
   CpLogoPosition,
   CpLiveSetPayload,
   CpMediaType,
@@ -139,6 +140,23 @@ function parseSongMeta(value: unknown, label: string): CpSongMeta | undefined {
   };
 }
 
+function parseCpItemBackground(value: unknown): CpItemBackground {
+  const rec = expectRecord(value, "CpItemBackground");
+  const bg: CpItemBackground = {};
+  if (rec.background != null) bg.background = expectString(rec.background, "CpItemBackground.background", { allowEmpty: true });
+  if (rec.backgroundMode != null) bg.backgroundMode = expectEnum(rec.backgroundMode, "CpItemBackground.backgroundMode", BACKGROUND_FILL_MODES);
+  if (rec.backgroundGradientFrom != null) bg.backgroundGradientFrom = expectString(rec.backgroundGradientFrom, "CpItemBackground.backgroundGradientFrom", { allowEmpty: true });
+  if (rec.backgroundGradientTo != null) bg.backgroundGradientTo = expectString(rec.backgroundGradientTo, "CpItemBackground.backgroundGradientTo", { allowEmpty: true });
+  if (rec.backgroundGradientAngle != null) bg.backgroundGradientAngle = expectNumber(rec.backgroundGradientAngle, "CpItemBackground.backgroundGradientAngle");
+  if (rec.backgroundMedia != null) bg.backgroundMedia = expectString(rec.backgroundMedia, "CpItemBackground.backgroundMedia");
+  if (rec.backgroundMediaType != null) bg.backgroundMediaType = expectEnum(rec.backgroundMediaType, "CpItemBackground.backgroundMediaType", ["IMAGE", "VIDEO"] as const);
+  if (rec.foreground != null) bg.foreground = expectString(rec.foreground, "CpItemBackground.foreground", { allowEmpty: true });
+  if (rec.foregroundMode != null) bg.foregroundMode = expectEnum(rec.foregroundMode, "CpItemBackground.foregroundMode", FOREGROUND_FILL_MODES);
+  if (rec.foregroundGradientFrom != null) bg.foregroundGradientFrom = expectString(rec.foregroundGradientFrom, "CpItemBackground.foregroundGradientFrom", { allowEmpty: true });
+  if (rec.foregroundGradientTo != null) bg.foregroundGradientTo = expectString(rec.foregroundGradientTo, "CpItemBackground.foregroundGradientTo", { allowEmpty: true });
+  return bg;
+}
+
 function parseProjectionCurrent(value: unknown, label: string): CpProjectionCurrent {
   const rec = expectRecord(value, label);
   const kind = expectEnum(rec.kind, `${label}.kind`, CURRENT_KINDS);
@@ -270,11 +288,16 @@ export function parseProjectionSetTextPayload(value: unknown): CpProjectionSetTe
         body: String((x as Record<string, unknown>).body),
       }));
   }
+  const backgroundOverride =
+    typeof rec.backgroundOverride === "object" && rec.backgroundOverride !== null
+      ? parseCpItemBackground(rec.backgroundOverride)
+      : undefined;
   return {
     title: expectOptionalString(rec.title, "projection:setContentText.title", { trim: false, allowEmpty: true }),
     body: expectString(rec.body, "projection:setContentText.body", { trim: false, allowEmpty: true }),
     metaSong: parseSongMeta(rec.metaSong, "projection:setContentText.metaSong"),
     secondaryTexts,
+    backgroundOverride,
   };
 }
 
@@ -402,6 +425,7 @@ export function parsePlanUpdatePayload(value: unknown): CpPlanUpdatePayload {
   return {
     planId: expectString(rec.planId, "plans:update.planId"),
     title: expectOptionalString(rec.title, "plans:update.title"),
+    backgroundConfig: rec.backgroundConfig === null ? null : expectOptionalString(rec.backgroundConfig, "plans:update.backgroundConfig", { trim: false, allowEmpty: true }),
   };
 }
 
@@ -414,6 +438,7 @@ export function parsePlanUpdateItemPayload(value: unknown): CpPlanUpdateItemPayl
     content: expectOptionalString(rec.content, "plans:updateItem.content", { trim: false, allowEmpty: true }),
     notes: expectOptionalString(rec.notes, "plans:updateItem.notes", { trim: false, allowEmpty: true }),
     secondaryContent: expectOptionalString(rec.secondaryContent, "plans:updateItem.secondaryContent", { trim: false, allowEmpty: true }),
+    backgroundConfig: rec.backgroundConfig === null ? null : expectOptionalString(rec.backgroundConfig, "plans:updateItem.backgroundConfig", { trim: false, allowEmpty: true }),
   };
 }
 
@@ -429,6 +454,7 @@ export function parsePlanAddItemPayload(value: unknown): CpPlanAddItemPayload {
     refSubId: expectOptionalString(rec.refSubId, "plans:addItem.refSubId"),
     mediaPath: expectOptionalString(rec.mediaPath, "plans:addItem.mediaPath"),
     secondaryContent: expectOptionalString(rec.secondaryContent, "plans:addItem.secondaryContent", { trim: false, allowEmpty: true }),
+    backgroundConfig: expectOptionalString(rec.backgroundConfig, "plans:addItem.backgroundConfig", { trim: false, allowEmpty: true }),
   };
 }
 

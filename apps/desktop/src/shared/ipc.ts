@@ -13,6 +13,20 @@ export type CpTheme = "light" | "dark";
 export type CpSongMeta = { title?: string; artist?: string; album?: string; year?: string };
 export type CpWindowState = { isOpen: boolean };
 
+export type CpItemBackground = {
+  background?: string;
+  backgroundMode?: CpBackgroundFillMode;
+  backgroundGradientFrom?: string;
+  backgroundGradientTo?: string;
+  backgroundGradientAngle?: number;
+  backgroundMedia?: string;          // absolute path to IMAGE or VIDEO file in media library
+  backgroundMediaType?: "IMAGE" | "VIDEO";
+  foreground?: string;
+  foregroundMode?: CpForegroundFillMode;
+  foregroundGradientFrom?: string;
+  foregroundGradientTo?: string;
+};
+
 export type CpProjectionCurrent = {
   kind: "EMPTY" | "TEXT" | "MEDIA";
   title?: string;
@@ -21,6 +35,7 @@ export type CpProjectionCurrent = {
   mediaType?: CpMediaType;
   metaSong?: CpSongMeta;
   secondaryTexts?: Array<{ label: string; body: string }>;
+  backgroundOverride?: CpItemBackground;
 };
 
 export type CpProjectionState = {
@@ -153,6 +168,7 @@ export type CpPlanItem = {
   refSubId?: string | null;
   mediaPath?: string | null;
   secondaryContent?: string | null;
+  backgroundConfig?: string | null;
   updatedAt?: string | Date;
   createdAt?: string | Date;
 };
@@ -168,6 +184,7 @@ export type CpPlan = {
   id: string;
   date: string | Date;
   title?: string | null;
+  backgroundConfig?: string | null;
   items: CpPlanItem[];
   updatedAt?: string | Date;
   createdAt?: string | Date;
@@ -183,13 +200,14 @@ export type CpPlanAddItemPayload = {
   refSubId?: string;
   mediaPath?: string;
   secondaryContent?: string;
+  backgroundConfig?: string;
 };
 
 export type CpPlanDuplicatePayload = { planId: string; dateIso?: string; title?: string };
 export type CpPlanCreatePayload = { dateIso: string; title?: string };
-export type CpPlanUpdatePayload = { planId: string; title?: string };
+export type CpPlanUpdatePayload = { planId: string; title?: string; backgroundConfig?: string | null };
 export type CpPlanUpdateResult = { ok: true };
-export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string; notes?: string; secondaryContent?: string };
+export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string; notes?: string; secondaryContent?: string | null; backgroundConfig?: string | null };
 export type CpPlanUpdateItemResult = { ok: true };
 export type CpPlanRemoveItemPayload = { planId: string; itemId: string };
 export type CpPlanReorderPayload = { planId: string; orderedItemIds: string[] };
@@ -321,7 +339,7 @@ export type CpProjectionSetAppearancePayload = {
   foregroundGradientTo?: string;
   foreground?: string;
 };
-export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta; secondaryTexts?: Array<{ label: string; body: string }> };
+export type CpProjectionSetTextPayload = { title?: string; body: string; metaSong?: CpSongMeta; secondaryTexts?: Array<{ label: string; body: string }>; backgroundOverride?: CpItemBackground };
 export type CpProjectionSetMediaPayload = { title?: string; mediaPath: string; mediaType: CpMediaType };
 export type CpLiveSetPayload = {
   planId?: string | null;

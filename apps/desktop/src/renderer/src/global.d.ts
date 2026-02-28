@@ -15,6 +15,7 @@ declare global {
   type CpSongMeta = Shared.CpSongMeta;
   type CpWindowState = Shared.CpWindowState;
 
+  type CpItemBackground = Shared.CpItemBackground;
   type CpProjectionCurrent = Shared.CpProjectionCurrent;
   type CpProjectionState = Shared.CpProjectionState;
   type CpScreenMeta = Shared.CpScreenMeta;
