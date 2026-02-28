@@ -1803,3 +1803,11 @@ ipcMain.handle("live:freeNavigate", (_evt, rawDir: unknown) => {
   const dir: 1 | -1 = rawDir === 1 ? 1 : -1;
   regieWin?.webContents.send("live:freeNavigate", dir);
 });
+
+// Video control: regie sends PLAY/PAUSE, main broadcasts to all projection windows
+ipcMain.handle("live:videoControl", (_evt, rawAction: unknown) => {
+  const action: "PLAY" | "PAUSE" = rawAction === "PLAY" ? "PLAY" : "PAUSE";
+  (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
+    projWins[k]?.webContents.send("live:videoControl", action);
+  });
+});

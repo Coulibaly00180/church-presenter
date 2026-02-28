@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { Check, GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KindBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,9 @@ interface PlanItemCardProps {
   item: CpPlanItem;
   index: number;
   isCurrentLive?: boolean;
+  isSelected?: boolean;
   onEdit?: (item: CpPlanItem) => void;
+  onToggleSelect?: (id: string) => void;
 }
 
 /** Returns a short subtitle describing the item content. */
@@ -42,7 +44,7 @@ function getItemSubtitle(item: CpPlanItem): string | null {
   }
 }
 
-export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: PlanItemCardProps) {
+export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onToggleSelect }: PlanItemCardProps) {
   const { live } = useLive();
   const { removeItem } = usePlan();
 
@@ -94,17 +96,35 @@ export function PlanItemCard({ item, index, isCurrentLive = false, onEdit }: Pla
         if (e.key === "Enter" || e.key === " ") void handleClick();
       }}
     >
-      {/* Drag handle — hidden until hover */}
-      <button
-        {...attributes}
-        {...listeners}
-        className="flex items-center justify-center h-6 w-4 text-text-muted opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing shrink-0 focus:outline-none transition-opacity"
-        aria-label="Déplacer"
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
+      {/* Drag handle — hidden until hover; replaced by checkbox when onToggleSelect provided */}
+      {onToggleSelect ? (
+        <button
+          type="button"
+          className={cn(
+            "flex items-center justify-center h-5 w-5 rounded border shrink-0 transition-all focus:outline-none",
+            "opacity-0 group-hover:opacity-100",
+            isSelected
+              ? "opacity-100 bg-primary border-primary text-white"
+              : "border-border bg-transparent text-transparent hover:border-text-muted",
+          )}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect(item.id); }}
+          aria-label={isSelected ? "Désélectionner" : "Sélectionner"}
+          tabIndex={-1}
+        >
+          {isSelected && <Check className="h-3 w-3" />}
+        </button>
+      ) : (
+        <button
+          {...attributes}
+          {...listeners}
+          className="flex items-center justify-center h-6 w-4 text-text-muted opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing shrink-0 focus:outline-none transition-opacity"
+          aria-label="Déplacer"
+          tabIndex={-1}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+      )}
 
       {/* Position index */}
       <span className="text-[11px] text-text-muted tabular-nums w-4 text-right shrink-0">

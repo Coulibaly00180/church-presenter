@@ -171,6 +171,12 @@ const cpApi: CpApi = {
       ipcRenderer.on("live:freeNavigate", handler);
       return () => ipcRenderer.removeListener("live:freeNavigate", handler);
     },
+    videoControl: (action: "PLAY" | "PAUSE") => ipcRenderer.invoke("live:videoControl", action),
+    onVideoControl: (cb: (action: "PLAY" | "PAUSE") => void) => {
+      const handler = (_: unknown, action: "PLAY" | "PAUSE") => cb(action);
+      ipcRenderer.on("live:videoControl", handler);
+      return () => ipcRenderer.removeListener("live:videoControl", handler);
+    },
   },
 
   sync: {

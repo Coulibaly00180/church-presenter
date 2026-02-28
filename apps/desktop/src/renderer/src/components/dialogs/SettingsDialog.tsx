@@ -42,6 +42,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
 
   // Projection — text scale + logo
   const [textScale, setTextScale] = useState(1);
+  const [titleTextScale, setTitleTextScale] = useState(1);
   const [logoPath, setLogoPath] = useState("");
   const [logoPosition, setLogoPosition] = useState<CpLogoPosition>("bottom-right");
   const [logoOpacity, setLogoOpacity] = useState(80);
@@ -75,6 +76,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       setTextFontPath(state.textFontPath ?? "");
       setTextFontLabel(state.textFontPath ? state.textFontPath.split(/[\\/]/).pop() ?? "" : "");
       setTextScale(state.textScale ?? 1);
+      setTitleTextScale(state.titleTextScale ?? state.textScale ?? 1);
       setLogoPath(state.logoPath ?? "");
       setLogoPosition((state.logoPosition as CpLogoPosition) ?? "bottom-right");
       setLogoOpacity(state.logoOpacity ?? 80);
@@ -105,12 +107,13 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       textFont,
       textFontPath,
       textScale,
+      titleTextScale,
       logoPath,
       logoPosition,
       logoOpacity,
     });
     toast.success("Apparence de projection appliquée");
-  }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textFont, textFontPath, textScale, logoPath, logoPosition, logoOpacity]);
+  }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textFont, textFontPath, textScale, titleTextScale, logoPath, logoPosition, logoOpacity]);
 
   const handlePickLogo = useCallback(async () => {
     const result = await window.cp.files.pickMedia();
@@ -488,20 +491,43 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   )}
                 </div>
 
-                {/* Size slider */}
+                {/* Body text size slider */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-text-secondary">Taille du texte</label>
+                    <label className="text-xs font-medium text-text-secondary">Taille du corps (centre)</label>
                     <span className="text-xs text-text-muted tabular-nums">{Math.round(textScale * 100)}%</span>
                   </div>
                   <input
                     type="range"
-                    aria-label="Taille du texte"
+                    aria-label="Taille du corps"
                     min={0.5}
                     max={2}
                     step={0.05}
                     value={textScale}
                     onChange={(e) => setTextScale(Number(e.target.value))}
+                    className="w-full accent-primary"
+                  />
+                  <div className="flex justify-between text-[10px] text-text-muted">
+                    <span>50%</span>
+                    <span>100%</span>
+                    <span>200%</span>
+                  </div>
+                </div>
+
+                {/* Title text size slider */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-text-secondary">Taille du titre (haut gauche)</label>
+                    <span className="text-xs text-text-muted tabular-nums">{Math.round(titleTextScale * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    aria-label="Taille du titre"
+                    min={0.5}
+                    max={2}
+                    step={0.05}
+                    value={titleTextScale}
+                    onChange={(e) => setTitleTextScale(Number(e.target.value))}
                     className="w-full accent-primary"
                   />
                   <div className="flex justify-between text-[10px] text-text-muted">

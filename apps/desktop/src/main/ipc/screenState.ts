@@ -158,6 +158,7 @@ export function setAppearance(
   ctx.screenStates[key] = {
     ...ctx.screenStates[key],
     textScale: patch.textScale ?? ctx.screenStates[key].textScale ?? 1,
+    titleTextScale: patch.titleTextScale !== undefined ? patch.titleTextScale : ctx.screenStates[key].titleTextScale,
     textFont: patch.textFont ?? ctx.screenStates[key].textFont ?? "system-ui",
     textFontPath: patch.textFontPath ?? ctx.screenStates[key].textFontPath ?? "",
     background: patch.background ?? ctx.screenStates[key].background ?? "#050505",

@@ -13,7 +13,7 @@ interface MediaPreviewDialogProps {
 export function MediaPreviewDialog({ file, onClose }: MediaPreviewDialogProps) {
   return (
     <Dialog open={!!file} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-[92vw] w-[92vw] h-[90vh] p-0 flex flex-col gap-0">
+      <DialogContent showClose={false} className="max-w-[92vw] w-[92vw] h-[90vh] p-0 flex flex-col gap-0">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
           <span className="text-sm font-medium text-text-primary truncate">

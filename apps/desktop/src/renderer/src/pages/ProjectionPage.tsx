@@ -102,6 +102,7 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
   }
 
   const scaleFactor = state.textScale ?? 1;
+  const titleScaleFactor = state.titleTextScale ?? scaleFactor;
 
   const isGradientFg = state.foregroundMode === "GRADIENT" && state.foregroundGradientFrom && state.foregroundGradientTo;
   const fgGradientStyle = isGradientFg
@@ -134,7 +135,7 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
         <div className="absolute top-6 left-8 z-10 max-w-[60%]">
           <h2
             className="font-semibold leading-snug opacity-75"
-            ref={(el) => applyFgStyle(el, Math.round(22 * scaleFactor))}
+            ref={(el) => applyFgStyle(el, Math.round(22 * titleScaleFactor))}
           >
             {current.title}
           </h2>
@@ -157,6 +158,17 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
 
 function MediaContent({ state }: { state: ProjectionState }) {
   const { current } = state;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Listen for play/pause commands from the control window
+  useEffect(() => {
+    const unsub = window.cp.live.onVideoControl((action) => {
+      if (action === "PLAY") void videoRef.current?.play();
+      else videoRef.current?.pause();
+    });
+    return unsub;
+  }, []);
+
   if (!current.mediaPath) return null;
 
   if (current.mediaType === "IMAGE") {
@@ -172,6 +184,7 @@ function MediaContent({ state }: { state: ProjectionState }) {
   if (current.mediaType === "VIDEO") {
     return (
       <video
+        ref={videoRef}
         src={`file://${current.mediaPath}`}
         className="w-full h-full object-contain"
         autoPlay

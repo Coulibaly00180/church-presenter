@@ -14,7 +14,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ClipboardList, Plus } from "lucide-react";
+import { ClipboardList, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlan } from "@/hooks/usePlan";
@@ -32,7 +32,7 @@ import { Dashboard } from "./Dashboard";
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
 export function PlanEditor() {
-  const { plan, reorder, loadingPlan, addItem } = usePlan();
+  const { plan, reorder, loadingPlan, addItem, removeItems } = usePlan();
   const { live } = useLive();
   const [activeItem, setActiveItem] = useState<CpPlanItem | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -41,6 +41,22 @@ export function PlanEditor() {
   const [editItem, setEditItem] = useState<CpPlanItem | null>(null);
   const [editItemOpen, setEditItemOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+
+  const toggleItemSelection = useCallback((id: string) => {
+    setSelectedItemIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleBatchDelete = useCallback(async () => {
+    const ids = [...selectedItemIds];
+    setSelectedItemIds(new Set());
+    await removeItems(ids);
+  }, [selectedItemIds, removeItems]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -156,7 +172,9 @@ export function PlanEditor() {
                       item={item}
                       index={index}
                       isCurrentLive={index === currentCursor}
+                      isSelected={selectedItemIds.has(item.id)}
                       onEdit={handleEdit}
+                      onToggleSelect={toggleItemSelection}
                     />
                   ))}
                 </div>
@@ -168,21 +186,48 @@ export function PlanEditor() {
             </DndContext>
           </ScrollArea>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-bg-surface shrink-0">
-            <span className="text-xs text-text-muted">
-              {plan.items.length} élément{plan.items.length !== 1 ? "s" : ""}
-            </span>
-            <Button
-              variant="ghost"
-              size="xs"
-              className="gap-1 text-text-secondary"
-              onClick={() => setAddDialogOpen(true)}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Ajouter
-            </Button>
-          </div>
+          {/* Footer — selection mode or normal */}
+          {selectedItemIds.size > 0 ? (
+            <div className="flex items-center justify-between px-4 py-2 border-t border-danger/30 bg-danger/5 shrink-0">
+              <span className="text-xs text-danger font-medium">
+                {selectedItemIds.size} élément{selectedItemIds.size > 1 ? "s" : ""} sélectionné{selectedItemIds.size > 1 ? "s" : ""}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="text-text-secondary"
+                  onClick={() => setSelectedItemIds(new Set())}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="xs"
+                  className="gap-1"
+                  onClick={() => void handleBatchDelete()}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  Supprimer
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-bg-surface shrink-0">
+              <span className="text-xs text-text-muted">
+                {plan.items.length} élément{plan.items.length !== 1 ? "s" : ""}
+              </span>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="gap-1 text-text-secondary"
+                onClick={() => setAddDialogOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Ajouter
+              </Button>
+            </div>
+          )}
         </>
       )}
 

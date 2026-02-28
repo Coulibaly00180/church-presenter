@@ -13,6 +13,7 @@ interface PlanContextValue {
   addItem: (payload: Omit<CpPlanAddItemPayload, "planId">) => Promise<CpPlanItem | null>;
   updateItem: (itemId: string, patch: { title?: string; content?: string; notes?: string }) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
+  removeItems: (itemIds: string[]) => Promise<void>;
   reorder: (orderedItemIds: string[]) => Promise<void>;
   createPlan: (payload: CpPlanCreatePayload) => Promise<CpPlan | null>;
   updatePlan: (title: string) => Promise<void>;
@@ -92,11 +93,28 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
 
   const removeItem = useCallback(async (itemId: string) => {
     if (!selectedPlanId) return;
+    // Optimistic update — remove immediately so ScrollArea doesn't reset scroll
+    setPlan((prev) => prev ? { ...prev, items: prev.items.filter((i) => i.id !== itemId) } : prev);
     try {
       await window.cp.plans.removeItem({ planId: selectedPlanId, itemId });
-      await refreshPlan();
     } catch {
       toast.error("Impossible de supprimer l'élément");
+      await refreshPlan(); // rollback on error
+    }
+  }, [selectedPlanId, refreshPlan]);
+
+  const removeItems = useCallback(async (itemIds: string[]) => {
+    if (!selectedPlanId || itemIds.length === 0) return;
+    const idSet = new Set(itemIds);
+    // Optimistic update — remove all at once
+    setPlan((prev) => prev ? { ...prev, items: prev.items.filter((i) => !idSet.has(i.id)) } : prev);
+    try {
+      for (const itemId of itemIds) {
+        await window.cp.plans.removeItem({ planId: selectedPlanId, itemId });
+      }
+    } catch {
+      toast.error("Impossible de supprimer les éléments");
+      await refreshPlan(); // rollback on error
     }
   }, [selectedPlanId, refreshPlan]);
 
@@ -164,6 +182,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     addItem,
     updateItem,
     removeItem,
+    removeItems,
     reorder,
     createPlan,
     updatePlan,

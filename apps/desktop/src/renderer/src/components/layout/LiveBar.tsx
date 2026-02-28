@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Circle, Clock, Monitor, MoonStar, Play, Square, Sun, X } from "lucide-react";
+import { Circle, Clock, Monitor, MoonStar, Pause, Play, Square, Sun, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SlidePreview } from "@/components/live/SlidePreview";
@@ -77,6 +77,22 @@ export function LiveBar() {
     const id = setInterval(calc, 250);
     return () => clearInterval(id);
   }, [currentState]);
+
+  // Video play/pause state — starts as playing (videos autoPlay)
+  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+
+  // Reset to playing when a new video starts
+  useEffect(() => {
+    if (currentState?.current?.mediaType === "VIDEO") {
+      setIsVideoPlaying(true);
+    }
+  }, [currentState?.current?.mediaPath]);
+
+  const handleVideoToggle = useCallback(async () => {
+    const next = !isVideoPlaying;
+    setIsVideoPlaying(next);
+    await window.cp.live.videoControl(next ? "PLAY" : "PAUSE");
+  }, [isVideoPlaying]);
 
   // Load projection states
   useEffect(() => {
@@ -223,6 +239,20 @@ export function LiveBar() {
             </Button>
           )}
         </div>
+
+        {/* Video play/pause — shown when a video is currently projected */}
+        {currentState?.current?.mediaType === "VIDEO" && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => void handleVideoToggle()}
+            className="gap-1 ml-2"
+            aria-label={isVideoPlaying ? "Mettre en pause la vidéo" : "Lire la vidéo"}
+          >
+            {isVideoPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+            {isVideoPlaying ? "Pause" : "Lire"}
+          </Button>
+        )}
 
         {/* Auto-advance — plan mode only */}
         {isPlanMode && (

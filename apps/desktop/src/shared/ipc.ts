@@ -27,6 +27,7 @@ export type CpProjectionState = {
   lowerThirdEnabled: boolean;
   transitionEnabled: boolean;
   textScale: number;
+  titleTextScale?: number;
   textFont: string;
   textFontPath?: string;
   background: string;
@@ -299,6 +300,7 @@ export type CpSettingsProfileDeleteResult = { ok: true; snapshot: CpSettingsProf
 
 export type CpProjectionSetAppearancePayload = {
   textScale?: number;
+  titleTextScale?: number;
   textFont?: string;
   textFontPath?: string;
   background?: string;
@@ -453,6 +455,9 @@ export interface CpApi {
     /** Free mode: called from projection window to forward arrow navigation to regie window */
     freeNavigate: (dir: 1 | -1) => Promise<void>;
     onFreeNavigate: (cb: (dir: 1 | -1) => void) => () => void;
+    /** Video control: regie sends PLAY/PAUSE; projection windows receive via onVideoControl */
+    videoControl: (action: "PLAY" | "PAUSE") => Promise<void>;
+    onVideoControl: (cb: (action: "PLAY" | "PAUSE") => void) => () => void;
   };
   sync: {
     start: (port?: number) => Promise<CpSyncStartResult>;

@@ -237,6 +237,7 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
   const patch: CpProjectionSetAppearancePayload = {};
 
   if (rec.textScale !== undefined) patch.textScale = expectNumber(rec.textScale, "projection:setAppearance.textScale");
+  if (rec.titleTextScale !== undefined) patch.titleTextScale = expectNumber(rec.titleTextScale, "projection:setAppearance.titleTextScale");
   if (rec.textFont !== undefined) patch.textFont = expectString(rec.textFont, "projection:setAppearance.textFont");
   if (rec.textFontPath !== undefined) patch.textFontPath = expectString(rec.textFontPath, "projection:setAppearance.textFontPath", { allowEmpty: true });
   if (rec.background !== undefined) patch.background = expectString(rec.background, "projection:setAppearance.background");
