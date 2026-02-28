@@ -1,6 +1,7 @@
 import { projectMediaToScreen, projectTextToScreen } from "../projection/target";
 import { getPlanKindDefaultTitle, isPlanKindBible } from "./planKinds";
 import { LiveState, PlanItem, ScreenKey } from "./types";
+import type { CpItemBackground } from "../../../shared/ipc";
 
 function formatBibleTitle(item: PlanItem): string {
   const rawTitle = (item.title || "").trim();
@@ -27,9 +28,18 @@ function formatForProjection(item: PlanItem) {
   };
 }
 
-export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem, live: LiveState | null) {
+export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem, live: LiveState | null, planBackground?: CpItemBackground) {
   const { title, body } = formatForProjection(item);
   const lockedScreens = live?.lockedScreens;
+
+  const itemBg = (() => {
+    if (!item.backgroundConfig) return undefined;
+    try { return JSON.parse(item.backgroundConfig) as CpItemBackground; }
+    catch { return undefined; }
+  })();
+  const backgroundOverride: CpItemBackground | undefined =
+    (planBackground || itemBg) ? { ...planBackground, ...itemBg } : undefined;
+
   if (item.kind === "ANNOUNCEMENT_IMAGE" && item.mediaPath) {
     await projectMediaToScreen({ target, title, mediaPath: item.mediaPath, mediaType: "IMAGE", lockedScreens });
     return;
@@ -51,5 +61,5 @@ export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem,
     try { return JSON.parse(item.secondaryContent) as Array<{ label: string; body: string }>; }
     catch { return undefined; }
   })();
-  await projectTextToScreen({ target, title, body, secondaryTexts, lockedScreens });
+  await projectTextToScreen({ target, title, body, secondaryTexts, backgroundOverride, lockedScreens });
 }

@@ -14,6 +14,7 @@ import { getPlanKindDefaultTitle } from "@/lib/planKinds";
 import { estimateItemDurationSeconds, formatMinutes } from "@/lib/planDuration";
 import { cn } from "@/lib/utils";
 import type { PlanItem } from "@/lib/types";
+import type { CpItemBackground } from "../../../../shared/ipc";
 
 export function LiveBar() {
   const { live, toggle, toggleBlack, toggleWhite, resume } = useLive();
@@ -133,9 +134,14 @@ export function LiveBar() {
   const handleItemClick = useCallback(async (item: CpPlanItem, index: number) => {
     await window.cp.live.setCursor(index);
     if (live) {
-      await projectPlanItemToTarget(live.target, item as PlanItem, live);
+      const planBg = (() => {
+        if (!plan?.backgroundConfig) return undefined;
+        try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
+        catch { return undefined; }
+      })();
+      await projectPlanItemToTarget(live.target, item as PlanItem, live, planBg);
     }
-  }, [live]);
+  }, [live, plan]);
 
   const handleNavigate = useCallback(async (dir: 1 | -1) => {
     const currentCursor = live?.cursor ?? 0;
@@ -146,7 +152,12 @@ export function LiveBar() {
     else await window.cp.live.prev();
     const item = plan?.items[nextCursor];
     if (item && live) {
-      await projectPlanItemToTarget(live.target, item as PlanItem, live);
+      const planBg = (() => {
+        if (!plan?.backgroundConfig) return undefined;
+        try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
+        catch { return undefined; }
+      })();
+      await projectPlanItemToTarget(live.target, item as PlanItem, live, planBg);
     } else {
       console.warn("[live] navigate: no item or no live state", { item: !!item, live: !!live, nextCursor });
     }

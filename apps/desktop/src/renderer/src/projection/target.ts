@@ -10,6 +10,7 @@ type TextProjectionPayload = ProjectionTargetOptions & {
   body: string;
   metaSong?: CpSongMeta;
   secondaryTexts?: Array<{ label: string; body: string }>;
+  backgroundOverride?: CpItemBackground;
 };
 
 type MediaProjectionPayload = ProjectionTargetOptions & {
@@ -45,25 +46,25 @@ async function resolveProjectionTarget(options: ProjectionTargetOptions): Promis
 }
 
 export async function projectTextToScreen(payload: TextProjectionPayload) {
-  const { title, body, metaSong, secondaryTexts, target, lockedScreens } = payload;
+  const { title, body, metaSong, secondaryTexts, backgroundOverride, target, lockedScreens } = payload;
   const route = await resolveProjectionTarget({ target, lockedScreens });
   if (route.skip) return;
 
   if (route.destination === "A" || !route.screensApi) {
-    await window.cp.projection.setContentText({ title, body, metaSong, secondaryTexts });
+    await window.cp.projection.setContentText({ title, body, metaSong, secondaryTexts, backgroundOverride });
     return;
   }
 
-  const res = await route.screensApi.setContentText(route.destination, { title, body, metaSong, secondaryTexts });
+  const res = await route.screensApi.setContentText(route.destination, { title, body, metaSong, secondaryTexts, backgroundOverride });
   if (!res.ok && res.reason === "MIRROR") {
     const list = await route.screensApi.list();
     const meta = list.find((screen) => screen.key === target);
     const fallback = resolveProjectionDestination(target, meta);
     if (fallback === "A") {
-      await window.cp.projection.setContentText({ title, body, metaSong, secondaryTexts });
+      await window.cp.projection.setContentText({ title, body, metaSong, secondaryTexts, backgroundOverride });
       return;
     }
-    await route.screensApi.setContentText(fallback, { title, body, metaSong, secondaryTexts });
+    await route.screensApi.setContentText(fallback, { title, body, metaSong, secondaryTexts, backgroundOverride });
   }
 }
 

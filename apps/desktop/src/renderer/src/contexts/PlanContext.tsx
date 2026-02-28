@@ -12,7 +12,7 @@ interface PlanContextValue {
   refreshPlan: () => Promise<void>;
   addItem: (payload: Omit<CpPlanAddItemPayload, "planId">) => Promise<CpPlanItem | null>;
   duplicateItem: (itemId: string) => Promise<void>;
-  updateItem: (itemId: string, patch: { title?: string; content?: string; notes?: string }) => Promise<void>;
+  updateItem: (itemId: string, patch: { title?: string; content?: string; notes?: string; secondaryContent?: string | null; backgroundConfig?: string | null }) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   removeItems: (itemIds: string[]) => Promise<void>;
   reorder: (orderedItemIds: string[]) => Promise<void>;
@@ -103,7 +103,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedPlanId, plan, refreshPlan]);
 
-  const updateItem = useCallback(async (itemId: string, patch: { title?: string; content?: string; notes?: string }) => {
+  const updateItem = useCallback(async (itemId: string, patch: { title?: string; content?: string; notes?: string; secondaryContent?: string | null; backgroundConfig?: string | null }) => {
     if (!selectedPlanId) return;
     try {
       await window.cp.plans.updateItem({ planId: selectedPlanId, itemId, ...patch });

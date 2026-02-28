@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, Copy, GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { Check, Copy, FileImage, FileVideo, GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KindBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ function getItemSubtitle(item: CpPlanItem): string | null {
 
 export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onToggleSelect, onDuplicate }: PlanItemCardProps) {
   const { live } = useLive();
-  const { removeItem } = usePlan();
+  const { plan, removeItem } = usePlan();
 
   const {
     attributes,
@@ -63,8 +63,13 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
 
   const handleClick = useCallback(async () => {
     if (!live) return;
-    await projectPlanItemToTarget(live.target, item as import("@/lib/types").PlanItem, live);
-  }, [item, live]);
+    const planBg = (() => {
+      if (!plan?.backgroundConfig) return undefined;
+      try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
+      catch { return undefined; }
+    })();
+    await projectPlanItemToTarget(live.target, item as import("@/lib/types").PlanItem, live, planBg);
+  }, [item, live, plan]);
 
   const handleRemove = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -139,6 +144,14 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
 
       {/* Kind badge */}
       <KindBadge kind={item.kind as CpPlanItemKind} className="shrink-0" />
+      {item.backgroundConfig && (() => {
+        try {
+          const bg = JSON.parse(item.backgroundConfig) as CpItemBackground;
+          if (bg.backgroundMediaType === "VIDEO") return <FileVideo className="h-3 w-3 shrink-0 text-text-muted" />;
+          if (bg.backgroundMediaType === "IMAGE") return <FileImage className="h-3 w-3 shrink-0 text-text-muted" />;
+          return <span className="w-2 h-2 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: bg.background ?? bg.backgroundGradientFrom ?? "#888" }} />;
+        } catch { return null; }
+      })()}
 
       {/* Title + subtitle + notes indicator */}
       <div className="flex flex-col flex-1 min-w-0 py-2">

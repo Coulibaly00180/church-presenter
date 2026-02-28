@@ -104,9 +104,14 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
   const scaleFactor = state.textScale ?? 1;
   const titleScaleFactor = state.titleTextScale ?? scaleFactor;
 
-  const isGradientFg = state.foregroundMode === "GRADIENT" && state.foregroundGradientFrom && state.foregroundGradientTo;
+  const fgOverride = current.backgroundOverride;
+  const effectiveFgMode = fgOverride?.foregroundMode ?? state.foregroundMode;
+  const effectiveFgFrom = fgOverride?.foregroundGradientFrom ?? state.foregroundGradientFrom;
+  const effectiveFgTo = fgOverride?.foregroundGradientTo ?? state.foregroundGradientTo;
+  const effectiveFg = fgOverride?.foreground ?? state.foreground ?? "#ffffff";
+  const isGradientFg = effectiveFgMode === "GRADIENT" && effectiveFgFrom && effectiveFgTo;
   const fgGradientStyle = isGradientFg
-    ? `linear-gradient(90deg, ${state.foregroundGradientFrom}, ${state.foregroundGradientTo})`
+    ? `linear-gradient(90deg, ${effectiveFgFrom}, ${effectiveFgTo})`
     : null;
 
   const applyFgStyle = (el: HTMLElement | null, fontSize: number) => {
@@ -124,7 +129,7 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
       el.style.webkitBackgroundClip = "";
       el.style.webkitTextFillColor = "";
       el.style.backgroundClip = "";
-      el.style.color = state.foreground ?? "#ffffff";
+      el.style.color = effectiveFg;
     }
   };
 
@@ -141,11 +146,11 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
     const separatorColor = `${(state.foreground ?? "#ffffff")}30`;
 
     return (
-      <div className="flex flex-col w-full h-full">
+      <div className="flex flex-col w-full h-full items-stretch justify-center">
         {allVersions.map((version, i) => (
           <div
             key={i}
-            className="flex flex-col justify-center px-12 py-2 flex-1"
+            className="flex flex-col px-12 py-4"
             style={{ borderTop: i > 0 ? `1px solid ${separatorColor}` : undefined }}
           >
             {version.label && (
@@ -270,13 +275,51 @@ function ProjectionContent({ state, onTimerExpired }: { state: ProjectionState; 
     bgStyle.backgroundColor = state.background ?? "#000000";
   }
 
+  // Per-item background override (transitoire — only active while current item has one)
+  const bgOverride = (current.kind === "TEXT" || current.kind === "MEDIA") ? current.backgroundOverride : undefined;
+  const bgOverrideIsMedia = bgOverride?.backgroundMedia && bgOverride?.backgroundMediaType;
+  if (bgOverride && !bgOverrideIsMedia) {
+    if (bgOverride.backgroundMode === "GRADIENT_LINEAR" && bgOverride.backgroundGradientFrom && bgOverride.backgroundGradientTo) {
+      bgStyle.background = `linear-gradient(${bgOverride.backgroundGradientAngle ?? 180}deg, ${bgOverride.backgroundGradientFrom}, ${bgOverride.backgroundGradientTo})`;
+      bgStyle.backgroundColor = undefined;
+    } else if (bgOverride.backgroundMode === "GRADIENT_RADIAL" && bgOverride.backgroundGradientFrom && bgOverride.backgroundGradientTo) {
+      bgStyle.background = `radial-gradient(circle, ${bgOverride.backgroundGradientFrom}, ${bgOverride.backgroundGradientTo})`;
+      bgStyle.backgroundColor = undefined;
+    } else if (bgOverride.background) {
+      bgStyle.background = undefined;
+      bgStyle.backgroundColor = bgOverride.background;
+    }
+  }
+
   return (
     <div className="relative w-full h-full overflow-hidden" style={bgStyle}>
-      {/* Background image */}
-      {state.backgroundImage && (
+      {/* Background image — suppressed when item has a background override */}
+      {state.backgroundImage && !bgOverride && (
         <img
           src={`file://${state.backgroundImage}`}
           alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+
+      {/* Per-item media background (image or looping video) */}
+      {bgOverrideIsMedia && bgOverride.backgroundMediaType === "IMAGE" && (
+        <img
+          src={`file://${bgOverride.backgroundMedia}`}
+          alt=""
+          aria-hidden
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      )}
+      {bgOverrideIsMedia && bgOverride.backgroundMediaType === "VIDEO" && (
+        <video
+          key={bgOverride.backgroundMedia}
+          src={`file://${bgOverride.backgroundMedia}`}
+          autoPlay
+          loop
+          muted
+          playsInline
           aria-hidden
           className="absolute inset-0 w-full h-full object-cover"
         />
