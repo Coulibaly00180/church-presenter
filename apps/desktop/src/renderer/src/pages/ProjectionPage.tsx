@@ -128,6 +128,46 @@ function TextContent({ state, onTimerExpired }: { state: ProjectionState; onTime
     }
   };
 
+  // Multi-translation stacked layout
+  const hasSecondary = (current.secondaryTexts?.length ?? 0) > 0;
+  if (hasSecondary) {
+    const allVersions = [
+      { label: current.title, body: current.body },
+      ...(current.secondaryTexts ?? []),
+    ].filter((v): v is { label: string | undefined; body: string } => Boolean(v.body));
+    const n = allVersions.length;
+    const bodySize = Math.round(26 * scaleFactor / (0.5 + 0.5 * n));
+    const labelSize = Math.round(13 * titleScaleFactor / Math.max(1, n - 0.5));
+    const separatorColor = `${(state.foreground ?? "#ffffff")}30`;
+
+    return (
+      <div className="flex flex-col w-full h-full">
+        {allVersions.map((version, i) => (
+          <div
+            key={i}
+            className="flex flex-col justify-center px-12 py-2 flex-1"
+            style={{ borderTop: i > 0 ? `1px solid ${separatorColor}` : undefined }}
+          >
+            {version.label && (
+              <span
+                className="uppercase tracking-wider font-semibold mb-1 opacity-50"
+                ref={(el) => applyFgStyle(el, labelSize)}
+              >
+                {version.label}
+              </span>
+            )}
+            <p
+              className="leading-snug whitespace-pre-wrap"
+              ref={(el) => applyFgStyle(el, bodySize)}
+            >
+              {version.body}
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full">
       {/* Title / reference — top-left overlay */}

@@ -46,5 +46,10 @@ export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem,
     await projectTextToScreen({ target, title: `TIMER:${title}`, body, lockedScreens });
     return;
   }
-  await projectTextToScreen({ target, title, body, lockedScreens });
+  const secondaryTexts = (() => {
+    if (!item.secondaryContent) return undefined;
+    try { return JSON.parse(item.secondaryContent) as Array<{ label: string; body: string }>; }
+    catch { return undefined; }
+  })();
+  await projectTextToScreen({ target, title, body, secondaryTexts, lockedScreens });
 }

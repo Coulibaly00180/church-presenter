@@ -17,6 +17,7 @@ export type PlanItem = {
   refSubId?: string | null;
   songId?: string | null;
   mediaPath?: string | null;
+  secondaryContent?: string | null;
 };
 
 export type Plan = {

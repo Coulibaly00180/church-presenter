@@ -67,6 +67,7 @@ export async function createPlanItemWithRetry(
             refSubId: payload.refSubId,
             songId: payload.kind === "SONG_BLOCK" ? payload.refId : undefined,
             mediaPath: payload.mediaPath,
+            secondaryContent: payload.secondaryContent,
           },
         });
       });
@@ -222,6 +223,7 @@ export function registerPlansIpc() {
         ...(payload.title !== undefined ? { title: payload.title } : {}),
         ...(payload.content !== undefined ? { content: payload.content } : {}),
         ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
+        ...(payload.secondaryContent !== undefined ? { secondaryContent: payload.secondaryContent } : {}),
       },
     });
     return { ok: true };

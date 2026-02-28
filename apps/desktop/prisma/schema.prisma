@@ -62,6 +62,7 @@ model ServiceItem {
   content   String?     // texte annonce / verset / etc
   notes     String?     // notes privées régie (non projetées)
   mediaPath String?     // chemin local image (MVP)
+  secondaryContent String?   // JSON: [{label, body}, ...] pour multi-traduction Bible
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 

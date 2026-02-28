@@ -259,10 +259,22 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
 
 export function parseProjectionSetTextPayload(value: unknown): CpProjectionSetTextPayload {
   const rec = expectRecord(value, "projection:setContentText payload");
+  let secondaryTexts: Array<{ label: string; body: string }> | undefined;
+  if (Array.isArray(rec.secondaryTexts)) {
+    secondaryTexts = (rec.secondaryTexts as unknown[])
+      .filter((x): x is { label: string; body: string } =>
+        typeof x === "object" && x !== null &&
+        typeof (x as Record<string, unknown>).body === "string")
+      .map((x) => ({
+        label: String((x as Record<string, unknown>).label ?? ""),
+        body: String((x as Record<string, unknown>).body),
+      }));
+  }
   return {
     title: expectOptionalString(rec.title, "projection:setContentText.title", { trim: false, allowEmpty: true }),
     body: expectString(rec.body, "projection:setContentText.body", { trim: false, allowEmpty: true }),
     metaSong: parseSongMeta(rec.metaSong, "projection:setContentText.metaSong"),
+    secondaryTexts,
   };
 }
 
@@ -401,6 +413,7 @@ export function parsePlanUpdateItemPayload(value: unknown): CpPlanUpdateItemPayl
     title: expectOptionalString(rec.title, "plans:updateItem.title", { trim: false, allowEmpty: true }),
     content: expectOptionalString(rec.content, "plans:updateItem.content", { trim: false, allowEmpty: true }),
     notes: expectOptionalString(rec.notes, "plans:updateItem.notes", { trim: false, allowEmpty: true }),
+    secondaryContent: expectOptionalString(rec.secondaryContent, "plans:updateItem.secondaryContent", { trim: false, allowEmpty: true }),
   };
 }
 
@@ -415,6 +428,7 @@ export function parsePlanAddItemPayload(value: unknown): CpPlanAddItemPayload {
     refId: expectOptionalString(rec.refId, "plans:addItem.refId"),
     refSubId: expectOptionalString(rec.refSubId, "plans:addItem.refSubId"),
     mediaPath: expectOptionalString(rec.mediaPath, "plans:addItem.mediaPath"),
+    secondaryContent: expectOptionalString(rec.secondaryContent, "plans:addItem.secondaryContent", { trim: false, allowEmpty: true }),
   };
 }
 

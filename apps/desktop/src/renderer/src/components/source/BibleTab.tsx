@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BookOpen, ChevronLeft, Keyboard, Loader2, Plus, Search } from "lucide-react";
+import { BookOpen, ChevronLeft, Keyboard, Loader2, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -21,22 +23,34 @@ import {
   type OfflineVerse,
   type LSG1910BookCatalogEntry,
 } from "@/bible/lookupLSG1910";
-import { searchVerses, listTranslations, type BollsVerse } from "@/bible/bollsApi";
+import { searchVerses, listTranslations, getChapter, type BollsVerse } from "@/bible/bollsApi";
 import { projectPlanItemToTarget } from "@/lib/projection";
+import { projectTextToScreen } from "@/projection/target";
 import type { PlanItem } from "@/lib/types";
 
 type BibleView = "reference" | "books" | "chapters" | "verses";
 type BibleMode = "browse" | "search";
 type ProjectionMode = "verse" | "passage";
 
-type TranslationEntry = { id: string; label: string };
+type TranslationGroup = { language: string; translations: Array<{ short_name: string; full_name: string }> };
 
-const FALLBACK_TRANSLATIONS: TranslationEntry[] = [
-  { id: "FRLSG", label: "Segond 1910" },
-  { id: "FRNEG", label: "NEG" },
-  { id: "FRBDS", label: "Bible du Semeur" },
-  { id: "LSG21", label: "Segond 21" },
+const FALLBACK_TRANSLATIONS: TranslationGroup[] = [
+  {
+    language: "Français",
+    translations: [
+      { short_name: "FRLSG", full_name: "Bible Segond 1910" },
+      { short_name: "FRNEG", full_name: "Nouvelle Édition de Genève" },
+      { short_name: "FRBDS", full_name: "Bible du Semeur" },
+      { short_name: "LSG21", full_name: "Segond 21" },
+    ],
+  },
 ];
+
+async function loadChapter(translation: string, bookId: number, chapter: number): Promise<OfflineVerse[]> {
+  if (translation === "FRLSG") return (await getLSG1910Chapter(bookId, chapter)) ?? [];
+  const vs = await getChapter(translation, bookId, chapter);
+  return vs.map((v) => ({ bookId: String(bookId), bookName: "", chapter, verse: v.verse, text: v.text }));
+}
 
 export function BibleTab() {
   const { live } = useLive();
@@ -75,7 +89,13 @@ export function BibleTab() {
 
   // ── Search state ──────────────────────────────────────────────────────────────
   const [translation, setTranslation] = useState("FRLSG");
-  const [translations, setTranslations] = useState<TranslationEntry[]>(FALLBACK_TRANSLATIONS);
+  const [translations, setTranslations] = useState<TranslationGroup[]>(FALLBACK_TRANSLATIONS);
+  const [comparisonTranslations, setComparisonTranslations] = useState<string[]>([]);
+  // Synchronous refs for stable callbacks
+  const translationRef = useRef(translation);
+  translationRef.current = translation;
+  const comparisonTranslationsRef = useRef(comparisonTranslations);
+  comparisonTranslationsRef.current = comparisonTranslations;
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<BollsVerse[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
@@ -88,14 +108,14 @@ export function BibleTab() {
       .then(setBooks)
       .catch(() => toast.error("Impossible de charger le catalogue biblique"));
 
-    void listTranslations().then((all) => {
-      const french = all
-        .filter((t) =>
-          t.language.toLowerCase().includes("french") ||
-          t.language.toLowerCase().includes("français")
-        )
-        .map((t) => ({ id: t.short_name, label: t.full_name }));
-      if (french.length > 0) setTranslations(french);
+    void listTranslations().then((flat) => {
+      if (flat.length === 0) return;
+      const groupMap = new Map<string, Array<{ short_name: string; full_name: string }>>();
+      for (const t of flat) {
+        if (!groupMap.has(t.language)) groupMap.set(t.language, []);
+        groupMap.get(t.language)!.push({ short_name: t.short_name, full_name: t.full_name });
+      }
+      setTranslations([...groupMap.entries()].map(([language, translations]) => ({ language, translations })));
     }).catch(() => {/* keep fallback list */});
   }, []);
 
@@ -116,11 +136,12 @@ export function BibleTab() {
       try {
         const range = parseReference(value);
         if (!range) return;
-        const chapter = await getLSG1910Chapter(
+        const chapter = await loadChapter(
+          translationRef.current,
           books.find((b) => b.bookKey === range.bookId)?.bookid ?? 0,
           range.chapter
         );
-        if (!chapter) return;
+        if (!chapter.length) return;
         setSelectedBook(books.find((b) => b.bookKey === range.bookId) ?? null);
         setSelectedChapter(range.chapter);
         setVerses(chapter);
@@ -146,8 +167,8 @@ export function BibleTab() {
     if (!selectedBook) return;
     setLoading(true);
     try {
-      const loaded = await getLSG1910Chapter(selectedBook.bookid, chapter);
-      setVerses(loaded ?? []);
+      const loaded = await loadChapter(translationRef.current, selectedBook.bookid, chapter);
+      setVerses(loaded);
       setSelectedChapter(chapter);
       setSelectedVerses(new Set());
       cursorVerseNumRef.current = null;
@@ -200,18 +221,34 @@ export function BibleTab() {
     const currentLive = liveRef.current;
     const currentBook = selectedBookRef.current;
     const currentChapter = selectedChapterRef.current;
+    const currentTranslation = translationRef.current;
+    const currentComparisons = comparisonTranslationsRef.current;
     if (!currentLive?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
     if (!currentBook || currentChapter === null) return;
-    const title = `${currentBook.name} ${currentChapter}:${verse.verse}`;
-    const fakeItem: PlanItem = {
-      id: "bible-temp",
-      order: 0,
-      kind: "BIBLE_VERSE",
-      title,
-      content: `${verse.verse}. ${verse.text}`,
-    };
-    await projectPlanItemToTarget(currentLive.target, fakeItem, currentLive);
-  }, []); // stable — reads live/book/chapter from refs
+    const baseTitle = `${currentBook.name} ${currentChapter}:${verse.verse}`;
+    const label = currentComparisons.length > 0 ? `${baseTitle} (${currentTranslation})` : baseTitle;
+    const body = `${verse.verse}. ${verse.text}`;
+    let secondaryTexts: Array<{ label: string; body: string }> | undefined;
+    if (currentComparisons.length > 0) {
+      const results = await Promise.allSettled(
+        currentComparisons.map((t) => loadChapter(t, currentBook.bookid, currentChapter))
+      );
+      secondaryTexts = results
+        .map((r, i) => {
+          if (r.status !== "fulfilled") return null;
+          const v = r.value.find((vv) => vv.verse === verse.verse);
+          return v ? { label: currentComparisons[i]!, body: `${v.verse}. ${v.text}` } : null;
+        })
+        .filter((x): x is { label: string; body: string } => x !== null);
+    }
+    await projectTextToScreen({
+      target: currentLive.target,
+      title: label,
+      body,
+      secondaryTexts,
+      lockedScreens: currentLive.lockedScreens,
+    });
+  }, []); // stable — reads live/book/chapter/translation/comparisons from refs
 
   /** Called when user clicks a verse in verse-mode + live: project + select + set cursor */
   const handleVerseClickInVerseMode = useCallback(async (verse: OfflineVerse) => {
@@ -310,13 +347,26 @@ export function BibleTab() {
       for (const vNum of sorted) {
         const verse = verses.find((v) => v.verse === vNum);
         if (!verse) continue;
-        const title = `${selectedBook?.name ?? "Bible"} ${selectedChapter}:${vNum}`;
+        const title = `${selectedBook?.name ?? "Bible"} ${selectedChapter}:${vNum} (${translation})`;
+        let secondaryContent: string | undefined;
+        if (comparisonTranslations.length > 0 && selectedBook && selectedChapter !== null) {
+          const results = await Promise.allSettled(
+            comparisonTranslations.map((t) => loadChapter(t, selectedBook.bookid, selectedChapter))
+          );
+          const secondary = results.map((r, i) => {
+            if (r.status !== "fulfilled") return null;
+            const v = r.value.find((vv) => vv.verse === vNum);
+            return v ? { label: comparisonTranslations[i]!, body: `${v.verse}. ${v.text}` } : null;
+          }).filter((x): x is { label: string; body: string } => x !== null);
+          if (secondary.length > 0) secondaryContent = JSON.stringify(secondary);
+        }
         const item = await addItem({
           kind: "BIBLE_VERSE",
           title,
           content: `${vNum}. ${verse.text}`,
           refId: `${selectedBook?.name} ${selectedChapter}`,
-          refSubId: "LSG",
+          refSubId: translation,
+          secondaryContent,
         });
         if (item) added++;
       }
@@ -326,18 +376,35 @@ export function BibleTab() {
       // Add all selected as one passage
       const content = buildVerseContent();
       if (!content) { toast.error("Aucun verset sélectionné"); return; }
+      let secondaryContent: string | undefined;
+      if (comparisonTranslations.length > 0 && selectedBook && selectedChapter !== null) {
+        const sortedNums = [...selectedVerses].sort((a, b) => a - b);
+        const results = await Promise.allSettled(
+          comparisonTranslations.map((t) => loadChapter(t, selectedBook.bookid, selectedChapter))
+        );
+        const secondary = results.map((r, i) => {
+          if (r.status !== "fulfilled") return null;
+          const text = sortedNums.map((vNum) => {
+            const v = r.value.find((vv) => vv.verse === vNum);
+            return v ? `${vNum}. ${v.text}` : "";
+          }).filter(Boolean).join("\n");
+          return text ? { label: comparisonTranslations[i]!, body: text } : null;
+        }).filter((x): x is { label: string; body: string } => x !== null);
+        if (secondary.length > 0) secondaryContent = JSON.stringify(secondary);
+      }
       const item = await addItem({
         kind: "BIBLE_VERSE",
         title: buildVerseTitle(),
         content,
         refId: `${selectedBook?.name} ${selectedChapter}`,
-        refSubId: "LSG",
+        refSubId: translation,
+        secondaryContent,
       });
       if (item) toast.success("Ajouté au plan");
     }
   }, [
     selectedVerses, projMode, verses, selectedBook, selectedChapter,
-    addItem, buildVerseContent, buildVerseTitle,
+    translation, comparisonTranslations, addItem, buildVerseContent, buildVerseTitle,
   ]);
 
   /** Add every verse in the current chapter as individual plan items (one per verse). */
@@ -345,19 +412,19 @@ export function BibleTab() {
     if (verses.length === 0) return;
     let added = 0;
     for (const verse of verses) {
-      const title = `${selectedBook?.name ?? "Bible"} ${selectedChapter}:${verse.verse}`;
+      const title = `${selectedBook?.name ?? "Bible"} ${selectedChapter}:${verse.verse} (${translation})`;
       const item = await addItem({
         kind: "BIBLE_VERSE",
         title,
         content: `${verse.verse}. ${verse.text}`,
         refId: `${selectedBook?.name} ${selectedChapter}`,
-        refSubId: "LSG",
+        refSubId: translation,
       });
       if (item) added++;
     }
     if (added > 0)
       toast.success(`${added} verset${added > 1 ? "s" : ""} ajouté${added > 1 ? "s" : ""} au plan`);
-  }, [verses, selectedBook, selectedChapter, addItem]);
+  }, [verses, selectedBook, selectedChapter, translation, addItem]);
 
   const handleProject = useCallback(async () => {
     if (!live?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
@@ -376,16 +443,30 @@ export function BibleTab() {
       // Project all selected as one passage
       const content = buildVerseContent();
       if (!content) { toast.error("Aucun verset sélectionné"); return; }
-      const fakeItem: PlanItem = {
-        id: "bible-temp",
-        order: 0,
-        kind: "BIBLE_VERSE",
+      let secondaryTexts: Array<{ label: string; body: string }> | undefined;
+      if (comparisonTranslations.length > 0 && selectedBook && selectedChapter !== null) {
+        const sortedNums = [...selectedVerses].sort((a, b) => a - b);
+        const results = await Promise.allSettled(
+          comparisonTranslations.map((t) => loadChapter(t, selectedBook.bookid, selectedChapter))
+        );
+        secondaryTexts = results.map((r, i) => {
+          if (r.status !== "fulfilled") return null;
+          const text = sortedNums.map((vNum) => {
+            const v = r.value.find((vv) => vv.verse === vNum);
+            return v ? `${vNum}. ${v.text}` : "";
+          }).filter(Boolean).join("\n");
+          return text ? { label: comparisonTranslations[i]!, body: text } : null;
+        }).filter((x): x is { label: string; body: string } => x !== null);
+      }
+      await projectTextToScreen({
+        target: live.target,
         title: buildVerseTitle(),
-        content,
-      };
-      await projectPlanItemToTarget(live.target, fakeItem, live);
+        body: content,
+        secondaryTexts,
+        lockedScreens: live.lockedScreens,
+      });
     }
-  }, [live, projMode, selectedVerses, verses, buildVerseContent, buildVerseTitle, handleProjectSingle]);
+  }, [live, projMode, selectedVerses, verses, selectedBook, selectedChapter, comparisonTranslations, buildVerseContent, buildVerseTitle, handleProjectSingle]);
 
   // ── Search handlers ───────────────────────────────────────────────────────────
 
@@ -490,20 +571,76 @@ export function BibleTab() {
           </Button>
         </div>
 
-        {mode === "search" && (
-          <Select value={translation} onValueChange={handleTranslationChange}>
-            <SelectTrigger className="h-8 text-xs">
-              <SelectValue placeholder="Traduction…" />
-            </SelectTrigger>
-            <SelectContent>
-              {translations.map((t) => (
-                <SelectItem key={t.id} value={t.id} className="text-xs">
-                  {t.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        {/* Translation selector — always visible, grouped by language */}
+        <Select value={translation} onValueChange={handleTranslationChange}>
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder="Traduction…" />
+          </SelectTrigger>
+          <SelectContent className="max-h-64">
+            {translations.map((group) => (
+              <SelectGroup key={group.language}>
+                <SelectLabel className="text-[10px] text-text-muted uppercase tracking-wide py-1">
+                  {group.language}
+                </SelectLabel>
+                {group.translations.map((t) => (
+                  <SelectItem key={t.short_name} value={t.short_name} className="text-xs">
+                    {t.full_name}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Comparison translations panel */}
+        <div className="flex flex-wrap items-center gap-1">
+          {comparisonTranslations.map((t) => (
+            <span
+              key={t}
+              className="flex items-center gap-0.5 text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full"
+            >
+              {t}
+              <button
+                type="button"
+                className="hover:text-accent/60"
+                onClick={() => setComparisonTranslations((prev) => prev.filter((x) => x !== t))}
+                aria-label={`Retirer ${t}`}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+          {comparisonTranslations.length < 3 && (
+            <Select
+              value=""
+              onValueChange={(v) => {
+                if (v && !comparisonTranslations.includes(v) && v !== translation)
+                  setComparisonTranslations((prev) => [...prev, v]);
+              }}
+            >
+              <SelectTrigger className="h-6 text-[10px] w-auto px-2 border-dashed gap-1">
+                <Plus className="h-2.5 w-2.5" />
+                Comparer
+              </SelectTrigger>
+              <SelectContent className="max-h-64">
+                {translations.map((group) => (
+                  <SelectGroup key={group.language}>
+                    <SelectLabel className="text-[10px] text-text-muted uppercase tracking-wide py-1">
+                      {group.language}
+                    </SelectLabel>
+                    {group.translations
+                      .filter((t) => t.short_name !== translation && !comparisonTranslations.includes(t.short_name))
+                      .map((t) => (
+                        <SelectItem key={t.short_name} value={t.short_name} className="text-xs">
+                          {t.full_name}
+                        </SelectItem>
+                      ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {/* Content area */}

@@ -106,7 +106,7 @@ export function setContentText(
   ctx.screenStates[key] = {
     ...ctx.screenStates[key],
     mode: "NORMAL",
-    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong },
+    current: { kind: "TEXT", title: payload.title, body: payload.body, metaSong: payload.metaSong, secondaryTexts: payload.secondaryTexts },
     updatedAt: Date.now(),
   };
   ctx.broadcast(key);
