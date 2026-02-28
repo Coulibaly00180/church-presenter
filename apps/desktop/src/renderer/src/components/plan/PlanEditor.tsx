@@ -104,6 +104,11 @@ export function PlanEditor() {
     }
   }, []);
 
+  const handleEditBackground = useCallback((item: CpPlanItem) => {
+    setEditItem(item);
+    setEditItemOpen(true);
+  }, []);
+
   const handleSelectKind = useCallback(async (kind: CpPlanItemKind) => {
     if (kind === "SONG_BLOCK") {
       setEditSongId(null);
@@ -209,6 +214,7 @@ export function PlanEditor() {
                         isCurrentLive={originalIndex === currentCursor}
                         isSelected={selectedItemIds.has(item.id)}
                         onEdit={handleEdit}
+                        onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
                         onDuplicate={handleDuplicate}
                         onToggleSelect={toggleItemSelection}
                       />
@@ -237,6 +243,7 @@ export function PlanEditor() {
                         isCurrentLive={index === currentCursor}
                         isSelected={selectedItemIds.has(item.id)}
                         onEdit={handleEdit}
+                        onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
                         onDuplicate={handleDuplicate}
                         onToggleSelect={toggleItemSelection}
                       />

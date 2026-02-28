@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, Copy, FileImage, FileVideo, GripVertical, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { Check, Copy, FileImage, FileVideo, GripVertical, MessageSquare, Palette, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { KindBadge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ interface PlanItemCardProps {
   isCurrentLive?: boolean;
   isSelected?: boolean;
   onEdit?: (item: CpPlanItem) => void;
+  onEditBackground?: (item: CpPlanItem) => void;
   onToggleSelect?: (id: string) => void;
   onDuplicate?: (id: string) => void;
 }
@@ -45,7 +46,7 @@ function getItemSubtitle(item: CpPlanItem): string | null {
   }
 }
 
-export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onToggleSelect, onDuplicate }: PlanItemCardProps) {
+export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onEditBackground, onToggleSelect, onDuplicate }: PlanItemCardProps) {
   const { live } = useLive();
   const { plan, removeItem } = usePlan();
 
@@ -80,6 +81,11 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
     e.stopPropagation();
     onEdit?.(item);
   }, [item, onEdit]);
+
+  const handleEditBackground = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEditBackground?.(item);
+  }, [item, onEditBackground]);
 
   const handleDuplicate = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -183,6 +189,17 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
 
       {/* Actions — visible on hover */}
       <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        {onEditBackground && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={handleEditBackground}
+            aria-label="Fond du chant"
+            className="h-6 w-6"
+          >
+            <Palette className="h-3 w-3" />
+          </Button>
+        )}
         {onEdit && (
           <Button
             variant="ghost"

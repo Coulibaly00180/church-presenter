@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileImage, FileVideo, Loader2 } from "lucide-react";
+import { FileImage, FileVideo, Loader2, Music } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -43,7 +43,7 @@ const BG_MODE_BUTTONS: { value: BgMode; label: string }[] = [
 ];
 
 export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
-  const { updateItem } = usePlan();
+  const { updateItem, updateSongBackground } = usePlan();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [notes, setNotes] = useState("");
@@ -68,6 +68,7 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
 
   const isTimer = item?.kind === "TIMER";
   const hasContent = item?.kind === "ANNOUNCEMENT_TEXT" || item?.kind === "VERSE_MANUAL";
+  const isSongBlock = item?.kind === "SONG_BLOCK";
 
   // Load media files when image/video mode selected
   useEffect(() => {
@@ -155,18 +156,27 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
         if (Object.keys(bg).length > 0) backgroundConfig = JSON.stringify(bg);
       }
 
-      await updateItem(item.id, {
-        title: title.trim() || undefined,
-        ...(newContent !== undefined && { content: newContent }),
-        notes: notes.trim() || undefined,
-        backgroundConfig,
-      });
+      if (isSongBlock && item.refId) {
+        // Notes/title update only for this item; background propagates to all blocks of the song
+        await updateItem(item.id, {
+          title: title.trim() || undefined,
+          notes: notes.trim() || undefined,
+        });
+        await updateSongBackground(item.refId, backgroundConfig);
+      } else {
+        await updateItem(item.id, {
+          title: title.trim() || undefined,
+          ...(newContent !== undefined && { content: newContent }),
+          notes: notes.trim() || undefined,
+          backgroundConfig,
+        });
+      }
       toast.success("Élément mis à jour");
       onClose();
     } finally {
       setSaving(false);
     }
-  }, [item, isTimer, hasContent, minutes, seconds, content, title, notes, updateItem, onClose, bgEnabled, bgMode, bgColor, bgFrom, bgTo, bgAngle, fgEnabled, fgColor, bgMediaPath]);
+  }, [item, isTimer, hasContent, isSongBlock, minutes, seconds, content, title, notes, updateItem, updateSongBackground, onClose, bgEnabled, bgMode, bgColor, bgFrom, bgTo, bgAngle, fgEnabled, fgColor, bgMediaPath]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey && !hasContent) void handleSave();
@@ -176,6 +186,7 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
 
   const dialogTitle =
     isTimer ? "Modifier la minuterie" :
+    isSongBlock ? "Fond du chant" :
     hasContent ? "Modifier le contenu" :
     "Modifier l'élément";
 
@@ -284,6 +295,12 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
 
           {/* Background personnalisé */}
           <div className="space-y-2 pt-1 border-t border-border">
+            {isSongBlock && (
+              <div className="flex items-center gap-1.5 text-xs text-text-muted">
+                <Music className="h-3 w-3 shrink-0" />
+                <span>Ce fond s'applique à tous les blocs de ce chant dans le plan.</span>
+              </div>
+            )}
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"

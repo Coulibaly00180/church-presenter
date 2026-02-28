@@ -13,6 +13,7 @@ interface PlanContextValue {
   addItem: (payload: Omit<CpPlanAddItemPayload, "planId">) => Promise<CpPlanItem | null>;
   duplicateItem: (itemId: string) => Promise<void>;
   updateItem: (itemId: string, patch: { title?: string; content?: string; notes?: string; secondaryContent?: string | null; backgroundConfig?: string | null }) => Promise<void>;
+  updateSongBackground: (refId: string, backgroundConfig: string | null) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   removeItems: (itemIds: string[]) => Promise<void>;
   reorder: (orderedItemIds: string[]) => Promise<void>;
@@ -113,6 +114,19 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     }
   }, [selectedPlanId, refreshPlan]);
 
+  const updateSongBackground = useCallback(async (refId: string, backgroundConfig: string | null) => {
+    if (!selectedPlanId || !plan) return;
+    const songItems = plan.items.filter((i) => i.kind === "SONG_BLOCK" && i.refId === refId);
+    try {
+      await Promise.all(
+        songItems.map((i) => window.cp.plans.updateItem({ planId: selectedPlanId, itemId: i.id, backgroundConfig }))
+      );
+      await refreshPlan();
+    } catch {
+      toast.error("Impossible de modifier le fond du chant");
+    }
+  }, [selectedPlanId, plan, refreshPlan]);
+
   const removeItem = useCallback(async (itemId: string) => {
     if (!selectedPlanId) return;
     // Optimistic update — remove immediately so ScrollArea doesn't reset scroll
@@ -204,6 +218,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     addItem,
     duplicateItem,
     updateItem,
+    updateSongBackground,
     removeItem,
     removeItems,
     reorder,
