@@ -18,7 +18,7 @@ interface PlanItemCardProps {
   onEdit?: (item: CpPlanItem) => void;
   onEditBackground?: (item: CpPlanItem) => void;
   onToggleSelect?: (id: string) => void;
-  onDuplicate?: (id: string) => void;
+  onCopy?: (item: CpPlanItem) => void;
 }
 
 /** Returns a short subtitle describing the item content. */
@@ -46,7 +46,7 @@ function getItemSubtitle(item: CpPlanItem): string | null {
   }
 }
 
-export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onEditBackground, onToggleSelect, onDuplicate }: PlanItemCardProps) {
+export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onEditBackground, onToggleSelect, onCopy }: PlanItemCardProps) {
   const { live } = useLive();
   const { plan, removeItem } = usePlan();
 
@@ -87,10 +87,10 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
     onEditBackground?.(item);
   }, [item, onEditBackground]);
 
-  const handleDuplicate = useCallback((e: React.MouseEvent) => {
+  const handleCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    onDuplicate?.(item.id);
-  }, [item.id, onDuplicate]);
+    onCopy?.(item);
+  }, [item, onCopy]);
 
   return (
     <div
@@ -211,12 +211,12 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
             <Pencil className="h-3 w-3" />
           </Button>
         )}
-        {onDuplicate && (
+        {onCopy && (
           <Button
             variant="ghost"
             size="icon-xs"
-            onClick={handleDuplicate}
-            aria-label="Dupliquer"
+            onClick={handleCopy}
+            aria-label="Copier"
             className="h-6 w-6"
           >
             <Copy className="h-3 w-3" />

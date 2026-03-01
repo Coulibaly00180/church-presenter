@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -14,7 +14,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { ClipboardList, Plus, Search, Trash2, X } from "lucide-react";
+import { Clipboard, ClipboardList, Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlan } from "@/hooks/usePlan";
@@ -32,7 +32,7 @@ import { Dashboard } from "./Dashboard";
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
 export function PlanEditor() {
-  const { plan, reorder, loadingPlan, addItem, duplicateItem, removeItems } = usePlan();
+  const { plan, reorder, loadingPlan, addItem, removeItems } = usePlan();
   const { live } = useLive();
   const [activeItem, setActiveItem] = useState<CpPlanItem | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -43,6 +43,41 @@ export function PlanEditor() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
+  const [clipboard, setClipboard] = useState<CpPlanItem | null>(null);
+
+  const handleCopyItem = useCallback((item: CpPlanItem) => {
+    setClipboard(item);
+  }, []);
+
+  const handlePaste = useCallback(async () => {
+    if (!clipboard) return;
+    await addItem({
+      kind: clipboard.kind as CpPlanItemKind,
+      title: clipboard.title ?? undefined,
+      content: clipboard.content ?? undefined,
+      notes: clipboard.notes ?? undefined,
+      refId: clipboard.refId ?? undefined,
+      refSubId: clipboard.refSubId ?? undefined,
+      mediaPath: clipboard.mediaPath ?? undefined,
+      secondaryContent: clipboard.secondaryContent ?? undefined,
+      backgroundConfig: clipboard.backgroundConfig ?? undefined,
+    });
+  }, [clipboard, addItem]);
+
+  // Ctrl+V → paste
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "v" && clipboard) {
+        // Don't intercept when typing in inputs/textareas
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        e.preventDefault();
+        void handlePaste();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [clipboard, handlePaste]);
 
   const toggleItemSelection = useCallback((id: string) => {
     setSelectedItemIds((prev) => {
@@ -58,10 +93,6 @@ export function PlanEditor() {
     setSelectedItemIds(new Set());
     await removeItems(ids);
   }, [selectedItemIds, removeItems]);
-
-  const handleDuplicate = useCallback((id: string) => {
-    void duplicateItem(id);
-  }, [duplicateItem]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -215,7 +246,7 @@ export function PlanEditor() {
                         isSelected={selectedItemIds.has(item.id)}
                         onEdit={handleEdit}
                         onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
-                        onDuplicate={handleDuplicate}
+                        onCopy={handleCopyItem}
                         onToggleSelect={toggleItemSelection}
                       />
                     );
@@ -244,7 +275,7 @@ export function PlanEditor() {
                         isSelected={selectedItemIds.has(item.id)}
                         onEdit={handleEdit}
                         onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
-                        onDuplicate={handleDuplicate}
+                        onCopy={handleCopyItem}
                         onToggleSelect={toggleItemSelection}
                       />
                     ))}
@@ -289,15 +320,40 @@ export function PlanEditor() {
               <span className="text-xs text-text-muted">
                 {plan.items.length} élément{plan.items.length !== 1 ? "s" : ""}
               </span>
-              <Button
-                variant="ghost"
-                size="xs"
-                className="gap-1 text-text-secondary"
-                onClick={() => setAddDialogOpen(true)}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Ajouter
-              </Button>
+              <div className="flex items-center gap-1">
+                {clipboard && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="gap-1 text-primary"
+                      onClick={() => void handlePaste()}
+                      title={`Coller « ${clipboard.title ?? "—"} » (Ctrl+V)`}
+                    >
+                      <Clipboard className="h-3.5 w-3.5" />
+                      Coller
+                    </Button>
+                    <button
+                      type="button"
+                      className="text-text-muted hover:text-text-primary transition-colors"
+                      onClick={() => setClipboard(null)}
+                      aria-label="Effacer le presse-papier"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                    <span className="text-border text-xs mx-0.5">|</span>
+                  </>
+                )}
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  className="gap-1 text-text-secondary"
+                  onClick={() => setAddDialogOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Ajouter
+                </Button>
+              </div>
             </div>
           )}
         </>
