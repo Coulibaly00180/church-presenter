@@ -1,8 +1,10 @@
 import { app, BrowserWindow, ipcMain, screen, dialog } from "electron";
 import { join, basename, dirname, extname } from "path";
 import { access, copyFile, readFile, unlink, rename } from "fs/promises";
-import { registerSongsIpc } from "./ipc/songs";
-import type { RegisterSongsIpcOptions } from "./ipc/songs";
+import { registerSongsIpcMeta } from "./ipc/songs-meta";
+import type { RegisterSongsIpcOptions } from "./ipc/songs-meta";
+import { registerSongsIpcImport } from "./ipc/songs-import";
+import { registerSongsIpcExport } from "./ipc/songs-export";
 import { registerPlansIpc } from "./ipc/plans";
 import { registerDataIpc } from "./ipc/data";
 import { registerBibleIpc } from "./ipc/bible";
@@ -401,7 +403,9 @@ void app.whenReady().then(async () => {
         return dirs.songsJsonDir;
       },
     };
-    registerSongsIpc(songsIpcOptions);
+    registerSongsIpcMeta(songsIpcOptions);
+    registerSongsIpcImport();
+    registerSongsIpcExport();
   } catch (e) {
     console.error("registerSongsIpc failed", e);
   }
