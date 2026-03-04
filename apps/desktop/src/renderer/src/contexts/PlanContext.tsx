@@ -97,6 +97,8 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
         refId: item.refId ?? undefined,
         refSubId: item.refSubId ?? undefined,
         mediaPath: item.mediaPath ?? undefined,
+        secondaryContent: item.secondaryContent ?? undefined,
+        backgroundConfig: item.backgroundConfig ?? undefined,
       });
       await refreshPlan();
     } catch {
