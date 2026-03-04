@@ -287,6 +287,7 @@ export type CpFilesPickFontResult =
   | { ok: false; error: string };
 export type CpFilesListMediaResult = { ok: true; rootDir: string; files: CpMediaFile[] } | { ok: false; error: string };
 export type CpFilesDeleteMediaResult = { ok: true } | { ok: false; error: string };
+export type CpFilesExistsMediaResult = { ok: true; exists: boolean } | { ok: false; error: string };
 export type CpFilesRenameMediaResult = { ok: true; path: string; name: string } | { ok: false; error: string };
 export type CpFilesValidateFontResult =
   | { ok: true; valid: boolean; reason?: string; family?: string }
@@ -511,6 +512,7 @@ export interface CpApi {
     chooseLibraryDir: () => Promise<CpFilesChooseLibraryDirResult>;
     getLibraryDir: () => Promise<CpFilesGetLibraryDirResult>;
     readMedia: (payload: { path: string }) => Promise<CpFilesReadMediaResult>;
+    existsMedia: (payload: { path: string }) => Promise<CpFilesExistsMediaResult>;
   };
   settings: {
     getTheme: () => Promise<CpSettingsGetThemeResult>;

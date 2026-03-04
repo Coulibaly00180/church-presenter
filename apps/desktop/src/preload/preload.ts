@@ -218,6 +218,7 @@ const cpApi: CpApi = {
     chooseLibraryDir: () => ipcRenderer.invoke("files:chooseLibraryDir"),
     getLibraryDir: () => ipcRenderer.invoke("files:getLibraryDir"),
     readMedia: (payload: { path: string }) => ipcRenderer.invoke("files:readMedia", payload),
+    existsMedia: (payload: { path: string }) => ipcRenderer.invoke("files:existsMedia", payload),
   },
 
   settings: {

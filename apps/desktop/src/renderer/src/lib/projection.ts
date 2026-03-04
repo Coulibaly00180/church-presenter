@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { projectMediaToScreen, projectTextToScreen } from "../projection/target";
 import { getPlanKindDefaultTitle, isPlanKindBible } from "./planKinds";
 import { LiveState, PlanItem, ScreenKey } from "./types";
@@ -12,6 +13,17 @@ export function parsePlanBackground(backgroundConfig: string | null | undefined)
     console.warn("[projection] backgroundConfig corrompu :", e);
     return undefined;
   }
+}
+
+/** Vérifie que le fichier media existe. Affiche un toast et retourne false si absent. */
+async function mediaFileExists(mediaPath: string): Promise<boolean> {
+  const result = await window.cp.files.existsMedia({ path: mediaPath });
+  if (!result.ok || !result.exists) {
+    const filename = mediaPath.split(/[\\/]/).pop() ?? mediaPath;
+    toast.error("Fichier introuvable", { description: filename });
+    return false;
+  }
+  return true;
 }
 
 function formatBibleTitle(item: PlanItem): string {
@@ -48,14 +60,17 @@ export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem,
     (planBackground || itemBg) ? { ...planBackground, ...itemBg } : undefined;
 
   if (item.kind === "ANNOUNCEMENT_IMAGE" && item.mediaPath) {
+    if (!await mediaFileExists(item.mediaPath)) return;
     await projectMediaToScreen({ target, title, mediaPath: item.mediaPath, mediaType: "IMAGE", lockedScreens });
     return;
   }
   if (item.kind === "ANNOUNCEMENT_PDF" && item.mediaPath) {
+    if (!await mediaFileExists(item.mediaPath)) return;
     await projectMediaToScreen({ target, title, mediaPath: item.mediaPath, mediaType: "PDF", lockedScreens });
     return;
   }
   if (item.kind === "ANNOUNCEMENT_VIDEO" && item.mediaPath) {
+    if (!await mediaFileExists(item.mediaPath)) return;
     await projectMediaToScreen({ target, title, mediaPath: item.mediaPath, mediaType: "VIDEO", lockedScreens });
     return;
   }
