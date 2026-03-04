@@ -28,6 +28,7 @@ import { ServicePreviewDialog } from "@/components/dialogs/ServicePreviewDialog"
 import { PlanItemCard, PlanItemCardGhost } from "./PlanItemCard";
 import { PlanToolbar } from "./PlanToolbar";
 import { Dashboard } from "./Dashboard";
+import { isPlanKindMedia } from "@/lib/planKinds";
 
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
@@ -144,6 +145,11 @@ export function PlanEditor() {
     if (kind === "SONG_BLOCK") {
       setEditSongId(null);
       setSongEditorOpen(true);
+    } else if (isPlanKindMedia(kind)) {
+      const result = await window.cp.files.pickMedia();
+      if (!result.ok || !("path" in result)) return;
+      const title = result.path.split(/[\\/]/).pop() ?? "";
+      await addItem({ kind, title, mediaPath: result.path });
     } else {
       await addItem({ kind });
     }

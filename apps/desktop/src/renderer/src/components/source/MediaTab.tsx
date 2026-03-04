@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FileImage, FileText, FileVideo, Loader2, Plus, RefreshCw } from "lucide-react";
+import { FileImage, FileText, FileVideo, Loader2, Monitor, Plus, RefreshCw, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -44,7 +44,22 @@ export function MediaTab() {
       mediaPath: file.path,
     });
     if (item) toast.success("Ajouté au plan");
+    else toast.error("Aucun plan ouvert");
   }, [addItem]);
+
+  const handleImport = useCallback(async () => {
+    const result = await window.cp.files.pickMedia();
+    if (!result.ok || !("path" in result)) return;
+    await loadFiles();
+    toast.success("Fichier importé dans la bibliothèque");
+  }, [loadFiles]);
+
+  const handleProject = useCallback(async (file: CpMediaFile) => {
+    const mediaType: CpMediaType =
+      file.kind === "IMAGE" ? "IMAGE" : file.kind === "VIDEO" ? "VIDEO" : "PDF";
+    await window.cp.projection.setContentMedia({ title: file.name, mediaPath: file.path, mediaType });
+    toast.success(`Projection : ${file.name}`);
+  }, []);
 
   const filtered =
     filter === "ALL"
@@ -70,15 +85,25 @@ export function MediaTab() {
             {f === "ALL" ? "Tous" : f}
           </button>
         ))}
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="ml-auto"
-          onClick={() => void loadFiles()}
-          aria-label="Actualiser"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-        </Button>
+        <div className="flex items-center gap-1 ml-auto">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void handleImport()}
+            aria-label="Importer un fichier"
+            title="Importer un fichier dans la bibliothèque"
+          >
+            <Upload className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void loadFiles()}
+            aria-label="Actualiser"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
@@ -90,13 +115,21 @@ export function MediaTab() {
           <div className="flex flex-col items-center justify-center py-8 gap-2 text-text-muted">
             <FileImage className="h-8 w-8 opacity-40" />
             <p className="text-sm">Aucun média</p>
+            <button
+              type="button"
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+              onClick={() => void handleImport()}
+            >
+              <Upload className="h-3 w-3" />
+              Importer un fichier
+            </button>
           </div>
         ) : (
           <div className="py-1">
             {filtered.map((file) => (
               <div
                 key={file.path}
-                className="group flex items-center gap-2 px-3 py-2 hover:bg-bg-elevated transition-colors cursor-pointer"
+                className="flex items-center gap-2 px-3 py-2 hover:bg-bg-elevated transition-colors cursor-pointer"
                 onDoubleClick={() => setPreviewFile(file)}
                 title="Double-clic pour prévisualiser"
               >
@@ -108,15 +141,26 @@ export function MediaTab() {
                   <FileText className="h-4 w-4 shrink-0 text-kind-announcement" />
                 )}
                 <span className="flex-1 text-sm text-text-primary truncate">{file.name}</span>
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="opacity-0 group-hover:opacity-100"
-                  onClick={(e) => { e.stopPropagation(); void handleAdd(file); }}
-                  aria-label={`Ajouter ${file.name} au plan`}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={(e) => { e.stopPropagation(); void handleProject(file); }}
+                    aria-label={`Projeter ${file.name} directement`}
+                    title="Projeter directement (mode libre)"
+                  >
+                    <Monitor className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={(e) => { e.stopPropagation(); void handleAdd(file); }}
+                    aria-label={`Ajouter ${file.name} au plan`}
+                    title="Ajouter au plan"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

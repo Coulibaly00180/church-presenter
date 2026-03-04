@@ -342,13 +342,21 @@ function ProjectionContent({ state, onTimerExpired }: { state: ProjectionState; 
           "center":       "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
         }[state.logoPosition ?? "top-left"] ?? "top-4 left-4";
         const opacity = (state.logoOpacity ?? 80) / 100;
+        const scale = (state.logoScale ?? 100) / 100;
+        const maxH = `${10 * scale}%`;
+        const maxW = `${15 * scale}%`;
         return (
           <img
             src={`file://${state.logoPath}`}
             alt=""
             aria-hidden
-            className={`absolute z-20 max-h-[10%] max-w-[15%] object-contain pointer-events-none ${posClass}`}
-            ref={(el) => { if (el) el.style.opacity = String(opacity); }}
+            className={`absolute z-20 object-contain pointer-events-none ${posClass}`}
+            ref={(el) => {
+              if (!el) return;
+              el.style.opacity = String(opacity);
+              el.style.maxHeight = maxH;
+              el.style.maxWidth = maxW;
+            }}
           />
         );
       })()}
