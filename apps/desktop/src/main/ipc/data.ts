@@ -1,7 +1,7 @@
 import { app, ipcMain, dialog } from "electron";
 import type { Prisma } from "@prisma/client";
 import { databasePathFromUrl, getPrisma } from "../db";
-import { copyFile, mkdir, readFile, stat, writeFile } from "fs/promises";
+import { copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from "fs/promises";
 import { basename, dirname, join } from "path";
 import type { CpDataFileV2, CpDataImportError } from "../../shared/ipc";
 import type { CpPlanItemKind } from "../../shared/planKinds";
@@ -173,6 +173,30 @@ function normalizeSongs(rawSongs: unknown, errors: CpDataImportError[]): Normali
   return songs;
 }
 
+const BACKUP_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
+
+async function pruneOldBackups(backupsDir: string) {
+  let entries: string[];
+  try {
+    entries = await readdir(backupsDir);
+  } catch {
+    return; // dossier inexistant, rien à faire
+  }
+  const now = Date.now();
+  for (const name of entries) {
+    if (!name.endsWith(".bak")) continue;
+    const filePath = join(backupsDir, name);
+    try {
+      const info = await stat(filePath);
+      if (now - info.mtimeMs > BACKUP_MAX_AGE_MS) {
+        await unlink(filePath);
+      }
+    } catch {
+      // fichier déjà supprimé ou inaccessible — on ignore
+    }
+  }
+}
+
 async function backupDatabaseSnapshot(reason: string) {
   const databasePath = databasePathFromUrl(process.env["DATABASE_URL"]);
   if (!databasePath) return null;
@@ -186,6 +210,8 @@ async function backupDatabaseSnapshot(reason: string) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const outputPath = join(backupsDir, `${basename(databasePath)}.${reason}.${stamp}.bak`);
   await copyFile(databasePath, outputPath);
+  // Nettoyage best-effort des backups de plus de 30 jours
+  void pruneOldBackups(backupsDir);
   return outputPath;
 }
 
