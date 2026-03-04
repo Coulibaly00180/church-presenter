@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { PlanTemplateDialog } from "@/components/dialogs/PlanTemplateDialog";
 import { usePlan } from "@/hooks/usePlan";
 import { isoToYmd } from "@/lib/date";
+import { parsePlanBackground } from "@/lib/projection";
 
 interface PlanToolbarProps {
   onAddItem?: () => void;
@@ -78,8 +79,8 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
 
   const openBgDialog = useCallback(() => {
     if (plan?.backgroundConfig) {
-      try {
-        const bg = JSON.parse(plan.backgroundConfig) as CpItemBackground;
+      const bg = parsePlanBackground(plan.backgroundConfig);
+      if (bg) {
         setBgEnabled(true);
         if (bg.backgroundMediaType && bg.backgroundMedia) {
           setBgMode(bg.backgroundMediaType === "VIDEO" ? "VIDEO" : "IMAGE");
@@ -94,9 +95,6 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
         setBgAngle(bg.backgroundGradientAngle ?? 135);
         if (bg.foreground) { setFgEnabled(true); setFgColor(bg.foreground); }
         else { setFgEnabled(false); setFgColor("#ffffff"); }
-      } catch {
-        setBgEnabled(false);
-        setBgMediaPath(null);
       }
     } else {
       setBgEnabled(false);
@@ -192,20 +190,9 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
   if (!plan) return null;
 
   const hasPlanBg = Boolean(plan.backgroundConfig);
-  const planBgIsMedia = (() => {
-    if (!hasPlanBg) return false;
-    try {
-      const bg = JSON.parse(plan.backgroundConfig!) as CpItemBackground;
-      return Boolean(bg.backgroundMediaType);
-    } catch { return false; }
-  })();
-  const planBgSwatchColor = (() => {
-    if (!hasPlanBg || planBgIsMedia) return "#888";
-    try {
-      const bg = JSON.parse(plan.backgroundConfig!) as CpItemBackground;
-      return bg.background ?? bg.backgroundGradientFrom ?? "#888";
-    } catch { return "#888"; }
-  })();
+  const _planBg = parsePlanBackground(plan.backgroundConfig);
+  const planBgIsMedia = hasPlanBg && Boolean(_planBg?.backgroundMediaType);
+  const planBgSwatchColor = (!hasPlanBg || planBgIsMedia) ? "#888" : (_planBg?.background ?? _planBg?.backgroundGradientFrom ?? "#888");
 
   const isMediaMode = bgMode === "IMAGE" || bgMode === "VIDEO";
 

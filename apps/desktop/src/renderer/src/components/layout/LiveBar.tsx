@@ -9,12 +9,11 @@ import { KindBadge } from "@/components/ui/badge";
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { useShortcuts } from "@/hooks/useShortcuts";
-import { projectPlanItemToTarget } from "@/lib/projection";
+import { projectPlanItemToTarget, parsePlanBackground } from "@/lib/projection";
 import { getPlanKindDefaultTitle } from "@/lib/planKinds";
 import { estimateItemDurationSeconds, formatMinutes } from "@/lib/planDuration";
 import { cn } from "@/lib/utils";
 import type { PlanItem } from "@/lib/types";
-import type { CpItemBackground } from "../../../../shared/ipc";
 
 export function LiveBar() {
   const { live, toggle, toggleBlack, toggleWhite, resume } = useLive();
@@ -134,12 +133,7 @@ export function LiveBar() {
   const handleItemClick = useCallback(async (item: CpPlanItem, index: number) => {
     await window.cp.live.setCursor(index);
     if (live) {
-      const planBg = (() => {
-        if (!plan?.backgroundConfig) return undefined;
-        try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
-        catch { return undefined; }
-      })();
-      await projectPlanItemToTarget(live.target, item as PlanItem, live, planBg);
+      await projectPlanItemToTarget(live.target, item as PlanItem, live, parsePlanBackground(plan?.backgroundConfig));
     }
   }, [live, plan]);
 
@@ -152,12 +146,7 @@ export function LiveBar() {
     else await window.cp.live.prev();
     const item = plan?.items[nextCursor];
     if (item && live) {
-      const planBg = (() => {
-        if (!plan?.backgroundConfig) return undefined;
-        try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
-        catch { return undefined; }
-      })();
-      await projectPlanItemToTarget(live.target, item as PlanItem, live, planBg);
+      await projectPlanItemToTarget(live.target, item as PlanItem, live, parsePlanBackground(plan?.backgroundConfig));
     } else {
       console.warn("[live] navigate: no item or no live state", { item: !!item, live: !!live, nextCursor });
     }
