@@ -1556,6 +1556,20 @@ ipcMain.handle("files:readMedia", async (_evt, rawPayload: unknown) => {
   }
 });
 
+ipcMain.handle("files:existsMedia", async (_evt, rawPayload: unknown) => {
+  try {
+    const payload = parseFilesDeleteMediaPayload(rawPayload);
+    if (!payload?.path) return { ok: false, error: "Missing media path" };
+    const dirs = await getActiveLibraryDirs();
+    if (!isPathInDir(dirs.rootDir, payload.path)) {
+      return { ok: false, error: "Path outside media directory" };
+    }
+    return { ok: true, exists: await pathExists(payload.path) };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
+});
+
 ipcMain.handle("files:validateFont", async (_evt, rawPayload: unknown) => {
   try {
     const payload = parseFilesDeleteMediaPayload(rawPayload);
