@@ -55,6 +55,7 @@ export type CpProjectionState = {
   logoPath?: string;
   logoPosition?: CpLogoPosition;
   logoOpacity?: number;
+  logoScale?: number;
   foregroundMode?: CpForegroundFillMode;
   foregroundGradientFrom?: string;
   foregroundGradientTo?: string;
@@ -339,6 +340,7 @@ export type CpProjectionSetAppearancePayload = {
   logoPath?: string;
   logoPosition?: CpLogoPosition;
   logoOpacity?: number;
+  logoScale?: number;
   foregroundMode?: CpForegroundFillMode;
   foregroundGradientFrom?: string;
   foregroundGradientTo?: string;

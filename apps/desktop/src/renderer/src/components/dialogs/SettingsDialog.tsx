@@ -46,6 +46,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const [logoPath, setLogoPath] = useState("");
   const [logoPosition, setLogoPosition] = useState<CpLogoPosition>("bottom-right");
   const [logoOpacity, setLogoOpacity] = useState(80);
+  const [logoScale, setLogoScale] = useState(100);
 
   // Interface theme
   const [theme, setTheme] = useState<CpTheme>("light");
@@ -80,6 +81,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       setLogoPath(state.logoPath ?? "");
       setLogoPosition((state.logoPosition as CpLogoPosition) ?? "bottom-right");
       setLogoOpacity(state.logoOpacity ?? 80);
+      setLogoScale(state.logoScale ?? 100);
     });
     void window.cp.settings.getTheme().then((r) => {
       if (r.ok && r.theme) setTheme(r.theme);
@@ -111,9 +113,10 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       logoPath,
       logoPosition,
       logoOpacity,
+      logoScale,
     });
     toast.success("Apparence de projection appliquée");
-  }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textFont, textFontPath, textScale, titleTextScale, logoPath, logoPosition, logoOpacity]);
+  }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textFont, textFontPath, textScale, titleTextScale, logoPath, logoPosition, logoOpacity, logoScale]);
 
   const handlePickLogo = useCallback(async () => {
     const result = await window.cp.files.pickMedia();
@@ -501,7 +504,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     type="range"
                     aria-label="Taille du corps"
                     min={0.5}
-                    max={2}
+                    max={5}
                     step={0.05}
                     value={textScale}
                     onChange={(e) => setTextScale(Number(e.target.value))}
@@ -510,7 +513,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   <div className="flex justify-between text-[10px] text-text-muted">
                     <span>50%</span>
                     <span>100%</span>
-                    <span>200%</span>
+                    <span>500%</span>
                   </div>
                 </div>
 
@@ -524,7 +527,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                     type="range"
                     aria-label="Taille du titre"
                     min={0.5}
-                    max={2}
+                    max={5}
                     step={0.05}
                     value={titleTextScale}
                     onChange={(e) => setTitleTextScale(Number(e.target.value))}
@@ -533,7 +536,7 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   <div className="flex justify-between text-[10px] text-text-muted">
                     <span>50%</span>
                     <span>100%</span>
-                    <span>200%</span>
+                    <span>500%</span>
                   </div>
                 </div>
               </div>
@@ -623,6 +626,31 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                       onChange={(e) => setLogoOpacity(Number(e.target.value))}
                       className="w-full accent-primary"
                     />
+                  </div>
+                )}
+
+                {/* Logo scale */}
+                {logoPath && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-text-secondary">Taille</label>
+                      <span className="text-xs text-text-muted tabular-nums">{logoScale}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      aria-label="Taille du logo"
+                      min={25}
+                      max={400}
+                      step={5}
+                      value={logoScale}
+                      onChange={(e) => setLogoScale(Number(e.target.value))}
+                      className="w-full accent-primary"
+                    />
+                    <div className="flex justify-between text-[10px] text-text-muted">
+                      <span>25%</span>
+                      <span>100%</span>
+                      <span>400%</span>
+                    </div>
                   </div>
                 )}
               </div>
