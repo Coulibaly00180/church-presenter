@@ -376,10 +376,29 @@ async function readSettingsConfig(): Promise<SettingsConfig> {
   }
 }
 
+// Queue de sérialisation des settings : garantit qu'un seul cycle
+// read→patch→write est actif à la fois, évitant les race conditions
+// entre modifications concurrentes de settings.json.
+let settingsWriteQueue: Promise<void> = Promise.resolve();
+
 async function writeSettingsConfig(cfg: SettingsConfig) {
   const cfgPath = getSettingsConfigPath();
   await mkdir(join(app.getPath("userData")), { recursive: true });
   await writeFile(cfgPath, JSON.stringify({ ...cfg, version: SETTINGS_VERSION }, null, 2), "utf-8");
+}
+
+/**
+ * Lit settings.json, applique le patch fourni, puis réécrit — le tout
+ * sérialisé dans une queue pour éviter les writes concurrents.
+ */
+async function patchSettingsConfig(patcher: (cfg: SettingsConfig) => SettingsConfig | Promise<SettingsConfig>): Promise<void> {
+  const run = async () => {
+    const current = await readSettingsConfig();
+    const next = await patcher(current);
+    await writeSettingsConfig(next);
+  };
+  settingsWriteQueue = settingsWriteQueue.then(run, run);
+  await settingsWriteQueue;
 }
 
 async function readLegacyFilesConfig(): Promise<FilesConfig> {
@@ -398,9 +417,7 @@ async function readLegacyFilesConfig(): Promise<FilesConfig> {
 }
 
 async function writeFilesConfig(cfg: FilesConfig) {
-  const settings = await readSettingsConfig();
-  const next: SettingsConfig = { ...settings, files: { ...cfg } };
-  await writeSettingsConfig(next);
+  await patchSettingsConfig((s) => ({ ...s, files: { ...cfg } }));
 }
 
 function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionAppearancePrefs | null {
@@ -469,9 +486,7 @@ async function readLegacyProjectionConfig(): Promise<ProjectionConfig> {
 }
 
 async function writeProjectionConfig(cfg: ProjectionConfig) {
-  const settings = await readSettingsConfig();
-  const next: SettingsConfig = { ...settings, projection: { ...cfg } };
-  await writeSettingsConfig(next);
+  await patchSettingsConfig((s) => ({ ...s, projection: { ...cfg } }));
 }
 
 async function readProjectionConfig(): Promise<ProjectionConfig> {
@@ -494,9 +509,7 @@ async function readAppConfig(): Promise<AppConfig> {
 }
 
 async function writeAppConfig(cfg: AppConfig) {
-  const settings = await readSettingsConfig();
-  const next: SettingsConfig = { ...settings, app: { ...cfg } };
-  await writeSettingsConfig(next);
+  await patchSettingsConfig((s) => ({ ...s, app: { ...cfg } }));
 }
 
 async function readShortcutsConfig(): Promise<ShortcutsConfig> {
@@ -505,9 +518,7 @@ async function readShortcutsConfig(): Promise<ShortcutsConfig> {
 }
 
 async function writeShortcutsConfig(shortcuts: ShortcutsConfig) {
-  const settings = await readSettingsConfig();
-  const next: SettingsConfig = { ...settings, shortcuts: sanitizeShortcutOverrides(shortcuts) };
-  await writeSettingsConfig(next);
+  await patchSettingsConfig((s) => ({ ...s, shortcuts: sanitizeShortcutOverrides(shortcuts) }));
 }
 
 async function readTemplatesConfig(): Promise<TemplatesConfig> {
@@ -516,9 +527,7 @@ async function readTemplatesConfig(): Promise<TemplatesConfig> {
 }
 
 async function writeTemplatesConfig(templates: TemplatesConfig) {
-  const settings = await readSettingsConfig();
-  const next: SettingsConfig = { ...settings, templates: sanitizePlanTemplates(templates) };
-  await writeSettingsConfig(next);
+  await patchSettingsConfig((s) => ({ ...s, templates: sanitizePlanTemplates(templates) }));
 }
 
 function cloneProjectionConfig(cfg?: ProjectionConfig): ProjectionConfig | undefined {
@@ -566,15 +575,13 @@ async function writeProfilesState(state: ProfilesState) {
     activeProfileId: state.activeProfileId,
     entries: state.entries.map((entry) => cloneSettingsProfile(entry)),
   });
-  const settings = await readSettingsConfig();
-  const next: SettingsConfig = {
-    ...settings,
+  await patchSettingsConfig((s) => ({
+    ...s,
     profiles: {
       activeProfileId: normalized.activeProfileId,
       entries: normalized.entries,
     },
-  };
-  await writeSettingsConfig(next);
+  }));
 }
 
 function getProfilesSnapshot(state: ProfilesState) {
@@ -734,30 +741,31 @@ function parseProfileRenamePayload(value: unknown): { profileId: string; name: s
 }
 
 async function migrateLegacySettingsIfNeeded() {
-  const settings = await readSettingsConfig();
-  let changed = false;
-  const next: SettingsConfig = { ...settings };
+  await patchSettingsConfig(async (settings) => {
+    let changed = false;
+    const next: SettingsConfig = { ...settings };
 
-  if (!next.files?.libraryDir) {
-    const legacyFiles = await readLegacyFilesConfig();
-    if (legacyFiles.libraryDir) {
-      next.files = { libraryDir: legacyFiles.libraryDir };
-      changed = true;
+    if (!next.files?.libraryDir) {
+      const legacyFiles = await readLegacyFilesConfig();
+      if (legacyFiles.libraryDir) {
+        next.files = { libraryDir: legacyFiles.libraryDir };
+        changed = true;
+      }
     }
-  }
 
-  if (!next.projection?.screens || Object.keys(next.projection.screens).length === 0) {
-    const legacyProjection = await readLegacyProjectionConfig();
-    if (legacyProjection.screens && Object.keys(legacyProjection.screens).length > 0) {
-      next.projection = { screens: legacyProjection.screens };
-      changed = true;
+    if (!next.projection?.screens || Object.keys(next.projection.screens).length === 0) {
+      const legacyProjection = await readLegacyProjectionConfig();
+      if (legacyProjection.screens && Object.keys(legacyProjection.screens).length > 0) {
+        next.projection = { screens: legacyProjection.screens };
+        changed = true;
+      }
     }
-  }
 
-  if (changed || settings.version !== SETTINGS_VERSION) {
-    next.version = SETTINGS_VERSION;
-    await writeSettingsConfig(next);
-  }
+    if (changed || settings.version !== SETTINGS_VERSION) {
+      next.version = SETTINGS_VERSION;
+    }
+    return next;
+  });
 }
 
 async function applyProjectionConfigOnStartup() {
