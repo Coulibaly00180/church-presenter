@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { usePlan } from "@/hooks/usePlan";
+import { parsePlanBackground } from "@/lib/projection";
 
 interface EditItemDialogProps {
   item: CpPlanItem | null;
@@ -95,27 +96,22 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
       setContent(item.content ?? "");
     }
     // Parse existing backgroundConfig
-    if (item.backgroundConfig) {
-      try {
-        const bg = JSON.parse(item.backgroundConfig) as CpItemBackground;
-        setBgEnabled(true);
-        if (bg.backgroundMediaType && bg.backgroundMedia) {
-          setBgMode(bg.backgroundMediaType === "VIDEO" ? "VIDEO" : "IMAGE");
-          setBgMediaPath(bg.backgroundMedia);
-        } else {
-          setBgMode((bg.backgroundMode as BgMode | undefined) ?? "SOLID");
-          setBgMediaPath(null);
-        }
-        setBgColor(bg.background ?? "#050505");
-        setBgFrom(bg.backgroundGradientFrom ?? "#2563eb");
-        setBgTo(bg.backgroundGradientTo ?? "#7c3aed");
-        setBgAngle(bg.backgroundGradientAngle ?? 135);
-        if (bg.foreground) { setFgEnabled(true); setFgColor(bg.foreground); }
-        else { setFgEnabled(false); setFgColor("#ffffff"); }
-      } catch {
-        setBgEnabled(false);
+    const bg = parsePlanBackground(item.backgroundConfig);
+    if (bg) {
+      setBgEnabled(true);
+      if (bg.backgroundMediaType && bg.backgroundMedia) {
+        setBgMode(bg.backgroundMediaType === "VIDEO" ? "VIDEO" : "IMAGE");
+        setBgMediaPath(bg.backgroundMedia);
+      } else {
+        setBgMode((bg.backgroundMode as BgMode | undefined) ?? "SOLID");
         setBgMediaPath(null);
       }
+      setBgColor(bg.background ?? "#050505");
+      setBgFrom(bg.backgroundGradientFrom ?? "#2563eb");
+      setBgTo(bg.backgroundGradientTo ?? "#7c3aed");
+      setBgAngle(bg.backgroundGradientAngle ?? 135);
+      if (bg.foreground) { setFgEnabled(true); setFgColor(bg.foreground); }
+      else { setFgEnabled(false); setFgColor("#ffffff"); }
     } else {
       setBgEnabled(false);
       setBgMode("SOLID");

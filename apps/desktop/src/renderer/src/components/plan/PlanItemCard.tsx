@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { getPlanKindDefaultTitle } from "@/lib/planKinds";
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
-import { projectPlanItemToTarget } from "@/lib/projection";
+import { projectPlanItemToTarget, parsePlanBackground } from "@/lib/projection";
 
 interface PlanItemCardProps {
   item: CpPlanItem;
@@ -64,12 +64,7 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
 
   const handleClick = useCallback(async () => {
     if (!live) return;
-    const planBg = (() => {
-      if (!plan?.backgroundConfig) return undefined;
-      try { return JSON.parse(plan.backgroundConfig) as CpItemBackground; }
-      catch { return undefined; }
-    })();
-    await projectPlanItemToTarget(live.target, item as import("@/lib/types").PlanItem, live, planBg);
+    await projectPlanItemToTarget(live.target, item as import("@/lib/types").PlanItem, live, parsePlanBackground(plan?.backgroundConfig));
   }, [item, live, plan]);
 
   const handleRemove = useCallback(async (e: React.MouseEvent) => {
@@ -151,12 +146,11 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
       {/* Kind badge */}
       <KindBadge kind={item.kind as CpPlanItemKind} className="shrink-0" />
       {item.backgroundConfig && (() => {
-        try {
-          const bg = JSON.parse(item.backgroundConfig) as CpItemBackground;
-          if (bg.backgroundMediaType === "VIDEO") return <FileVideo className="h-3 w-3 shrink-0 text-text-muted" />;
-          if (bg.backgroundMediaType === "IMAGE") return <FileImage className="h-3 w-3 shrink-0 text-text-muted" />;
-          return <span className="w-2 h-2 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: bg.background ?? bg.backgroundGradientFrom ?? "#888" }} />;
-        } catch { return null; }
+        const bg = parsePlanBackground(item.backgroundConfig);
+        if (!bg) return null;
+        if (bg.backgroundMediaType === "VIDEO") return <FileVideo className="h-3 w-3 shrink-0 text-text-muted" />;
+        if (bg.backgroundMediaType === "IMAGE") return <FileImage className="h-3 w-3 shrink-0 text-text-muted" />;
+        return <span className="w-2 h-2 rounded-full border border-white/30 shrink-0" style={{ backgroundColor: bg.background ?? bg.backgroundGradientFrom ?? "#888" }} />;
       })()}
 
       {/* Title + subtitle + notes indicator */}

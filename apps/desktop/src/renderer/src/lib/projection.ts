@@ -3,6 +3,17 @@ import { getPlanKindDefaultTitle, isPlanKindBible } from "./planKinds";
 import { LiveState, PlanItem, ScreenKey } from "./types";
 import type { CpItemBackground } from "../../../shared/ipc";
 
+/** Parse le backgroundConfig JSON d'un plan ou d'un item. Loggue un warning si corrompu. */
+export function parsePlanBackground(backgroundConfig: string | null | undefined): CpItemBackground | undefined {
+  if (!backgroundConfig) return undefined;
+  try {
+    return JSON.parse(backgroundConfig) as CpItemBackground;
+  } catch (e) {
+    console.warn("[projection] backgroundConfig corrompu :", e);
+    return undefined;
+  }
+}
+
 function formatBibleTitle(item: PlanItem): string {
   const rawTitle = (item.title || "").trim();
   if (rawTitle) return rawTitle;
@@ -32,11 +43,7 @@ export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem,
   const { title, body } = formatForProjection(item);
   const lockedScreens = live?.lockedScreens;
 
-  const itemBg = (() => {
-    if (!item.backgroundConfig) return undefined;
-    try { return JSON.parse(item.backgroundConfig) as CpItemBackground; }
-    catch { return undefined; }
-  })();
+  const itemBg = parsePlanBackground(item.backgroundConfig);
   const backgroundOverride: CpItemBackground | undefined =
     (planBackground || itemBg) ? { ...planBackground, ...itemBg } : undefined;
 
@@ -59,7 +66,10 @@ export async function projectPlanItemToTarget(target: ScreenKey, item: PlanItem,
   const secondaryTexts = (() => {
     if (!item.secondaryContent) return undefined;
     try { return JSON.parse(item.secondaryContent) as Array<{ label: string; body: string }>; }
-    catch { return undefined; }
+    catch (e) {
+      console.warn(`[projection] secondaryContent corrompu sur l'item "${item.id}" :`, e);
+      return undefined;
+    }
   })();
   await projectTextToScreen({ target, title, body, secondaryTexts, backgroundOverride, lockedScreens });
 }
