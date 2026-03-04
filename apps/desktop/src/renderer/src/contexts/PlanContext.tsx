@@ -147,9 +147,7 @@ export function PlanProvider({ children }: { children: React.ReactNode }) {
     // Optimistic update — remove all at once
     setPlan((prev) => prev ? { ...prev, items: prev.items.filter((i) => !idSet.has(i.id)) } : prev);
     try {
-      for (const itemId of itemIds) {
-        await window.cp.plans.removeItem({ planId: selectedPlanId, itemId });
-      }
+      await window.cp.plans.removeItems({ planId: selectedPlanId, itemIds });
     } catch {
       toast.error("Impossible de supprimer les éléments");
       await refreshPlan(); // rollback on error

@@ -212,11 +212,13 @@ export type CpPlanUpdateResult = { ok: true };
 export type CpPlanUpdateItemPayload = { planId: string; itemId: string; title?: string; content?: string; notes?: string; secondaryContent?: string | null; backgroundConfig?: string | null };
 export type CpPlanUpdateItemResult = { ok: true };
 export type CpPlanRemoveItemPayload = { planId: string; itemId: string };
+export type CpPlanRemoveItemsPayload = { planId: string; itemIds: string[] };
 export type CpPlanReorderPayload = { planId: string; orderedItemIds: string[] };
 export type CpPlanExportPayload = { planId: string };
 
 export type CpPlanDeleteResult = { ok: true };
 export type CpPlanRemoveItemResult = { ok: true };
+export type CpPlanRemoveItemsResult = { ok: true };
 export type CpPlanReorderResult = { ok: true };
 export type CpPlanExportResult = { ok: true; path: string } | { ok: false; canceled: true };
 
@@ -452,6 +454,7 @@ export interface CpApi {
     addItem: (payload: CpPlanAddItemPayload) => Promise<CpPlanItem>;
     updateItem: (payload: CpPlanUpdateItemPayload) => Promise<CpPlanUpdateItemResult>;
     removeItem: (payload: CpPlanRemoveItemPayload) => Promise<CpPlanRemoveItemResult>;
+    removeItems: (payload: CpPlanRemoveItemsPayload) => Promise<CpPlanRemoveItemsResult>;
     reorder: (payload: CpPlanReorderPayload) => Promise<CpPlanReorderResult>;
     export: (payload: CpPlanExportPayload) => Promise<CpPlanExportResult>;
     importFromFile: (planId: string) => Promise<{ ok: true; added: number } | { ok: false; canceled: true } | { ok: false; error: string }>;

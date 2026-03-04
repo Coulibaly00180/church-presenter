@@ -15,6 +15,7 @@ import type {
   CpPlanUpdatePayload,
   CpPlanUpdateItemPayload,
   CpPlanRemoveItemPayload,
+  CpPlanRemoveItemsPayload,
   CpPlanReorderPayload,
   CpProjectionCurrent,
   CpProjectionMode,
@@ -463,6 +464,16 @@ export function parsePlanRemoveItemPayload(value: unknown): CpPlanRemoveItemPayl
   return {
     planId: expectString(rec.planId, "plans:removeItem.planId"),
     itemId: expectString(rec.itemId, "plans:removeItem.itemId"),
+  };
+}
+
+export function parsePlanRemoveItemsPayload(value: unknown): CpPlanRemoveItemsPayload {
+  const rec = expectRecord(value, "plans:removeItems payload");
+  return {
+    planId: expectString(rec.planId, "plans:removeItems.planId"),
+    itemIds: expectArray(rec.itemIds, "plans:removeItems.itemIds").map((id, idx) =>
+      expectString(id, `plans:removeItems.itemIds[${idx}]`)
+    ),
   };
 }
 
