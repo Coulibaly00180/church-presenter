@@ -12,6 +12,7 @@ import {
   parsePlanDuplicatePayload,
   parsePlanExportPayload,
   parsePlanRemoveItemPayload,
+  parsePlanRemoveItemsPayload,
   parsePlanReorderPayload,
   parsePlanUpdatePayload,
   parsePlanUpdateItemPayload,
@@ -254,6 +255,36 @@ export function registerPlansIpc() {
       });
 
       for (const [idx, it] of items.entries()) {
+        await tx.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } });
+      }
+    });
+
+    return { ok: true };
+  });
+
+  ipcMain.handle("plans:removeItems", async (_evt, rawPayload: unknown) => {
+    const prisma = getPrisma();
+    const payload = parsePlanRemoveItemsPayload(rawPayload);
+    if (payload.itemIds.length === 0) return { ok: true };
+
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Vérifier que tous les items appartiennent bien au plan
+      const items = await tx.serviceItem.findMany({
+        where: { id: { in: payload.itemIds } },
+        select: { id: true, planId: true },
+      });
+      const foreign = items.find((i) => i.planId !== payload.planId);
+      if (foreign) throw new Error(`Item ${foreign.id} does not belong to plan ${payload.planId}`);
+
+      await tx.serviceItem.deleteMany({ where: { id: { in: payload.itemIds } } });
+
+      // Renuméroter les items restants
+      const remaining = await tx.serviceItem.findMany({
+        where: { planId: payload.planId },
+        orderBy: { order: "asc" },
+        select: { id: true },
+      });
+      for (const [idx, it] of remaining.entries()) {
         await tx.serviceItem.update({ where: { id: it.id }, data: { order: idx + 1 } });
       }
     });
