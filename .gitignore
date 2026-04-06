@@ -69,3 +69,4 @@ apps/**/data/*.db
 apps/**/data/*.db-shm
 apps/**/data/*.db-wal
 apps/**/data/backups
+AGENTS.md
