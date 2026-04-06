@@ -268,6 +268,7 @@ export function parseProjectionSetAppearancePayload(value: unknown): CpProjectio
   if (rec.logoPath !== undefined) patch.logoPath = expectString(rec.logoPath, "projection:setAppearance.logoPath", { allowEmpty: true });
   if (rec.logoPosition !== undefined) patch.logoPosition = parseLogoPosition(rec.logoPosition, "projection:setAppearance.logoPosition");
   if (rec.logoOpacity !== undefined) patch.logoOpacity = expectNumber(rec.logoOpacity, "projection:setAppearance.logoOpacity");
+  if (rec.logoScale !== undefined) patch.logoScale = expectNumber(rec.logoScale, "projection:setAppearance.logoScale");
   if (rec.foregroundMode !== undefined) patch.foregroundMode = parseForegroundFillMode(rec.foregroundMode, "projection:setAppearance.foregroundMode");
   if (rec.foregroundGradientFrom !== undefined) patch.foregroundGradientFrom = expectString(rec.foregroundGradientFrom, "projection:setAppearance.foregroundGradientFrom");
   if (rec.foregroundGradientTo !== undefined) patch.foregroundGradientTo = expectString(rec.foregroundGradientTo, "projection:setAppearance.foregroundGradientTo");

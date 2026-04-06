@@ -42,6 +42,27 @@ function isUniqueConstraintError(err: unknown) {
   return typeof err === "object" && err !== null && "code" in err && (err as { code?: string }).code === "P2002";
 }
 
+type DuplicatePlanSourceItem = {
+  order: number;
+  kind: string;
+  title?: string | null;
+  content?: string | null;
+  refId?: string | null;
+  refSubId?: string | null;
+  songId?: string | null;
+  mediaPath?: string | null;
+  notes?: string | null;
+  secondaryContent?: string | null;
+  backgroundConfig?: string | null;
+};
+
+type DuplicatePlanSource = {
+  date: string | Date;
+  title?: string | null;
+  backgroundConfig?: string | null;
+  items: DuplicatePlanSourceItem[];
+};
+
 export async function createPlanItemWithRetry(
   prisma: ReturnType<typeof getPrisma>,
   payload: ReturnType<typeof parsePlanAddItemPayload>,
@@ -82,6 +103,56 @@ export async function createPlanItemWithRetry(
   throw new Error("Unable to allocate a unique plan item order");
 }
 
+export async function duplicatePlanWithRetry(
+  prisma: ReturnType<typeof getPrisma>,
+  base: DuplicatePlanSource,
+  payload: ReturnType<typeof parsePlanDuplicatePayload>,
+  maxRetries = 3660
+) {
+  const baseDateIso = base.date instanceof Date ? base.date.toISOString() : String(base.date);
+  let candidateDate = normalizeDateToMidnight(payload.dateIso || baseDateIso);
+  const title = payload.title?.trim() || base.title || "Culte";
+
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
+    try {
+      return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const created = await tx.servicePlan.create({
+          data: { date: candidateDate, title, backgroundConfig: base.backgroundConfig },
+        });
+
+        for (const it of base.items) {
+          await tx.serviceItem.create({
+            data: {
+              planId: created.id,
+              order: it.order,
+              kind: normalizeCpPlanItemKind(it.kind),
+              title: it.title,
+              content: it.content,
+              refId: it.refId,
+              refSubId: it.refSubId,
+              songId: it.songId,
+              mediaPath: it.mediaPath,
+              notes: it.notes,
+              secondaryContent: it.secondaryContent,
+              backgroundConfig: it.backgroundConfig,
+            },
+          });
+        }
+
+        return tx.servicePlan.findUnique({
+          where: { id: created.id },
+          include: { items: { orderBy: { order: "asc" } } },
+        });
+      });
+    } catch (e) {
+      if (!isUniqueConstraintError(e) || attempt === maxRetries - 1) throw e;
+      candidateDate = addUtcDays(candidateDate, 1);
+    }
+  }
+
+  throw new Error("Unable to find an available plan date");
+}
+
 export function registerPlansIpc() {
   ipcMain.handle("plans:list", async () => {
     const prisma = getPrisma();
@@ -118,45 +189,7 @@ export function registerPlansIpc() {
       include: { items: { orderBy: { order: "asc" } } },
     });
     if (!base) throw new Error("Plan not found");
-
-    let candidateDate = normalizeDateToMidnight(payload.dateIso || base.date.toISOString());
-    const title = payload.title?.trim() || base.title || "Culte";
-
-    for (let attempt = 0; attempt < 3660; attempt += 1) {
-      try {
-        return await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-          const created = await tx.servicePlan.create({
-            data: { date: candidateDate, title },
-          });
-
-          for (const it of base.items) {
-            await tx.serviceItem.create({
-              data: {
-                planId: created.id,
-                order: it.order,
-                kind: normalizeCpPlanItemKind(it.kind),
-                title: it.title,
-                content: it.content,
-                refId: it.refId,
-                refSubId: it.refSubId,
-                songId: it.songId,
-                mediaPath: it.mediaPath,
-              },
-            });
-          }
-
-          return tx.servicePlan.findUnique({
-            where: { id: created.id },
-            include: { items: { orderBy: { order: "asc" } } },
-          });
-        });
-      } catch (e) {
-        if (!isUniqueConstraintError(e)) throw e;
-        candidateDate = addUtcDays(candidateDate, 1);
-      }
-    }
-
-    throw new Error("Unable to find an available plan date");
+    return duplicatePlanWithRetry(prisma, base, payload);
   });
 
   ipcMain.handle("plans:create", async (_evt, rawPayload: unknown) => {

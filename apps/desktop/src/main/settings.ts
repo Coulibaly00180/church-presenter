@@ -44,6 +44,7 @@ export type ProjectionAppearancePrefs = {
   logoPath?: string;
   logoPosition?: CpProjectionState["logoPosition"];
   logoOpacity?: number;
+  logoScale?: number;
   foreground?: string;
   foregroundMode?: CpProjectionState["foregroundMode"];
   foregroundGradientFrom?: string;
@@ -222,6 +223,7 @@ export function sanitizeProjectionAppearancePrefs(value: unknown): ProjectionApp
     out.logoPosition = rec.logoPosition;
   }
   if (typeof rec.logoOpacity === "number" && Number.isFinite(rec.logoOpacity)) out.logoOpacity = rec.logoOpacity;
+  if (typeof rec.logoScale === "number" && Number.isFinite(rec.logoScale)) out.logoScale = rec.logoScale;
   if (typeof rec.foreground === "string") out.foreground = rec.foreground;
   if (rec.foregroundMode === "SOLID" || rec.foregroundMode === "GRADIENT") out.foregroundMode = rec.foregroundMode;
   if (typeof rec.foregroundGradientFrom === "string") out.foregroundGradientFrom = rec.foregroundGradientFrom;
@@ -564,6 +566,7 @@ export function pickProjectionAppearancePrefs(state: CpProjectionState): Project
     logoPath: state.logoPath,
     logoPosition: state.logoPosition,
     logoOpacity: state.logoOpacity,
+    logoScale: state.logoScale,
     foreground: state.foreground,
     foregroundMode: state.foregroundMode,
     foregroundGradientFrom: state.foregroundGradientFrom,

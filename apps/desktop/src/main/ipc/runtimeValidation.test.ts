@@ -6,6 +6,7 @@ import {
   parseDataImportPayload,
   parseLiveSetPayload,
   parsePlanReorderPayload,
+  parseProjectionSetAppearancePayload,
   parseProjectionSetMediaPayload,
   parseProjectionStatePatch,
   parseScreenMirrorMode,
@@ -73,6 +74,13 @@ describe("runtime validation", () => {
     expect(() => parseProjectionSetMediaPayload({ mediaPath: "/tmp/a.pdf", mediaType: "AUDIO" })).toThrow(
       "must be one of"
     );
+  });
+
+  it("accepts logoScale in projection appearance payload", () => {
+    expect(parseProjectionSetAppearancePayload({ logoPath: "C:\\logo.png", logoScale: 135 })).toEqual({
+      logoPath: "C:\\logo.png",
+      logoScale: 135,
+    });
   });
 
   it("validates screen mirror payload", () => {

@@ -33,11 +33,15 @@ type ImportedPlanItem = {
   title?: string;
   content?: string;
   mediaPath?: string;
+  notes?: string;
+  secondaryContent?: string;
+  backgroundConfig?: string;
 };
 
 type ImportedPlan = {
   date?: string | Date;
   title?: string;
+  backgroundConfig?: string;
   items?: ImportedPlanItem[];
 };
 
@@ -82,11 +86,15 @@ type NormalizedPlanItem = {
   title?: string;
   content?: string;
   mediaPath?: string;
+  notes?: string;
+  secondaryContent?: string;
+  backgroundConfig?: string;
 };
 
 type NormalizedPlan = {
   date?: string | Date;
   title: string;
+  backgroundConfig?: string;
   items: NormalizedPlanItem[];
 };
 export type DataNormalizedPlan = NormalizedPlan;
@@ -110,6 +118,10 @@ function asStringLike(value: unknown): string | undefined {
   if (typeof value === "string") return asString(value);
   if (typeof value === "number") return String(value);
   return undefined;
+}
+
+function asRawString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function asPositiveInt(value: unknown, fallback: number) {
@@ -245,6 +257,7 @@ export async function createPlanWithItems(tx: Prisma.TransactionClient, planData
     data: {
       date: normalizeDateToMidnight(planData.date),
       title: planData.title,
+      backgroundConfig: planData.backgroundConfig,
     },
   });
   for (const it of planData.items) {
@@ -258,6 +271,9 @@ export async function createPlanWithItems(tx: Prisma.TransactionClient, planData
         title: it.title,
         content: it.content,
         mediaPath: it.mediaPath,
+        notes: it.notes,
+        secondaryContent: it.secondaryContent,
+        backgroundConfig: it.backgroundConfig,
       },
     });
   }
@@ -332,7 +348,7 @@ export async function importNormalizedDataMerge(
   return { ok: true, imported: true, partial: errors.length > 0, counts: { songs: songsImported, plans: plansImported }, errors };
 }
 
-function normalizePlans(rawPlans: unknown, errors: CpDataImportError[]): NormalizedPlan[] {
+export function normalizePlans(rawPlans: unknown, errors: CpDataImportError[]): NormalizedPlan[] {
   if (rawPlans == null) return [];
   if (!Array.isArray(rawPlans)) {
     pushValidationError(errors, "plans doit etre un tableau");
@@ -385,6 +401,9 @@ function normalizePlans(rawPlans: unknown, errors: CpDataImportError[]): Normali
             title: asStringLike(it.title),
             content: asStringLike(it.content),
             mediaPath: asStringLike(it.mediaPath),
+            notes: asRawString(it.notes),
+            secondaryContent: asRawString(it.secondaryContent),
+            backgroundConfig: asRawString(it.backgroundConfig),
           });
         }
       }
@@ -393,6 +412,7 @@ function normalizePlans(rawPlans: unknown, errors: CpDataImportError[]): Normali
     plans.push({
       date: p.date,
       title,
+      backgroundConfig: asRawString(p.backgroundConfig),
       items,
     });
   }
