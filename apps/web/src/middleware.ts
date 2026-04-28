@@ -1,6 +1,8 @@
-import { auth } from "@/lib/auth"
+import NextAuth from "next-auth"
+import { authConfig } from "@/lib/auth.config"
 import { NextResponse } from "next/server"
-import { canAccessUserAdmin } from "@/lib/roles"
+
+const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
@@ -10,13 +12,8 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/login", req.nextUrl))
   }
 
-  // Protection de la zone admin au niveau middleware
-  if (isLoggedIn && pathname.startsWith("/app/admin")) {
-    const role = (req.auth?.user as { role?: string } | undefined)?.role ?? ""
-    if (!canAccessUserAdmin(role)) {
-      return NextResponse.redirect(new URL("/app", req.nextUrl))
-    }
-  }
+  // La vérification fine du rôle admin se fait côté serveur dans les pages /app/admin/*
+  // (le middleware Edge ne peut pas importer canAccessUserAdmin sans alourdir le bundle)
 
   return NextResponse.next()
 })
