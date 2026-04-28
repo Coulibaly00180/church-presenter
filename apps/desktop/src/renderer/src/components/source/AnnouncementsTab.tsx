@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { FileImage, FileText, FileVideo, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { usePlan } from "@/hooks/usePlan";
 
 export function AnnouncementsTab() {
@@ -58,22 +59,27 @@ export function AnnouncementsTab() {
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      {/* Text announcement */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-text-secondary">Annonce texte</p>
-        <input
+      <section className="space-y-3 rounded-2xl border border-border bg-bg-surface p-4">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">Annonce texte</p>
+          <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+            Rédige une annonce rapide et ajoute-la directement au plan.
+          </p>
+        </div>
+        <Input
           type="text"
           placeholder="Titre (optionnel)"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+          aria-label="Titre de l'annonce"
         />
         <textarea
           placeholder="Texte de l'annonce…"
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={4}
-          className="w-full px-2.5 py-1.5 text-sm rounded-md border border-border bg-bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+          className="min-h-[120px] w-full resize-none rounded-md border border-border bg-bg-base px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+          aria-label="Texte de l'annonce"
         />
         <Button
           variant="outline"
@@ -85,16 +91,20 @@ export function AnnouncementsTab() {
           <Plus className="h-4 w-4" />
           Ajouter au plan
         </Button>
-      </div>
+      </section>
 
-      {/* Media */}
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-text-secondary">Médias</p>
-        <div className="flex gap-2">
+      <section className="space-y-3 rounded-2xl border border-border bg-bg-surface p-4">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">Annonces médias</p>
+          <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+            Ajoute une image, un PDF ou une vidéo depuis la bibliothèque.
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5"
+            className="justify-start gap-1.5"
             onClick={() => void handleAddImage()}
           >
             <FileImage className="h-4 w-4" />
@@ -103,7 +113,7 @@ export function AnnouncementsTab() {
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5"
+            className="justify-start gap-1.5"
             onClick={() => void handleAddPdf()}
           >
             <FileText className="h-4 w-4" />
@@ -112,14 +122,14 @@ export function AnnouncementsTab() {
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5"
+            className="justify-start gap-1.5"
             onClick={() => void handleAddVideo()}
           >
             <FileVideo className="h-4 w-4" />
             Vidéo
           </Button>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -11,7 +11,9 @@
     "build": "npm run build -w @cp/desktop",
     "dist:win": "npm run dist:win -w @cp/desktop",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run typecheck -w @cp/desktop",
-    "test": "npm run test -w @cp/desktop"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "web:dev": "npm run dev -w @cp/web",
+    "web:build": "npm run build -w @cp/web"
   }
 }

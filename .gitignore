@@ -53,6 +53,7 @@ apps/**/dist
 apps/**/out
 apps/**/build
 apps/**/release
+apps/**/.env
 apps/**/.env.local
 apps/**/.env.development
 apps/**/.env.test

@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Profil Utilisateur - WorshipFlow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#07006c",
+                        "primary-container": "#8083ff",
+                        "on-error-container": "#ffdad6",
+                        "on-surface": "#dae2fd",
+                        "on-primary-container": "#0d0096",
+                        "primary-fixed": "#e1e0ff",
+                        "on-surface-variant": "#c7c4d7",
+                        "inverse-on-surface": "#283044",
+                        "secondary-fixed-dim": "#3cddc7",
+                        "inverse-surface": "#dae2fd",
+                        "on-secondary-fixed-variant": "#005047",
+                        "on-background": "#dae2fd",
+                        "on-tertiary-fixed-variant": "#891933",
+                        "surface-tint": "#c0c1ff",
+                        "tertiary-container": "#ea6479",
+                        "tertiary": "#ffb2b9",
+                        "outline-variant": "#464554",
+                        "on-tertiary-container": "#5b001a",
+                        "on-tertiary-fixed": "#400010",
+                        "on-primary": "#1000a9",
+                        "surface": "#0b1326",
+                        "error-container": "#93000a",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed": "#ffdadc",
+                        "error": "#ffb4ab",
+                        "on-secondary-container": "#004d44",
+                        "surface-bright": "#31394d",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "inverse-primary": "#494bd6",
+                        "primary": "#c0c1ff",
+                        "on-error": "#690005",
+                        "surface-container": "#171f33",
+                        "surface-container-low": "#131b2e",
+                        "surface-dim": "#0b1326",
+                        "surface-variant": "#2d3449",
+                        "outline": "#908fa0",
+                        "secondary-fixed": "#62fae3",
+                        "on-secondary": "#003731",
+                        "on-tertiary": "#67001f",
+                        "secondary-container": "#03c6b2",
+                        "tertiary-fixed-dim": "#ffb2b9",
+                        "on-secondary-fixed": "#00201c",
+                        "background": "#0b1326",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#44e2cd",
+                        "surface-container-high": "#222a3d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-max": "1280px",
+                        "sm": "12px",
+                        "gutter": "24px",
+                        "xs": "4px",
+                        "lg": "48px",
+                        "md": "24px",
+                        "base": "8px",
+                        "xl": "80px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Manrope"],
+                        "label-caps": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "display-xl": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "headline-md": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "500" }],
+                        "display-xl": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            background-image: radial-gradient(circle at 10% 20%, rgba(192, 193, 255, 0.05) 0%, transparent 40%),
+                              radial-gradient(circle at 90% 80%, rgba(68, 226, 205, 0.05) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+        .glass-card {
+            background-color: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .glow-active {
+            box-shadow: inset 0 0 0 1px rgba(192, 193, 255, 0.2);
+        }
+        .btn-gradient {
+            background: linear-gradient(135deg, theme('colors.inverse-primary'), theme('colors.on-primary-fixed-variant'));
+            transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+            box-shadow: 0 0 15px rgba(73, 75, 214, 0.4);
+        }
+        
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: theme('colors.surface-container-lowest'); 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: theme('colors.surface-variant'); 
+            border-radius: theme('borderRadius.full');
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline'); 
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row antialiased">
+<!-- TopAppBar (Mobile Only) -->
+<header class="md:hidden bg-slate-950/80 backdrop-blur-xl docked full-width top-0 z-40 border-b border-white/10 shadow-lg shadow-indigo-500/5 fixed top-0 left-0 w-full flex justify-between items-center px-6 h-16">
+<div class="flex items-center gap-4">
+<h1 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500 font-['Manrope'] font-bold tracking-tight">WorshipFlow</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-indigo-500 dark:text-indigo-400 hover:bg-white/5 hover:text-indigo-300 transition-all active:scale-95 duration-200 p-2 rounded-full">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+<img alt="User avatar" class="w-8 h-8 rounded-full border border-white/10 object-cover" data-alt="Close-up portrait of a smiling young man with short dark hair, wearing a casual grey t-shirt, against a clean white background, soft natural lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAP4dcZnIbYGHTVXCIlYM75YTzikz1Pe37LZ2VIg3pRc16B-Hh4mOcqZsSrXZIL1zCKZT8uCqz8_t6_CZd10tOc8x2GfkVUL_gudlmFMjL9lqFXTZeQTvErvNv7MiEA-_ByuwNqMRAUnYaFk7U-PleJVRkPTfszFLFKjwouGxNmZY1CTh3ueFawT3r0dBeL3ITfc3RuDpeMjTU8CG1fMWxA_3B7vG-Njx11pWSlpKXuY58Fe3EXmzvBuKfypwX8Y1EITtmURVqpm6I"/>
+</div>
+</header>
+<!-- SideNavBar (Web Only) -->
+<nav class="hidden md:flex bg-slate-950/90 backdrop-blur-2xl h-screen w-64 border-r border-white/10 shadow-2xl shadow-black fixed left-0 top-0 h-full flex-col pt-20 pb-8 px-4 z-30">
+<div class="mb-10 px-4">
+<h2 class="text-xl font-extrabold text-indigo-400 font-['Manrope'] text-sm font-semibold mb-1">WorshipFlow</h2>
+<p class="text-slate-500 text-xs font-['Manrope']">Exuberant &amp; Organized</p>
+</div>
+<ul class="flex flex-col gap-2 flex-grow">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform font-['Manrope'] text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+                    Tableau de Bord
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform font-['Manrope'] text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">library_music</span>
+                    Bibliothèque
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform font-['Manrope'] text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">event_note</span>
+                    Plans
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform font-['Manrope'] text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">group</span>
+                    Utilisateurs
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-500/20 to-transparent text-indigo-400 border-l-4 border-indigo-500 hover:translate-x-1 transition-transform font-['Manrope'] text-sm font-semibold" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+                    Profil
+                </a>
+</li>
+</ul>
+<div class="mt-auto px-4 flex items-center gap-3 border-t border-white/5 pt-4">
+<img alt="Church Logo" class="w-10 h-10 rounded-full border border-white/10 object-cover" data-alt="Close-up portrait of a smiling young man with short dark hair, wearing a casual grey t-shirt, against a clean white background, soft natural lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3Y6gfLGFkx6hda0OJ4J3nk2v2lyUKCCeiL7NYQI3PtZ3GjzUKclb747XlWymjdta-kFprZfItfFsbzdOKUJZM8w0EA2YLW5la6QCs83XzYrBBf-wTjP6EJx5GeZW0zwswRFNZpDEqywguz0GDE9LZWiyjUr3zrmrUJqOR7O1yuHsQ0hcvmWkkjCJnEGB0iBK8bkInZEEonQrpOK5wTjh-UQ-PRoLXa2YwzeZQv6hT5ttSnyAOENzDIR9pO8M9fOc_mGxEqXaH6nA"/>
+<div>
+<p class="text-sm font-['Manrope'] font-bold text-slate-200">Alexandre</p>
+<p class="text-xs font-['Manrope'] text-slate-500">Leader Louange</p>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-20 pb-24 md:pb-8 md:pl-64 min-h-screen flex flex-col relative z-10">
+<div class="max-w-[1280px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-lg">
+<!-- Header Section -->
+<header class="flex flex-col gap-sm md:flex-row md:items-end justify-between">
+<div>
+<p class="font-label-caps text-label-caps text-primary uppercase tracking-widest mb-2">Mon Espace</p>
+<h1 class="font-display-xl text-display-xl text-on-background">Profil Utilisateur</h1>
+</div>
+<button class="btn-gradient px-6 py-3 rounded-lg font-body-md text-body-md text-white font-bold flex items-center gap-2 w-fit">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">save</span>
+                    Enregistrer les modifications
+                </button>
+</header>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Personal Info & Settings -->
+<div class="lg:col-span-4 flex flex-col gap-gutter">
+<!-- Profile Card -->
+<section class="glass-card rounded-xl p-md flex flex-col items-center text-center relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-surface-container-high to-surface-container opacity-50 z-0"></div>
+<div class="relative z-10 mt-6 mb-4">
+<div class="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-secondary to-primary-container">
+<img alt="Profile Photo" class="w-full h-full rounded-full object-cover border-4 border-surface" data-alt="High quality portrait photo of a smiling man with a neat beard, wearing a dark blue shirt, well-lit studio setting with a dark background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB83SGkV5kKTb4xO4auqzAw0l2VhGPlUiSGB0BifvCqVahxvDwGcoQ6mr5TWY4yqfVNkXOEJN4TWNZX9lORuc-AmHcUJKwVQul6CTF3b5ee6hXaA3HTjzglRnntpT_d8vqJxG7PqZXw7jeirdKD-KQOLwLFYwTddcOrJEBte869QuSUvLZCFErAsy48OCkO3QC_9s-ThKLPCktWLzKTtgXF-WxEdm00RZ-3WWt9qHtpVNk0HA21538HWV5F6Ez6au6gVI6cQlBBL5E"/>
+</div>
+<button class="absolute bottom-0 right-0 bg-surface-container-high text-on-surface p-2 rounded-full border border-outline-variant hover:bg-surface-variant transition-colors">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">photo_camera</span>
+</button>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface relative z-10">Alexandre Dubois</h2>
+<p class="font-body-md text-body-md text-on-surface-variant relative z-10 mb-6">alexandre.d@eglise-espoir.com</p>
+<div class="w-full space-y-4 relative z-10 text-left">
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-label-caps text-outline">Nom Complet</label>
+<input class="bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all font-body-md text-body-md w-full" type="text" value="Alexandre Dubois"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-label-caps text-outline">Email</label>
+<input class="bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all font-body-md text-body-md w-full" type="email" value="alexandre.d@eglise-espoir.com"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-label-caps text-outline">Rôle</label>
+<div class="bg-surface-container-low border border-outline-variant rounded-lg px-4 py-3 text-on-surface-variant font-body-md text-body-md w-full flex items-center justify-between cursor-not-allowed opacity-70">
+                                    Leader Louange
+                                    <span class="material-symbols-outlined text-outline" style="font-variation-settings: 'FILL' 0;">lock</span>
+</div>
+</div>
+</div>
+</section>
+<!-- App Settings -->
+<section class="glass-card rounded-xl p-md">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 0;">settings</span>
+                            Paramètres
+                        </h3>
+<div class="space-y-6">
+<!-- Theme Toggle -->
+<div class="flex items-center justify-between">
+<div>
+<p class="font-body-lg text-body-lg text-on-surface">Thème Sombre</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Apparence de l'interface</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+<hr class="border-outline-variant/30"/>
+<!-- Notifications -->
+<div class="flex items-center justify-between">
+<div>
+<p class="font-body-lg text-body-lg text-on-surface">Notifications Push</p>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Rappels de répétition</p>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input checked="" class="sr-only peer" type="checkbox" value=""/>
+<div class="w-11 h-6 bg-surface-container-highest rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+</label>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Security & Favorites -->
+<div class="lg:col-span-8 flex flex-col gap-gutter">
+<!-- Security / Password -->
+<section class="glass-card rounded-xl p-md border-l-4 border-l-tertiary-container">
+<h3 class="font-headline-md text-headline-md text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary" style="font-variation-settings: 'FILL' 0;">security</span>
+                            Sécurité
+                        </h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-label-caps text-outline">Nouveau mot de passe</label>
+<input class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-tertiary focus:ring-1 focus:ring-tertiary transition-all font-body-md text-body-md w-full" placeholder="••••••••" type="password"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-label-caps text-outline">Confirmer mot de passe</label>
+<input class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-on-surface focus:outline-none focus:border-tertiary focus:ring-1 focus:ring-tertiary transition-all font-body-md text-body-md w-full" placeholder="••••••••" type="password"/>
+</div>
+</div>
+<div class="mt-4 flex justify-end">
+<button class="bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface px-4 py-2 rounded-lg font-body-md text-body-md font-medium transition-colors">
+                                Mettre à jour le mot de passe
+                            </button>
+</div>
+</section>
+<!-- Favorites Grid -->
+<section class="glass-card rounded-xl p-md flex-grow flex flex-col">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container" style="font-variation-settings: 'FILL' 1;">favorite</span>
+                                Mes Chants Favoris
+                            </h3>
+<button class="text-primary hover:text-primary-container text-sm font-body-md font-medium transition-colors flex items-center gap-1">
+                                Voir tout <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</button>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 auto-rows-max">
+<!-- Favorite Song Card 1 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 hover:border-primary-container/50 rounded-lg p-4 transition-all hover:bg-surface-container-low group cursor-pointer relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-r from-primary-container/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start relative z-10">
+<div>
+<h4 class="font-body-lg text-body-lg text-on-surface font-bold mb-1 group-hover:text-primary-fixed transition-colors">Océans</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Hillsong UNITED</p>
+</div>
+<span class="bg-surface-container-highest text-secondary text-xs px-2 py-1 rounded font-label-caps">Ré D</span>
+</div>
+<div class="mt-4 flex items-center gap-2 text-outline-variant relative z-10">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">mic</span>
+<span class="text-xs font-body-md">Soprano Lead</span>
+</div>
+</div>
+<!-- Favorite Song Card 2 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 hover:border-primary-container/50 rounded-lg p-4 transition-all hover:bg-surface-container-low group cursor-pointer relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-r from-primary-container/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start relative z-10">
+<div>
+<h4 class="font-body-lg text-body-lg text-on-surface font-bold mb-1 group-hover:text-primary-fixed transition-colors">La Bénédiction</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Kari Jobe</p>
+</div>
+<span class="bg-surface-container-highest text-secondary text-xs px-2 py-1 rounded font-label-caps">Sol G</span>
+</div>
+<div class="mt-4 flex items-center gap-2 text-outline-variant relative z-10">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">piano</span>
+<span class="text-xs font-body-md">Arrangement Clavier</span>
+</div>
+</div>
+<!-- Favorite Song Card 3 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 hover:border-primary-container/50 rounded-lg p-4 transition-all hover:bg-surface-container-low group cursor-pointer relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-r from-primary-container/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start relative z-10">
+<div>
+<h4 class="font-body-lg text-body-lg text-on-surface font-bold mb-1 group-hover:text-primary-fixed transition-colors">Glorieux Echange</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Dan Luiten</p>
+</div>
+<span class="bg-surface-container-highest text-secondary text-xs px-2 py-1 rounded font-label-caps">La A</span>
+</div>
+<div class="mt-4 flex items-center gap-2 text-outline-variant relative z-10">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">music_note</span>
+<span class="text-xs font-body-md">Voix 2</span>
+</div>
+</div>
+<!-- Favorite Song Card 4 -->
+<div class="bg-surface-container-lowest border border-outline-variant/50 hover:border-primary-container/50 rounded-lg p-4 transition-all hover:bg-surface-container-low group cursor-pointer relative overflow-hidden">
+<div class="absolute inset-0 bg-gradient-to-r from-primary-container/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start relative z-10">
+<div>
+<h4 class="font-body-lg text-body-lg text-on-surface font-bold mb-1 group-hover:text-primary-fixed transition-colors">Tu Es Bon</h4>
+<p class="font-body-md text-body-md text-on-surface-variant text-sm">Bethel Music</p>
+</div>
+<span class="bg-surface-container-highest text-secondary text-xs px-2 py-1 rounded font-label-caps">Mi E</span>
+</div>
+<div class="mt-4 flex items-center gap-2 text-outline-variant relative z-10">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 0;">queue_music</span>
+<span class="text-xs font-body-md">Setlist Dimanche</span>
+</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-2xl border-t border-white/5 pb-safe z-40">
+<ul class="flex justify-around items-center h-16 px-2">
+<li>
+<a class="flex flex-col items-center justify-center w-16 h-full text-slate-500 hover:text-slate-200" href="#">
+<span class="material-symbols-outlined mb-1 text-xl" style="font-variation-settings: 'FILL' 0;">dashboard</span>
+<span class="text-[10px] font-['Manrope'] font-medium">Accueil</span>
+</a>
+</li>
+<li>
+<a class="flex flex-col items-center justify-center w-16 h-full text-slate-500 hover:text-slate-200" href="#">
+<span class="material-symbols-outlined mb-1 text-xl" style="font-variation-settings: 'FILL' 0;">library_music</span>
+<span class="text-[10px] font-['Manrope'] font-medium">Chants</span>
+</a>
+</li>
+<li>
+<a class="flex flex-col items-center justify-center w-16 h-full text-slate-500 hover:text-slate-200" href="#">
+<span class="material-symbols-outlined mb-1 text-xl" style="font-variation-settings: 'FILL' 0;">event_note</span>
+<span class="text-[10px] font-['Manrope'] font-medium">Plans</span>
+</a>
+</li>
+<li>
+<a class="flex flex-col items-center justify-center w-16 h-full text-indigo-400" href="#">
+<div class="relative">
+<span class="material-symbols-outlined mb-1 text-xl" style="font-variation-settings: 'FILL' 1;">account_circle</span>
+<div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-indigo-500 rounded-full"></div>
+</div>
+<span class="text-[10px] font-['Manrope'] font-bold">Profil</span>
+</a>
+</li>
+</ul>
+</nav>
+</body></html>

@@ -12,6 +12,7 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
+    "prisma:generate:pg": "prisma generate --schema=prisma/schema.pg.prisma",
     "db:migrate:safe": "node scripts/prisma-migrate-safe.mjs",
     "bible:build-offline": "node scripts/build-lsg1910-offline.mjs",
     "postinstall": "prisma generate",

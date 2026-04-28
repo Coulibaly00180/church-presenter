@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Modèles métier (partagés avec le desktop via PostgreSQL) ─────────────────
+
+model Song {
+  id        String    @id @default(cuid())
+  title     String    @unique
+  artist    String?
+  album     String?
+  year      String?
+  language  String?
+  tags      String?   // JSON-as-TEXT (compatibilité desktop)
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  blocks    SongBlock[]
+  planItems ServiceItem[]  @relation("ServiceItemSong")
+  favorites Favorite[]
+  learnings SongLearning[]
+}
+
+model SongBlock {
+  id        String   @id @default(cuid())
+  songId    String
+  order     Int
+  type      String
+  title     String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  song  Song       @relation(fields: [songId], references: [id], onDelete: Cascade)
+  notes SongNote[]
+
+  @@unique([songId, order])
+  @@index([songId, order])
+}
+
+model ServicePlan {
+  id               String    @id @default(cuid())
+  date             DateTime  @unique
+  title            String?
+  backgroundConfig String?   // JSON-as-TEXT
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  items ServiceItem[]
+}
+
+model ServiceItem {
+  id               String  @id @default(cuid())
+  planId           String
+  order            Int
+  kind             String
+  refId            String?
+  refSubId         String?
+  songId           String?
+  title            String?
+  content          String?
+  notes            String?
+  mediaPath        String?
+  secondaryContent String?  // JSON-as-TEXT
+  backgroundConfig String?  // JSON-as-TEXT
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  plan ServicePlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  song Song?       @relation("ServiceItemSong", fields: [songId], references: [id], onDelete: SetNull)
+
+  @@unique([planId, order])
+  @@index([planId, order])
+  @@index([songId])
+}
+
+// ── Modèles spécifiques à l'app web ─────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         UserRole  @default(CHANTRE)
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  favorites Favorite[]
+  notes     SongNote[]
+  learnings SongLearning[]
+}
+
+enum UserRole {
+  ADMIN
+  RESPONSABLE_CHANTRE
+  CHANTRE
+  LECTEUR
+}
+
+model Favorite {
+  userId    String
+  songId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@id([userId, songId])
+}
+
+model SongNote {
+  id          String   @id @default(cuid())
+  userId      String
+  songBlockId String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songBlock SongBlock @relation(fields: [songBlockId], references: [id], onDelete: Cascade)
+}
+
+model SongLearning {
+  userId    String
+  songId    String
+  status    LearningStatus @default(TO_LEARN)
+  updatedAt DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  song Song @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  @@id([userId, songId])
+}
+
+enum LearningStatus {
+  TO_LEARN
+  IN_PROGRESS
+  MASTERED
+}

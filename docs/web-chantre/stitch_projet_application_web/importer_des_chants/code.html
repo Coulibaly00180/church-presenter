@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Import Songs - WorshipFlow</title>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.fill {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#00201c",
+                        "surface-container-lowest": "#060e20",
+                        "on-primary": "#1000a9",
+                        "error-container": "#93000a",
+                        "surface-container": "#171f33",
+                        "surface-container-low": "#131b2e",
+                        "inverse-primary": "#494bd6",
+                        "on-tertiary-fixed-variant": "#891933",
+                        "tertiary": "#ffb2b9",
+                        "inverse-on-surface": "#283044",
+                        "surface-dim": "#0b1326",
+                        "secondary": "#44e2cd",
+                        "primary-container": "#8083ff",
+                        "tertiary-fixed": "#ffdadc",
+                        "outline": "#908fa0",
+                        "error": "#ffb4ab",
+                        "background": "#0b1326",
+                        "on-primary-fixed": "#07006c",
+                        "secondary-fixed": "#62fae3",
+                        "on-secondary-container": "#004d44",
+                        "surface-bright": "#31394d",
+                        "on-primary-container": "#0d0096",
+                        "surface-container-high": "#222a3d",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "secondary-fixed-dim": "#3cddc7",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "surface-variant": "#2d3449",
+                        "inverse-surface": "#dae2fd",
+                        "on-tertiary-container": "#5b001a",
+                        "primary": "#c0c1ff",
+                        "on-secondary-fixed-variant": "#005047",
+                        "on-error": "#690005",
+                        "on-background": "#dae2fd",
+                        "surface-container-highest": "#2d3449",
+                        "on-tertiary": "#67001f",
+                        "on-secondary": "#003731",
+                        "surface-tint": "#c0c1ff",
+                        "outline-variant": "#464554",
+                        "on-surface": "#dae2fd",
+                        "tertiary-container": "#ea6479",
+                        "primary-fixed": "#e1e0ff",
+                        "on-tertiary-fixed": "#400010",
+                        "on-surface-variant": "#c7c4d7",
+                        "tertiary-fixed-dim": "#ffb2b9",
+                        "secondary-container": "#03c6b2",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#0b1326"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "xl": "80px",
+                        "lg": "48px",
+                        "sm": "12px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "md": "24px"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "display-xl": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "display-xl": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md text-body-md antialiased min-h-screen flex items-center justify-center p-gutter relative overflow-hidden">
+<!-- Atmospheric Layering: Ambient Background Glows -->
+<div class="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-primary-container/10 blur-[120px] pointer-events-none"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-secondary-container/10 blur-[100px] pointer-events-none"></div>
+<!-- Main Content Canvas (Navigation Suppressed for Task-Focused Flow) -->
+<main class="w-full max-w-[1024px] relative z-10 flex flex-col gap-md">
+<!-- Header Actions -->
+<div class="flex items-center justify-between w-full mb-base">
+<button class="flex items-center gap-xs text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined text-[20px]">arrow_back</span>
+<span class="font-body-md text-body-md">Back to Library</span>
+</button>
+</div>
+<!-- Task Card Container -->
+<div class="bg-surface-container-lowest/40 backdrop-blur-[20px] border border-outline-variant/30 rounded-[1.5rem] overflow-hidden flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+<!-- Header -->
+<div class="px-lg pt-lg pb-md border-b border-outline-variant/20">
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-xs">Import Songs</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Upload lyric documents to automatically parse titles and song blocks.</p>
+</div>
+<!-- Bento Grid Layout for Content -->
+<div class="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-0">
+<!-- Left Column: Upload & Options -->
+<div class="p-lg flex flex-col gap-lg border-b lg:border-b-0 lg:border-r border-outline-variant/20 bg-surface-container-lowest/20">
+<!-- Dropzone -->
+<div class="relative group">
+<input accept=".txt,.docx" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" id="file-upload" multiple="" type="file"/>
+<div class="border-2 border-dashed border-outline-variant/50 rounded-xl p-xl flex flex-col items-center justify-center text-center bg-surface-container/20 group-hover:border-primary/50 group-hover:bg-primary-container/5 transition-all duration-300">
+<div class="w-16 h-16 rounded-full bg-surface-container-high/50 flex items-center justify-center mb-sm group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-primary text-[32px] font-light">cloud_upload</span>
+</div>
+<h3 class="font-headline-md text-headline-md text-on-surface mb-xs">Drag &amp; drop files</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-sm">or click to browse your computer</p>
+<div class="flex gap-xs mt-sm">
+<span class="bg-surface-variant text-on-surface-variant font-label-caps text-label-caps px-sm py-xs rounded-full">.TXT</span>
+<span class="bg-surface-variant text-on-surface-variant font-label-caps text-label-caps px-sm py-xs rounded-full">.DOCX</span>
+</div>
+</div>
+</div>
+<!-- Conflict Resolution Options -->
+<div class="flex flex-col gap-sm">
+<h4 class="font-label-caps text-label-caps text-primary uppercase tracking-wider">Conflict Resolution</h4>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-sm">
+<!-- Option 1: Ignore -->
+<label class="cursor-pointer relative flex flex-col p-sm rounded-lg border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-container/10">
+<input checked="" class="peer sr-only" name="conflict" type="radio" value="ignore"/>
+<div class="flex items-center gap-sm mb-xs">
+<div class="w-5 h-5 rounded-full border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">
+<div class="w-2 h-2 rounded-full bg-background opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+<span class="font-body-lg text-body-lg text-on-surface">Ignore duplicates</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant pl-[28px] text-sm">Skip files that match existing titles in your library.</p>
+</label>
+<!-- Option 2: Overwrite -->
+<label class="cursor-pointer relative flex flex-col p-sm rounded-lg border border-outline-variant/40 bg-surface-container-low hover:bg-surface-container transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-container/10">
+<input class="peer sr-only" name="conflict" type="radio" value="overwrite"/>
+<div class="flex items-center gap-sm mb-xs">
+<div class="w-5 h-5 rounded-full border-2 border-outline-variant peer-checked:border-primary peer-checked:bg-primary flex items-center justify-center transition-all">
+<div class="w-2 h-2 rounded-full bg-background opacity-0 peer-checked:opacity-100 transition-opacity"></div>
+</div>
+<span class="font-body-lg text-body-lg text-on-surface">Overwrite</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant pl-[28px] text-sm">Update existing songs with new arrangements.</p>
+</label>
+</div>
+</div>
+</div>
+<!-- Right Column: Detection Preview -->
+<div class="bg-surface-container-low/30 flex flex-col h-full max-h-[600px]">
+<div class="p-md border-b border-outline-variant/20 flex justify-between items-center bg-surface-container/20">
+<h4 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Detected Songs</h4>
+<span class="bg-primary-container/20 text-primary font-label-caps text-label-caps px-sm py-xs rounded-full">3 Ready</span>
+</div>
+<div class="p-md flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-sm">
+<!-- Preview Item 1 -->
+<div class="flex items-center gap-md p-sm rounded-lg bg-surface-container/40 border border-outline-variant/20 hover:border-outline-variant/50 transition-colors">
+<div class="w-10 h-10 rounded-md bg-inverse-primary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-inverse-primary">description</span>
+</div>
+<div class="flex-1 min-w-0">
+<h5 class="font-body-lg text-body-lg text-on-surface truncate">10,000 Reasons (Bless The Lord)</h5>
+<div class="flex items-center gap-xs mt-xs">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">7 Blocks Detected</span>
+</div>
+</div>
+</div>
+<!-- Preview Item 2 -->
+<div class="flex items-center gap-md p-sm rounded-lg bg-surface-container/40 border border-outline-variant/20 hover:border-outline-variant/50 transition-colors">
+<div class="w-10 h-10 rounded-md bg-inverse-primary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-inverse-primary">description</span>
+</div>
+<div class="flex-1 min-w-0">
+<h5 class="font-body-lg text-body-lg text-on-surface truncate">How Great Is Our God</h5>
+<div class="flex items-center gap-xs mt-xs">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">5 Blocks Detected</span>
+</div>
+</div>
+</div>
+<!-- Preview Item 3 -->
+<div class="flex items-center gap-md p-sm rounded-lg bg-surface-container/40 border border-outline-variant/20 hover:border-outline-variant/50 transition-colors">
+<div class="w-10 h-10 rounded-md bg-inverse-primary/10 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-inverse-primary">description</span>
+</div>
+<div class="flex-1 min-w-0">
+<h5 class="font-body-lg text-body-lg text-on-surface truncate">Oceans (Where Feet May Fail)</h5>
+<div class="flex items-center gap-xs mt-xs">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-label-caps text-label-caps text-on-surface-variant">8 Blocks Detected</span>
+</div>
+</div>
+</div>
+<!-- Placeholder for empty state (Hidden currently) -->
+<div class="hidden flex-col items-center justify-center text-center p-xl opacity-50 h-full">
+<span class="material-symbols-outlined text-[48px] text-outline-variant mb-sm">library_music</span>
+<p class="font-body-md text-body-md text-on-surface-variant">Upload files to see preview</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Actions -->
+<div class="p-md px-lg border-t border-outline-variant/20 bg-surface-container-highest/30 flex justify-end items-center gap-md">
+<button class="font-body-lg text-body-lg text-on-surface hover:text-on-surface-variant transition-colors px-md py-sm rounded-lg">
+                    Cancel
+                </button>
+<button class="relative group overflow-hidden rounded-lg">
+<!-- Glow effect layer -->
+<div class="absolute inset-0 bg-gradient-to-r from-inverse-primary to-primary opacity-80 group-hover:opacity-100 blur-[4px] transition-opacity"></div>
+<!-- Button core -->
+<div class="relative bg-gradient-to-r from-inverse-primary to-primary text-on-primary font-body-lg text-body-lg px-xl py-sm flex items-center gap-sm">
+<span>Process Import</span>
+<span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</div>
+</button>
+</div>
+</div>
+</main>
+<!-- Custom Scrollbar CSS scoped for the preview list -->
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: rgba(144, 143, 160, 0.3); /* outline variant with opacity */
+            border-radius: 10px;
+        }
+    </style>
+</body></html>

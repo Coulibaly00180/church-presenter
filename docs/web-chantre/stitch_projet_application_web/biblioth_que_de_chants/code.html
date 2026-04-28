@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Song Library - WorshipFlow</title>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-primary": "#bec6e0",
+                        "on-error": "#ffffff",
+                        "outline": "#76777d",
+                        "primary-container": "#131b2e",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "tertiary-container": "#0b1c30",
+                        "secondary-fixed-dim": "#b9c7e0",
+                        "surface-dim": "#d8dadc",
+                        "on-tertiary": "#ffffff",
+                        "background": "#f7f9fb",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-primary-container": "#7c839b",
+                        "secondary-container": "#d5e3fd",
+                        "inverse-surface": "#2d3133",
+                        "on-surface-variant": "#45464d",
+                        "outline-variant": "#c6c6cd",
+                        "primary": "#000000",
+                        "secondary-fixed": "#d5e3fd",
+                        "secondary": "#515f74",
+                        "surface-container": "#eceef0",
+                        "on-secondary": "#ffffff",
+                        "on-background": "#191c1e",
+                        "surface": "#f7f9fb",
+                        "on-secondary-fixed": "#0d1c2f",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-primary": "#ffffff",
+                        "tertiary": "#000000",
+                        "on-secondary-container": "#57657b",
+                        "on-error-container": "#93000a",
+                        "surface-bright": "#f7f9fb",
+                        "on-tertiary-container": "#75859d",
+                        "on-secondary-fixed-variant": "#3a485c",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-on-surface": "#eff1f3",
+                        "primary-fixed": "#dae2fd",
+                        "surface-variant": "#e0e3e5",
+                        "surface-tint": "#565e74",
+                        "surface-container-low": "#f2f4f6",
+                        "on-primary-fixed": "#131b2e",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "on-surface": "#191c1e",
+                        "error": "#ba1a1a",
+                        "surface-container-high": "#e6e8ea",
+                        "primary-fixed-dim": "#bec6e0",
+                        "tertiary-fixed": "#d3e4fe",
+                        "error-container": "#ffdad6"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "container-margin": "20px",
+                        "base": "4px",
+                        "sm": "8px",
+                        "md": "16px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "xl": "40px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Manrope"],
+                        "display-xl": ["Manrope"],
+                        "label-sm": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "lyrics-view": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "display-xl": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "lyrics-view": ["22px", {"lineHeight": "1.7", "letterSpacing": "0.01em", "fontWeight": "500"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        
+        /* Hide scrollbar for clean A-Z list */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased min-h-screen flex flex-col md:flex-row">
+<!-- TopAppBar -->
+<header class="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50 font-manrope text-sm font-medium fixed top-0 w-full z-40 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center h-16 px-6 w-full flat no shadows">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined md:hidden cursor-pointer active:opacity-80">menu</span>
+<div class="text-xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">WorshipFlow</div>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer active:opacity-80 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors p-2 rounded-full">search</span>
+<span class="material-symbols-outlined cursor-pointer active:opacity-80 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors p-2 rounded-full">notifications</span>
+<span class="material-symbols-outlined cursor-pointer active:opacity-80 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors p-2 rounded-full hidden md:block">settings</span>
+<img alt="User profile avatar" class="w-8 h-8 rounded-full border border-outline-variant cursor-pointer active:opacity-80" data-alt="Close up portrait of a young man with neutral expression, clean background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-ee-qCwkFEmdMKhm0gWgbItA2yM1wN8N7DujGn83sqy6Arnep7VgVe-9DS4c7yWrD479Jrw2Bjb0AMNYl9rz4S63H1_684IKE97psJdIEEYhq5fKNoPrBoGSwSLq7-5nUAhc7LFSd21xCKbZffEZSvpwSWaY-CM8YB-qyMotSxmD3Zyg0Xmu2L51VCCF27wOkeJKjN-xi5EGL2JZ_rQ4N7V6Mz89xre6cJg8osjboETilR97jKw6CY6pIj-gy5eg78TvYVDRaDGM"/>
+</div>
+</header>
+<!-- SideNavBar (Desktop) -->
+<nav class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50 font-manrope text-sm fixed left-0 top-0 h-full w-64 border-r hidden md:flex flex-col border-slate-200 dark:border-slate-800 flat no shadows flex flex-col py-8 gap-4 pt-24 z-30">
+<div class="px-6 mb-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-primary text-on-primary flex items-center justify-center font-bold text-lg">GW</div>
+<div>
+<div class="font-bold text-lg text-slate-900 dark:text-slate-100 leading-tight">Grace Worship</div>
+<div class="text-slate-500 dark:text-slate-400 text-xs">Admin Console</div>
+</div>
+</div>
+<div class="px-4 mb-4">
+<button class="w-full bg-primary text-on-primary rounded-xl py-2 px-4 flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors font-semibold">
+<span class="material-symbols-outlined text-sm">add</span>
+                New Setlist
+            </button>
+</div>
+<div class="flex-1 flex flex-col gap-1 px-2">
+<a class="flex items-center gap-3 py-3 text-slate-900 dark:text-white font-bold border-l-2 border-slate-900 dark:border-slate-50 pl-4 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200 ease-in-out bg-slate-200/50 dark:bg-slate-800/50 rounded-r-xl" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">library_music</span>
+                Library
+            </a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-4 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">list_alt</span>
+                Setlists
+            </a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-4 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">groups</span>
+                Team
+            </a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-4 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">calendar_today</span>
+                Schedule
+            </a>
+</div>
+<div class="flex flex-col gap-1 px-2 mt-auto">
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-4 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+                Help
+            </a>
+<a class="flex items-center gap-3 py-3 text-slate-500 dark:text-slate-400 pl-4 hover:text-slate-900 dark:hover:text-slate-100 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined">logout</span>
+                Logout
+            </a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full pt-20 pb-24 md:pb-8 md:pl-64 px-4 md:px-lg max-w-[1400px] mx-auto">
+<!-- Header & Search -->
+<div class="mb-lg space-y-md">
+<h1 class="font-headline-lg text-headline-lg text-on-background">Song Library</h1>
+<div class="relative max-w-2xl">
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-full py-3 pl-12 pr-4 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors font-body-md text-on-background placeholder:text-on-surface-variant/70 shadow-sm" placeholder="Search by title, author, or lyrics..." type="text"/>
+</div>
+</div>
+<!-- A-Z Filter -->
+<div class="mb-lg overflow-x-auto no-scrollbar pb-2">
+<div class="flex gap-2 min-w-max">
+<button class="px-3 py-1 rounded-full bg-primary-container text-on-primary-container font-label-sm text-label-sm cursor-pointer hover:opacity-90 transition-opacity">All</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">A</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">B</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">C</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">D</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">E</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">F</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">G</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">H</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">I</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">J</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">K</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">L</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">M</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">N</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">O</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">P</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">Q</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">R</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">S</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">T</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">U</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">V</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">W</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">X</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">Y</button>
+<button class="px-3 py-1 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm cursor-pointer transition-colors">Z</button>
+</div>
+</div>
+<!-- Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md lg:gap-lg">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-outline transition-all duration-200 flex flex-col justify-between group relative overflow-hidden cursor-pointer">
+<div class="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-[100%] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<div class="flex justify-between items-start mb-sm">
+<h3 class="font-headline-md text-headline-md text-on-background pr-4">10,000 Reasons (Bless the Lord)</h3>
+<button class="text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-lg">Matt Redman, Jonas Myrin</p>
+</div>
+<div class="flex items-center justify-between mt-auto">
+<div class="flex gap-2 items-center">
+<span class="bg-surface-container-high text-on-surface rounded-md px-2 py-1 font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">music_note</span>
+                            Sol
+                        </span>
+<span class="bg-[#e6f4ea] text-[#137333] rounded-full px-2.5 py-1 font-label-sm text-label-sm border border-[#ceead6]">
+                            Mastered
+                        </span>
+</div>
+<button class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center hover:bg-secondary hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-outline transition-all duration-200 flex flex-col justify-between group relative overflow-hidden cursor-pointer">
+<div class="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-[100%] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<div class="flex justify-between items-start mb-sm">
+<h3 class="font-headline-md text-headline-md text-on-background pr-4">Oceans (Where Feet May Fail)</h3>
+<button class="text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-lg">Hillsong United</p>
+</div>
+<div class="flex items-center justify-between mt-auto">
+<div class="flex gap-2 items-center">
+<span class="bg-surface-container-high text-on-surface rounded-md px-2 py-1 font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">music_note</span>
+                            Ré
+                        </span>
+<span class="bg-[#fef7e0] text-[#b06000] rounded-full px-2.5 py-1 font-label-sm text-label-sm border border-[#fce8b2]">
+                            In Progress
+                        </span>
+</div>
+<button class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center hover:bg-secondary hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-outline transition-all duration-200 flex flex-col justify-between group relative overflow-hidden cursor-pointer">
+<div class="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-[100%] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<div class="flex justify-between items-start mb-sm">
+<h3 class="font-headline-md text-headline-md text-on-background pr-4">What A Beautiful Name</h3>
+<button class="text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-lg">Hillsong Worship</p>
+</div>
+<div class="flex items-center justify-between mt-auto">
+<div class="flex gap-2 items-center">
+<span class="bg-surface-container-high text-on-surface rounded-md px-2 py-1 font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">music_note</span>
+                            Do
+                        </span>
+<span class="bg-[#f1f3f4] text-[#5f6368] rounded-full px-2.5 py-1 font-label-sm text-label-sm border border-[#dadce0]">
+                            To Learn
+                        </span>
+</div>
+<button class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center hover:bg-secondary hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] hover:border-outline transition-all duration-200 flex flex-col justify-between group relative overflow-hidden cursor-pointer">
+<div class="absolute top-0 right-0 w-16 h-16 bg-primary/5 rounded-bl-[100%] opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div>
+<div class="flex justify-between items-start mb-sm">
+<h3 class="font-headline-md text-headline-md text-on-background pr-4">How Great Is Our God</h3>
+<button class="text-on-surface-variant hover:text-primary transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-lg">Chris Tomlin</p>
+</div>
+<div class="flex items-center justify-between mt-auto">
+<div class="flex gap-2 items-center">
+<span class="bg-surface-container-high text-on-surface rounded-md px-2 py-1 font-label-sm text-label-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">music_note</span>
+                            La
+                        </span>
+<span class="bg-[#e6f4ea] text-[#137333] rounded-full px-2.5 py-1 font-label-sm text-label-sm border border-[#ceead6]">
+                            Mastered
+                        </span>
+</div>
+<button class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center hover:bg-secondary hover:text-on-secondary transition-colors">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed bottom-24 right-6 md:bottom-8 md:right-8 w-14 h-14 bg-primary text-on-primary rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-40 group">
+<span class="material-symbols-outlined text-[28px] group-hover:rotate-90 transition-transform duration-300">add</span>
+</button>
+<!-- BottomNavBar (Mobile) -->
+<nav class="bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50 font-manrope text-[10px] font-medium uppercase tracking-wider fixed bottom-0 w-full z-50 border-t border-slate-200 dark:border-slate-800 md:hidden shadow-[0_-1px_3px_0_rgba(0,0,0,0.05)] fixed bottom-0 left-0 w-full h-16 flex justify-around items-center px-4 pb-safe tap-highlight-transparent">
+<button class="flex flex-col items-center justify-center text-slate-900 dark:text-white font-bold active:bg-slate-50 dark:active:bg-slate-900 p-2 rounded-lg w-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">music_note</span>
+            Songs
+        </button>
+<button class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 active:bg-slate-50 dark:active:bg-slate-900 p-2 rounded-lg w-16">
+<span class="material-symbols-outlined mb-1">event_note</span>
+            Plans
+        </button>
+<button class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 active:bg-slate-50 dark:active:bg-slate-900 p-2 rounded-lg w-16">
+<span class="material-symbols-outlined mb-1">person</span>
+            Team
+        </button>
+<button class="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 active:bg-slate-50 dark:active:bg-slate-900 p-2 rounded-lg w-16">
+<span class="material-symbols-outlined mb-1">more_horiz</span>
+            More
+        </button>
+</nav>
+</body></html>

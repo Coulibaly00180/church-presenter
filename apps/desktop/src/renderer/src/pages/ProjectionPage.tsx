@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { projectPlanItemToTarget } from "@/lib/projection";
+import { parsePlanBackground, projectPlanItemToTarget } from "@/lib/projection";
 import type { PlanItem } from "@/lib/types";
 
 type ProjectionState = CpProjectionState;
@@ -397,7 +397,6 @@ export function ProjectionPage() {
     const onKeyDown = async (e: KeyboardEvent) => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       const live = liveNavRef.current;
-      console.log("[proj] arrow key", e.key, "live:", live?.enabled, "planId:", live?.planId);
       if (!live?.enabled) return;
       if (!live.planId) {
         // Free mode: forward to regie window which handles song/bible navigation
@@ -415,7 +414,12 @@ export function ProjectionPage() {
       else await window.cp.live.prev();
       const item = plan.items[nextCursor];
       if (item) {
-        await projectPlanItemToTarget(live.target, item as PlanItem, live);
+        await projectPlanItemToTarget(
+          live.target,
+          item as PlanItem,
+          live,
+          parsePlanBackground(plan.backgroundConfig)
+        );
       }
     };
     window.addEventListener("keydown", onKeyDown);

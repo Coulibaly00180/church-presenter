@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
-import { CalendarDays, ChevronDown, Circle, Copy, HelpCircle, Plus, Radio, Settings, Video } from "lucide-react";
+import { CalendarDays, ChevronDown, Circle, Copy, Keyboard, MoreHorizontal, Plus, Radio, Settings, Video } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,7 +16,7 @@ import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { cn } from "@/lib/utils";
 import { localNowYmd, isoToYmd } from "@/lib/date";
-import { projectPlanItemToTarget } from "@/lib/projection";
+import { parsePlanBackground, projectPlanItemToTarget } from "@/lib/projection";
 import type { PlanItem, LiveState } from "@/lib/types";
 
 interface HeaderProps {
@@ -49,16 +50,23 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
 
   const isPlanMode = live?.enabled === true && live.planId !== null;
   const isFreeMode = live?.enabled === true && live.planId === null;
+  const canStartPlanMode = isPlanMode || Boolean(selectedPlanId);
 
   // Mode Direct (plan) — binds a plan, resets cursor, auto-projects first item.
   const handlePlanModeToggle = useCallback(async () => {
     if (isPlanMode) {
       await toggle();
     } else {
+      if (!selectedPlanId) return;
       const liveState = await window.cp.live.set({ planId: selectedPlanId ?? null, enabled: true, cursor: 0 });
       const firstItem = plan?.items[0];
       if (firstItem) {
-        await projectPlanItemToTarget(liveState.target, firstItem as PlanItem, liveState as unknown as LiveState);
+        await projectPlanItemToTarget(
+          liveState.target,
+          firstItem as PlanItem,
+          liveState as unknown as LiveState,
+          parsePlanBackground(plan?.backgroundConfig)
+        );
       }
     }
   }, [isPlanMode, toggle, selectedPlanId, plan]);
@@ -83,169 +91,232 @@ export function Header({ onOpenShortcuts, onOpenSettings }: HeaderProps) {
     }
   }, [selectedPlanId, refreshList, selectPlan]);
 
+  const statusLabel = isPlanMode ? "Mode Direct" : isFreeMode ? "Mode Libre" : "Preparation";
+  const statusTone = isPlanMode
+    ? "bg-live-indicator/15 text-live-indicator border-live-indicator/20"
+    : isFreeMode
+      ? "bg-warning/15 text-warning border-warning/20"
+      : "bg-bg-surface text-text-secondary border-border";
+  const statusHint = isPlanMode
+    ? "Le plan selectionne est projete en direct."
+    : isFreeMode
+      ? "Projection libre sans plan lie au service."
+      : plan
+        ? "Pret a projeter ce plan quand vous le souhaitez."
+        : "Selectionnez un plan avant de lancer le direct.";
+  const utilityCount =
+    (plan ? 1 : 0) +
+    (onOpenShortcuts ? 1 : 0) +
+    (onOpenSettings ? 1 : 0);
+
   return (
     <>
       <header
-        className="flex items-center justify-between px-4 border-b border-border bg-bg-surface shrink-0 h-12"
+        className="flex items-center justify-between gap-4 px-4 border-b border-border bg-bg-surface shrink-0 h-[var(--header-height)]"
       >
-        {/* Left: Logo + Plan selector */}
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: plan context */}
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           {/* Logo */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Video className="h-4 w-4 text-primary" />
-            <span className="font-semibold text-text-primary text-sm hidden sm:block">Church Presenter</span>
+          <div className="flex items-center gap-2 shrink-0 rounded-xl border border-border bg-bg-elevated/40 px-3 py-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Video className="h-4 w-4" />
+            </div>
+            <div className="hidden min-w-0 sm:block">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+                Regie
+              </p>
+              <p className="text-sm font-semibold text-text-primary">Church Presenter</p>
+            </div>
           </div>
 
-          <div className="w-px h-5 bg-border shrink-0" />
-
           {/* Plan selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-1.5 max-w-[240px] h-8 px-2"
-              >
-                <CalendarDays className="h-3.5 w-3.5 shrink-0 text-text-muted" />
-                <span className="truncate text-sm font-medium">
-                  {plan ? formatPlanLabel(plan) : "Aucun plan"}
-                </span>
-                {plan && isTodayPlan(plan) && (
-                  <span className="text-[9px] font-semibold bg-success/15 text-success px-1 py-0.5 rounded shrink-0">
-                    Auj.
-                  </span>
-                )}
-                <ChevronDown className="h-3 w-3 shrink-0 text-text-muted ml-0.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72">
-              <DropdownMenuLabel className="text-xs">Plans de culte</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {planList.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-text-muted">
-                  Aucun plan disponible
-                </div>
-              ) : (
-                planList.map((p) => {
-                  const isSelected = selectedPlanId === p.id;
-                  const isToday = isTodayPlan(p);
-                  return (
-                    <DropdownMenuItem
-                      key={p.id}
-                      className={cn(isSelected && "bg-bg-elevated font-medium")}
-                      onClick={() => selectPlan(p.id)}
-                    >
-                      <CalendarDays className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate text-sm">{p.title ?? formatPlanDate(p.date)}</div>
-                        {p.title && (
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-text-muted">
+              Plan actif
+            </p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-11 w-full max-w-[320px] justify-between rounded-xl border border-border bg-bg-elevated/30 px-3"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <CalendarDays className="h-4 w-4 shrink-0 text-text-muted" />
+                    <div className="min-w-0 text-left">
+                      <p className="truncate text-sm font-semibold text-text-primary">
+                        {plan ? formatPlanLabel(plan) : "Aucun plan"}
+                      </p>
+                      <p className="truncate text-[11px] text-text-muted">
+                        {plan ? formatPlanDate(plan.date) : "Choisissez un plan a preparer"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {plan && isTodayPlan(plan) && (
+                      <Badge variant="success" className="px-1.5 py-0 text-xs">
+                        Auj.
+                      </Badge>
+                    )}
+                    <ChevronDown className="h-3.5 w-3.5 text-text-muted" />
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-80">
+                <DropdownMenuLabel className="text-xs">Plans de culte</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {planList.length === 0 ? (
+                  <div className="px-3 py-4 text-center text-xs text-text-muted">
+                    Aucun plan disponible
+                  </div>
+                ) : (
+                  planList.map((p) => {
+                    const isSelected = selectedPlanId === p.id;
+                    const isToday = isTodayPlan(p);
+                    return (
+                      <DropdownMenuItem
+                        key={p.id}
+                        className={cn(isSelected && "bg-bg-elevated font-medium")}
+                        onClick={() => selectPlan(p.id)}
+                      >
+                        <CalendarDays className="h-3.5 w-3.5 text-text-muted shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate text-sm">{p.title ?? formatPlanDate(p.date)}</div>
                           <div className="truncate text-xs text-text-muted">{formatPlanDate(p.date)}</div>
+                        </div>
+                        {isToday && (
+                          <Badge variant="success" className="px-1.5 py-0 text-xs">
+                            Auj.
+                          </Badge>
                         )}
-                      </div>
-                      {isToday && (
-                        <span className="text-[9px] font-semibold bg-success/15 text-success px-1 py-0.5 rounded shrink-0">
-                          Auj.
-                        </span>
-                      )}
-                      {isSelected && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-hidden />
-                      )}
-                    </DropdownMenuItem>
-                  );
-                })
-              )}
-              <DropdownMenuSeparator />
-              {plan && (
-                <DropdownMenuItem onClick={() => void handleDuplicate()}>
-                  <Copy className="h-3.5 w-3.5" />
-                  Dupliquer ce plan
+                        {isSelected && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" aria-hidden />
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setCreateDialogOpen(true)}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Nouveau plan…
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem onClick={() => setCreateDialogOpen(true)}>
-                <Plus className="h-3.5 w-3.5" />
-                Nouveau plan…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        {/* Right: actions */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Mode Direct (plan) */}
-          <Button
-            variant={isPlanMode ? "destructive" : "default"}
-            size="sm"
-            onClick={() => void handlePlanModeToggle()}
-            disabled={isFreeMode}
-            className={cn(
-              "gap-1.5 h-8 px-3 font-medium",
-              !isPlanMode && !isFreeMode && "bg-success hover:bg-success/90 text-white",
-            )}
-            aria-label={isPlanMode ? "Quitter le mode Direct" : "Passer en mode Direct"}
-            title={isFreeMode ? "Quitter d'abord le Mode Libre" : undefined}
-          >
+        {/* Center: projection commands */}
+        <div className="flex min-w-[360px] max-w-[560px] flex-1 items-center justify-between gap-3 rounded-2xl border border-border bg-bg-elevated/30 px-4 py-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide",
+                  statusTone,
+                )}
+              >
+                <Circle className={cn("h-2.5 w-2.5", (isPlanMode || isFreeMode) && "fill-current animate-pulse")} />
+                {statusLabel}
+              </span>
+              {plan && isTodayPlan(plan) && (
+                <span className="text-[11px] font-medium text-success">Plan du jour</span>
+              )}
+            </div>
+            <p className="mt-1 truncate text-xs text-text-muted">
+              {statusHint}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
             {isPlanMode ? (
-              <>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => void handlePlanModeToggle()}
+                className="gap-1.5 rounded-xl px-4"
+                aria-label="Quitter le mode Direct"
+              >
                 <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
-                Direct
-              </>
+                Quitter le Direct
+              </Button>
+            ) : isFreeMode ? (
+              <Button
+                size="sm"
+                onClick={() => void handleFreeToggle()}
+                className="gap-1.5 rounded-xl border-warning bg-warning px-4 text-white hover:bg-warning/90"
+                aria-label="Quitter le mode Libre"
+              >
+                <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
+                Quitter le Mode Libre
+              </Button>
             ) : (
               <>
-                <Video className="h-3.5 w-3.5" />
-                Mode Direct
+                <Button
+                  size="sm"
+                  onClick={() => void handlePlanModeToggle()}
+                  disabled={!canStartPlanMode}
+                  className="gap-1.5 rounded-xl bg-success px-4 text-white hover:bg-success/90"
+                  aria-label="Entrer en mode Direct"
+                  title={!canStartPlanMode ? "Selectionnez un plan pour lancer le direct" : undefined}
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  Entrer en mode Direct
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleFreeToggle()}
+                  className="gap-1.5 rounded-xl px-4"
+                  aria-label="Passer en mode Libre"
+                >
+                  <Radio className="h-3.5 w-3.5" />
+                  Mode Libre
+                </Button>
               </>
             )}
-          </Button>
+          </div>
+        </div>
 
-          {/* Mode Libre (sans plan) */}
-          <Button
-            variant={isFreeMode ? "destructive" : "ghost"}
-            size="sm"
-            onClick={() => void handleFreeToggle()}
-            disabled={isPlanMode}
-            className={cn(
-              "gap-1.5 h-8 px-3 font-medium",
-              !isFreeMode && !isPlanMode && "text-text-secondary hover:text-text-primary",
-              isFreeMode && "bg-warning hover:bg-warning/90 text-white border-warning",
-            )}
-            aria-label={isFreeMode ? "Quitter le Mode Libre" : "Passer en Mode Libre"}
-            title={isPlanMode ? "Quitter d'abord le Mode Direct" : "Mode Libre — projection sans plan"}
-          >
-            {isFreeMode ? (
-              <>
-                <Circle className="h-2.5 w-2.5 fill-current animate-pulse" />
-                Libre
-              </>
-            ) : (
-              <>
-                <Radio className="h-3.5 w-3.5" />
-                Mode Libre
-              </>
-            )}
-          </Button>
-
-          {onOpenSettings && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onOpenSettings}
-              aria-label="Paramètres"
-              className="h-8 w-8"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          )}
-
-          {onOpenShortcuts && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onOpenShortcuts}
-              aria-label="Raccourcis clavier (?)"
-              className="h-8 w-8"
-            >
-              <HelpCircle className="h-4 w-4" />
-            </Button>
+        {/* Right: utilities */}
+        <div className="flex items-center gap-2 shrink-0">
+          {utilityCount > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Outils du plan et reglages"
+                  className="h-9 w-9 rounded-xl border border-border bg-bg-elevated/30"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="text-xs">Outils</DropdownMenuLabel>
+                {plan && (
+                  <>
+                    <DropdownMenuItem onClick={() => void handleDuplicate()}>
+                      <Copy className="h-3.5 w-3.5" />
+                      Dupliquer ce plan
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {onOpenShortcuts && (
+                  <DropdownMenuItem onClick={onOpenShortcuts}>
+                    <Keyboard className="h-3.5 w-3.5" />
+                    Raccourcis clavier
+                  </DropdownMenuItem>
+                )}
+                {onOpenSettings && (
+                  <DropdownMenuItem onClick={onOpenSettings}>
+                    <Settings className="h-3.5 w-3.5" />
+                    Parametres
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </header>

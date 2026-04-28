@@ -15,6 +15,7 @@ interface PlanItemCardProps {
   index: number;
   isCurrentLive?: boolean;
   isSelected?: boolean;
+  isInspectorActive?: boolean;
   onEdit?: (item: CpPlanItem) => void;
   onEditBackground?: (item: CpPlanItem) => void;
   onToggleSelect?: (id: string) => void;
@@ -46,7 +47,17 @@ function getItemSubtitle(item: CpPlanItem): string | null {
   }
 }
 
-export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = false, onEdit, onEditBackground, onToggleSelect, onCopy }: PlanItemCardProps) {
+export function PlanItemCard({
+  item,
+  index,
+  isCurrentLive = false,
+  isSelected = false,
+  isInspectorActive = false,
+  onEdit,
+  onEditBackground,
+  onToggleSelect,
+  onCopy,
+}: PlanItemCardProps) {
   const { live } = useLive();
   const { plan, removeItem } = usePlan();
 
@@ -61,6 +72,7 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
 
   const subtitle = getItemSubtitle(item);
   const displayTitle = item.title?.trim() || getPlanKindDefaultTitle(item.kind);
+  const showControls = isSelected || isInspectorActive || isCurrentLive;
 
   const handleClick = useCallback(async () => {
     if (!live) return;
@@ -99,13 +111,18 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
         "hover:bg-bg-elevated hover:shadow-sm transition-all duration-100",
         isDragging && "opacity-50 shadow-lg rotate-[0.5deg] z-10",
         isCurrentLive && "bg-primary/5 ring-1 ring-primary/40",
+        isInspectorActive && "border-primary/40 bg-primary/5",
       )}
       tabIndex={0}
       aria-label={`${displayTitle} — ${item.kind}`}
       aria-current={isCurrentLive ? "true" : undefined}
       onClick={() => void handleClick()}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") void handleClick();
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          void handleClick();
+        }
       }}
     >
       {/* Drag handle — hidden until hover; replaced by checkbox when onToggleSelect provided */}
@@ -114,14 +131,16 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
           type="button"
           className={cn(
             "flex items-center justify-center h-5 w-5 rounded border shrink-0 transition-all focus:outline-none",
-            "opacity-0 group-hover:opacity-100",
+            "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
             isSelected
               ? "opacity-100 bg-primary border-primary text-white"
+              : showControls
+                ? "opacity-100 border-border text-transparent hover:border-text-muted"
               : "border-border bg-transparent text-transparent hover:border-text-muted",
           )}
           onClick={(e) => { e.stopPropagation(); onToggleSelect(item.id); }}
           aria-label={isSelected ? "Désélectionner" : "Sélectionner"}
-          tabIndex={-1}
+          tabIndex={0}
         >
           {isSelected && <Check className="h-3 w-3" />}
         </button>
@@ -129,7 +148,13 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
         <button
           {...attributes}
           {...listeners}
-          className="flex items-center justify-center h-6 w-4 text-text-muted opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing shrink-0 focus:outline-none transition-opacity"
+          className={cn(
+            "flex h-6 w-4 shrink-0 items-center justify-center text-text-muted transition-opacity focus:outline-none",
+            "cursor-grab active:cursor-grabbing",
+            showControls
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+          )}
           aria-label="Déplacer"
           tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
@@ -139,7 +164,7 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
       )}
 
       {/* Position index */}
-      <span className="text-[11px] text-text-muted tabular-nums w-4 text-right shrink-0">
+      <span className="w-4 shrink-0 text-right text-xs tabular-nums text-text-muted">
         {index + 1}
       </span>
 
@@ -182,7 +207,14 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
       )}
 
       {/* Actions — visible on hover */}
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div
+        className={cn(
+          "flex items-center gap-0.5 shrink-0 transition-opacity",
+          showControls
+            ? "opacity-100"
+            : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+        )}
+      >
         {onEditBackground && (
           <Button
             variant="ghost"
@@ -199,7 +231,7 @@ export function PlanItemCard({ item, index, isCurrentLive = false, isSelected = 
             variant="ghost"
             size="icon-xs"
             onClick={handleEdit}
-            aria-label="Modifier"
+            aria-label="Ouvrir les details"
             className="h-6 w-6"
           >
             <Pencil className="h-3 w-3" />

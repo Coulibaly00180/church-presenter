@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
 import { projectPlanItemToTarget } from "@/lib/projection";
+import { ensureReadyForFreeProjection } from "@/lib/liveProjection";
 import type { PlanItem } from "@/lib/types";
 
 interface SongDetailPanelProps {
@@ -108,7 +109,8 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
 
   const handleProjectBlock = useCallback(
     async (block: CpSongBlock, cursorIndex?: number) => {
-      if (!live?.enabled) {
+      const currentLive = await ensureReadyForFreeProjection(liveRef.current);
+      if (!currentLive?.enabled) {
         toast.error("Activez Mode Direct ou Mode Libre pour projeter");
         return;
       }
@@ -126,9 +128,9 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
         refId: song.id,
         refSubId: block.id,
       };
-      await projectPlanItemToTarget(live.target, fakeItem, live);
+      await projectPlanItemToTarget(currentLive.target, fakeItem, currentLive);
     },
-    [live, song],
+    [song],
   );
 
   /** Move keyboard cursor by dir (+1 next, -1 prev) and project the block.
@@ -137,7 +139,7 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
    */
   const handleBlockCursorMove = useCallback(
     async (dir: 1 | -1) => {
-      const currentLive = liveRef.current;
+      const currentLive = await ensureReadyForFreeProjection(liveRef.current);
       const currentSong = songRef.current;
       if (!currentSong || !currentLive?.enabled) return;
       const curIdx = blockCursorRef.current ?? -1;
@@ -258,7 +260,7 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
         <>
           {live?.enabled && (
             <div className="px-4 pt-3 pb-0">
-              <p className="flex items-center gap-1 text-[10px] text-text-muted">
+              <p className="flex items-center gap-1 text-xs text-text-muted">
                 <Keyboard className="h-3 w-3 opacity-50" />
                 ← → pour naviguer · clic ▶ pour projeter
               </p>
@@ -282,7 +284,7 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
                   <div className="flex items-center justify-between px-3 py-1.5 bg-bg-elevated/60 border-b border-border">
                     <div className="flex items-center gap-1.5">
                       {isCursor && (
-                        <span className="text-[9px] font-bold text-primary">▶</span>
+                        <span className="text-xs font-bold text-primary">▶</span>
                       )}
                       <span className="text-xs font-semibold text-text-secondary uppercase tracking-wide">
                         {blockLabel(block)}
@@ -290,7 +292,7 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
                     </div>
                     <div className={cn(
                       "flex gap-0.5 transition-opacity",
-                      isCursor ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                      isCursor ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
                     )}>
                       <Button
                         variant="ghost"
@@ -300,7 +302,7 @@ export function SongDetailPanel({ songId, onClose }: SongDetailPanelProps) {
                         aria-label={`Projeter ${blockLabel(block)}`}
                         className="h-6 w-6 text-text-muted hover:text-primary"
                       >
-                        <span className="text-[10px] leading-none">▶</span>
+                        <span className="text-xs leading-none">▶</span>
                       </Button>
                       <Button
                         variant="ghost"

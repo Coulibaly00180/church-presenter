@@ -1,129 +1,25 @@
-import { useEffect, useState } from "react";
-import { FileDown, Music, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/layout/AppShell";
 import { PlanEditor } from "@/components/plan/PlanEditor";
 import { SourcePanel } from "@/components/source/SourcePanel";
-import { SongDetailPanel } from "@/components/source/SongDetailPanel";
 import { SongEditorDialog } from "@/components/dialogs/SongEditorDialog";
-import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { WorkspaceInspector } from "@/components/inspector/WorkspaceInspector";
+import type { BibleInspectorPreview, WorkspaceInspectorState } from "@/lib/workspaceInspector";
 
-// ─── Onboarding overlay (US-001) ──────────────────────────────────────────────
-
-function WelcomeScreen({ onDismiss }: { onDismiss: () => void }) {
-  const [songEditorOpen, setSongEditorOpen] = useState(false);
-  const [importing, setImporting] = useState(false);
-
-  const handleImport = async () => {
-    setImporting(true);
-    try {
-      const result = await window.cp.data.importAll({ mode: "MERGE" });
-      if (result.ok) {
-        toast.success(
-          `Import terminé — ${result.counts.songs} chant${result.counts.songs !== 1 ? "s" : ""}, ${result.counts.plans} plan${result.counts.plans !== 1 ? "s" : ""}`,
-        );
-        onDismiss();
-      } else if (!("canceled" in result)) {
-        toast.error("Import échoué", { description: "error" in result ? result.error : undefined });
-      }
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-bg-base">
-      <div className="relative w-full max-w-md mx-auto px-8 py-12 text-center space-y-8">
-        {/* Dismiss */}
-        <button
-          type="button"
-          aria-label="Ignorer"
-          className="absolute top-2 right-2 text-text-muted hover:text-text-primary transition-colors"
-          onClick={onDismiss}
-        >
-          <X className="h-4 w-4" />
-        </button>
-
-        {/* Logo / Icon */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Music className="h-8 w-8 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-text-primary">Bienvenue dans Church Presenter</h1>
-            <p className="text-sm text-text-secondary mt-1.5">
-              Gérez vos chants, plans de culte et projection en toute simplicité.
-            </p>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-col gap-3">
-          <Button
-            className="w-full gap-2"
-            size="lg"
-            onClick={() => setSongEditorOpen(true)}
-          >
-            <Music className="h-4 w-4" />
-            Créer votre premier chant
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            size="lg"
-            onClick={() => void handleImport()}
-            disabled={importing}
-          >
-            <FileDown className="h-4 w-4" />
-            {importing ? "Import en cours…" : "Importer des données existantes"}
-          </Button>
-
-          <button
-            type="button"
-            className="text-sm text-text-muted hover:text-text-primary transition-colors mt-1"
-            onClick={onDismiss}
-          >
-            Commencer sans importer →
-          </button>
-        </div>
-
-        {/* Feature hints */}
-        <div className="grid grid-cols-3 gap-3 text-center pt-2 border-t border-border">
-          {[
-            ["Chants", "Bibliothèque avec blocs verse/refrain"],
-            ["Bible", "LSG 1910 intégré hors-ligne"],
-            ["Projection", "Écrans A/B/C indépendants"],
-          ].map(([title, desc]) => (
-            <div key={title} className="space-y-0.5">
-              <p className="text-xs font-semibold text-text-primary">{title}</p>
-              <p className="text-[10px] text-text-muted leading-tight">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <SongEditorDialog
-        open={songEditorOpen}
-        onClose={() => setSongEditorOpen(false)}
-        onSaved={() => {
-          setSongEditorOpen(false);
-          onDismiss();
-        }}
-      />
-    </div>
-  );
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
+const DESKTOP_INSPECTOR_BREAKPOINT = 1280;
 
 export function MainPage() {
-  // null = loading, true = show welcome, false = skip welcome
   const [showWelcome, setShowWelcome] = useState<boolean | null>(null);
-  const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
+  const [songEditorOpen, setSongEditorOpen] = useState(false);
+  const [importingWelcome, setImportingWelcome] = useState(false);
+  const [inspectorState, setInspectorState] = useState<WorkspaceInspectorState | null>(null);
+  const [wideInspector, setWideInspector] = useState(() =>
+    typeof window === "undefined" ? true : window.innerWidth >= DESKTOP_INSPECTOR_BREAKPOINT,
+  );
 
   useEffect(() => {
-    // Check first-launch: show welcome if no songs and no plans
     void Promise.all([
       window.cp.songs.list(),
       window.cp.plans.list(),
@@ -132,22 +28,128 @@ export function MainPage() {
     });
   }, []);
 
+  useEffect(() => {
+    const onResize = () => {
+      setWideInspector(window.innerWidth >= DESKTOP_INSPECTOR_BREAKPOINT);
+    };
+
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const handleImportWelcome = async () => {
+    setImportingWelcome(true);
+    try {
+      const result = await window.cp.data.importAll({ mode: "MERGE" });
+      if (result.ok) {
+        toast.success(
+          `Import terminé — ${result.counts.songs} chant${result.counts.songs !== 1 ? "s" : ""}, ${result.counts.plans} plan${result.counts.plans !== 1 ? "s" : ""}`,
+        );
+        setShowWelcome(false);
+      } else if (!("canceled" in result)) {
+        toast.error("Import échoué", { description: "error" in result ? result.error : undefined });
+      }
+    } finally {
+      setImportingWelcome(false);
+    }
+  };
+
+  const inspectedSongId = inspectorState?.kind === "SONG" ? inspectorState.songId : null;
+  const inspectedMediaPath =
+    inspectorState?.kind === "MEDIA" ? inspectorState.file.path : null;
+  const inspectedItemId = inspectorState?.kind === "PLAN_ITEM" ? inspectorState.itemId : null;
+  const inspectorOpen = inspectorState !== null;
+
+  const openSongInspector = useCallback((songId: string) => {
+    setInspectorState({ kind: "SONG", songId });
+  }, []);
+
+  const openMediaInspector = useCallback((file: CpMediaFile) => {
+    setInspectorState({ kind: "MEDIA", file });
+  }, []);
+
+  const openPlanItemInspector = useCallback((itemId: string) => {
+    setInspectorState({ kind: "PLAN_ITEM", itemId });
+  }, []);
+
+  const handleBiblePreview = useCallback((preview: BibleInspectorPreview | null) => {
+    setInspectorState((current) => {
+      if (!preview) {
+        return current?.kind === "BIBLE" ? null : current;
+      }
+      if (
+        current?.kind === "BIBLE" &&
+        current.preview.id === preview.id &&
+        current.preview.title === preview.title &&
+        current.preview.subtitle === preview.subtitle &&
+        current.preview.content === preview.content
+      ) {
+        return current;
+      }
+      return { kind: "BIBLE", preview };
+    });
+  }, []);
+
   return (
     <AppShell>
       <div className="relative flex flex-1 overflow-hidden">
-        <SourcePanel onSelectSong={(id) => setSelectedSongId(id)} />
-        {selectedSongId ? (
-          <SongDetailPanel
-            songId={selectedSongId}
-            onClose={() => setSelectedSongId(null)}
-          />
-        ) : (
-          <PlanEditor />
-        )}
-        {showWelcome && (
-          <WelcomeScreen onDismiss={() => setShowWelcome(false)} />
+        <SourcePanel
+          onSelectSong={openSongInspector}
+          onInspectMedia={openMediaInspector}
+          onInspectBible={handleBiblePreview}
+          inspectedSongId={inspectedSongId}
+          inspectedMediaPath={inspectedMediaPath}
+        />
+
+        <PlanEditor
+          quickStart={{
+            visible: showWelcome === true,
+            importing: importingWelcome,
+            onDismiss: () => setShowWelcome(false),
+            onCreateSong: () => setSongEditorOpen(true),
+            onImportData: () => void handleImportWelcome(),
+          }}
+          onInspectItem={openPlanItemInspector}
+          inspectedItemId={inspectedItemId}
+        />
+
+        {wideInspector && (
+          <aside className="hidden h-full w-[360px] shrink-0 border-l border-border bg-bg-surface xl:flex xl:flex-col">
+            <WorkspaceInspector
+              state={inspectorState}
+              onClose={() => setInspectorState(null)}
+              onInspectSong={openSongInspector}
+              onInspectMedia={openMediaInspector}
+            />
+          </aside>
         )}
       </div>
+
+      {!wideInspector && (
+        <Sheet open={inspectorOpen} onOpenChange={(nextOpen) => !nextOpen && setInspectorState(null)}>
+          <SheetContent side="right" className="w-full max-w-md p-0">
+            <SheetTitle className="sr-only">Inspecteur de contenu</SheetTitle>
+            <SheetDescription className="sr-only">
+              Detail du chant, du media, du passage biblique ou de l&apos;element de plan selectionne.
+            </SheetDescription>
+            <WorkspaceInspector
+              state={inspectorState}
+              onClose={() => setInspectorState(null)}
+              onInspectSong={openSongInspector}
+              onInspectMedia={openMediaInspector}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
+
+      <SongEditorDialog
+        open={songEditorOpen}
+        onClose={() => setSongEditorOpen(false)}
+        onSaved={() => {
+          setSongEditorOpen(false);
+          setShowWelcome(false);
+        }}
+      />
     </AppShell>
   );
 }

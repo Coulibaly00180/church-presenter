@@ -92,13 +92,13 @@
   /* Tailles de composants */
   --plan-item-height-compact:  56px;
   --plan-item-height-expanded: 72px;
-  --source-panel-width:        280px;
-  --live-bar-height:           220px;
+  --source-panel-width:        360px;
+  --live-bar-height:           236px;
   --btn-height-sm:  28px;
   --btn-height-md:  32px;
   --btn-height-lg:  40px;
   --btn-height-xl:  48px;
-  --header-height:  48px;
+  --header-height:  56px;
 }
 
 /* ─── Mode Préparation — thème clair (défaut) ───────────────────────────────

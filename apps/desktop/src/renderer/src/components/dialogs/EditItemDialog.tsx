@@ -316,7 +316,7 @@ export function EditItemDialog({ item, open, onClose }: EditItemDialogProps) {
                       key={btn.value}
                       type="button"
                       onClick={() => setBgMode(btn.value)}
-                      className={`px-1 py-1 rounded text-[10px] font-medium border transition-colors ${
+                      className={`px-1 py-1 rounded text-xs font-medium border transition-colors ${
                         bgMode === btn.value
                           ? "bg-primary text-primary-foreground border-primary"
                           : "border-border hover:bg-bg-elevated"

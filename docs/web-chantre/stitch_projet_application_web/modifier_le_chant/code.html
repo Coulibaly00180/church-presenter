@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Modifier le Chant - WorshipFlow</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#908fa0",
+                        "primary-container": "#8083ff",
+                        "inverse-primary": "#494bd6",
+                        "on-error": "#690005",
+                        "secondary-fixed-dim": "#3cddc7",
+                        "tertiary-container": "#ea6479",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "secondary-container": "#03c6b2",
+                        "on-primary-container": "#0d0096",
+                        "primary": "#c0c1ff",
+                        "outline-variant": "#464554",
+                        "on-surface-variant": "#c7c4d7",
+                        "inverse-surface": "#dae2fd",
+                        "surface-dim": "#0b1326",
+                        "on-tertiary": "#67001f",
+                        "background": "#0b1326",
+                        "surface-container-highest": "#2d3449",
+                        "surface-container": "#171f33",
+                        "on-secondary": "#003731",
+                        "secondary": "#44e2cd",
+                        "secondary-fixed": "#62fae3",
+                        "on-secondary-fixed": "#00201c",
+                        "on-background": "#dae2fd",
+                        "surface": "#0b1326",
+                        "on-secondary-container": "#004d44",
+                        "on-error-container": "#ffdad6",
+                        "tertiary": "#ffb2b9",
+                        "surface-bright": "#31394d",
+                        "tertiary-fixed-dim": "#ffb2b9",
+                        "on-primary": "#1000a9",
+                        "surface-tint": "#c0c1ff",
+                        "on-tertiary-container": "#5b001a",
+                        "on-secondary-fixed-variant": "#005047",
+                        "surface-variant": "#2d3449",
+                        "surface-container-lowest": "#060e20",
+                        "primary-fixed": "#e1e0ff",
+                        "inverse-on-surface": "#283044",
+                        "on-tertiary-fixed-variant": "#891933",
+                        "tertiary-fixed": "#ffdadc",
+                        "surface-container-high": "#222a3d",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "error-container": "#93000a",
+                        "on-tertiary-fixed": "#400010",
+                        "surface-container-low": "#131b2e",
+                        "on-primary-fixed": "#07006c",
+                        "error": "#ffb4ab",
+                        "on-surface": "#dae2fd"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "sm": "12px",
+                        "md": "24px",
+                        "container-max": "1280px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "xl": "80px",
+                        "lg": "48px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "display-xl": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "label-caps": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "body-md": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "display-xl": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "500" }],
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style type="text/tailwindcss">
+        @layer utilities {
+            .glass-panel {
+                @apply bg-surface-variant/40 backdrop-blur-xl border border-white/5;
+            }
+            .input-field {
+                @apply w-full bg-surface-container-highest border border-outline-variant/50 rounded-lg text-body-md font-body-md text-on-surface px-sm py-[10px] focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all;
+            }
+            .form-label {
+                @apply block font-label-caps text-label-caps text-on-surface-variant mb-xs;
+            }
+            .btn-primary {
+                @apply bg-gradient-to-r from-primary-container to-inverse-primary text-white font-label-caps text-label-caps px-md py-sm rounded-lg hover:shadow-[0_0_20px_rgba(128,131,255,0.3)] transition-all flex items-center justify-center gap-xs;
+            }
+            .btn-secondary {
+                @apply text-on-surface-variant hover:text-on-surface font-label-caps text-label-caps px-md py-sm rounded-lg transition-colors flex items-center justify-center gap-xs border border-transparent hover:border-outline-variant/30 hover:bg-surface-container-lowest;
+            }
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen overflow-x-hidden font-body-md text-body-md">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full flex flex-col z-40 bg-slate-950/80 backdrop-blur-2xl font-['Manrope'] font-semibold tracking-tight h-screen w-64 border-r border-white/10 border-r border-white/5 shadow-[20px_0_50px_rgba(0,0,0,0.3)]">
+<div class="p-6">
+<div class="text-2xl font-black bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-indigo-500 mb-2">
+                WorshipFlow
+            </div>
+<div class="text-xs text-slate-400 uppercase tracking-widest font-bold">Exubérant &amp; Organisé</div>
+</div>
+<div class="px-4 mb-6">
+<button class="w-full bg-gradient-to-r from-primary-container to-inverse-primary text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(128,131,255,0.2)] hover:shadow-[0_0_20px_rgba(128,131,255,0.4)] transition-all hover:scale-[1.02]">
+<span class="material-symbols-outlined text-sm">add</span> Nouveau Plan
+            </button>
+</div>
+<div class="flex-1 overflow-y-auto py-4">
+<ul class="flex flex-col gap-1">
+<li>
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-100 py-3 px-6 transition-colors hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-violet-500 dark:text-violet-400">dashboard</span>
+                        Tableau de bord
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-white bg-gradient-to-r from-violet-600/20 to-transparent border-l-4 border-violet-500 py-3 px-6 hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-violet-500 dark:text-violet-400">library_music</span>
+                        Chants
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-100 py-3 px-6 transition-colors hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-violet-500 dark:text-violet-400">calendar_today</span>
+                        Planning
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-100 py-3 px-6 transition-colors hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-violet-500 dark:text-violet-400">history</span>
+                        Historique
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-100 py-3 px-6 transition-colors hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-violet-500 dark:text-violet-400">group</span>
+                        Équipe
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-100 py-3 px-6 transition-colors hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-violet-500 dark:text-violet-400">settings</span>
+                        Paramètres
+                    </a>
+</li>
+</ul>
+</div>
+<div class="mt-auto border-t border-white/5 p-4">
+<a class="flex items-center gap-3 text-slate-400 hover:text-slate-100 py-3 px-6 transition-colors hover:bg-white/5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-violet-500 dark:text-violet-400">help</span>
+                Aide
+            </a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="fixed top-0 right-0 left-64 flex items-center justify-between px-8 z-30 bg-slate-950/40 backdrop-blur-md font-['Manrope'] text-sm font-medium h-16 w-full border-b border-white/10 border-b border-white/10">
+<div class="flex items-center gap-4 w-1/3">
+<!-- Search omitted based on JSON search_bar structure request without explicit field definition, keeping clean -->
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-300 hover:text-violet-300 transition-colors focus:ring-2 focus:ring-violet-500/50 outline-none rounded-full p-2">
+<span class="material-symbols-outlined text-indigo-400">notifications</span>
+</button>
+<button class="text-slate-300 hover:text-violet-300 transition-colors focus:ring-2 focus:ring-violet-500/50 outline-none rounded-full p-2">
+<span class="material-symbols-outlined text-indigo-400">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/30 ml-2">
+<img alt="Avatar de l'utilisateur" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBV4B6Y5ogSpVd4maVpaRWmitKl84hFDSxj0OK5Bt_XEy0gXLEtZkI7GyeaR8Q-OMiyvSSr_KFRjf6imtPvxtdz6KWcxkU3y6MRPDsv4X-XUQhzyuOvGXVej7PoJ4BrGwV0FvSLH9CwY8jeVzUPrrlsmkl4_C-55TIMrCJ5oVh9MJ-W9joyM7dcV5zwVFpoAFeah0CizvPbNVccddmyOrFBD5yvKxWJ8w9EZqypMNl6aeHUu6cwoKaLbZjlrCEwd144Ft-ug2FaUL8"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 mt-16 p-lg max-w-container-max mx-auto">
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-lg gap-4">
+<div>
+<a class="text-primary hover:text-primary-container text-sm font-bold flex items-center gap-1 mb-2 transition-colors" href="#">
+<span class="material-symbols-outlined text-sm">arrow_back</span> Retour aux chants
+                </a>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Modifier le Chant</h1>
+</div>
+<div class="flex items-center gap-sm">
+<button class="btn-secondary">
+                    Annuler
+                </button>
+<button class="btn-primary">
+<span class="material-symbols-outlined text-sm">save</span>
+                    Enregistrer les modifications
+                </button>
+</div>
+</div>
+<!-- Editor Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-md">
+<!-- Left Column: Metadata (4 columns) -->
+<div class="xl:col-span-4 flex flex-col gap-md">
+<!-- Information Card -->
+<div class="glass-panel rounded-xl p-md">
+<div class="flex items-center gap-2 mb-md border-b border-outline-variant/20 pb-sm">
+<span class="material-symbols-outlined text-secondary">info</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Informations</h2>
+</div>
+<div class="flex flex-col gap-sm">
+<div>
+<label class="form-label" for="song-title">Titre du chant</label>
+<input class="input-field" id="song-title" type="text" value="Amazing Grace"/>
+</div>
+<div>
+<label class="form-label" for="song-author">Auteur / Artiste</label>
+<input class="input-field" id="song-author" type="text" value="John Newton"/>
+</div>
+<div class="grid grid-cols-2 gap-sm mt-2">
+<div>
+<label class="form-label" for="song-key">Tonalité (Clé)</label>
+<div class="relative">
+<select class="input-field appearance-none" id="song-key">
+<option value="C">C (Do)</option>
+<option value="D">D (Ré)</option>
+<option value="E">E (Mi)</option>
+<option value="F">F (Fa)</option>
+<option selected="" value="G">G (Sol)</option>
+<option value="A">A (La)</option>
+<option value="B">B (Si)</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-2.5 text-outline pointer-events-none">expand_more</span>
+</div>
+</div>
+<div>
+<label class="form-label" for="song-tempo">Tempo (BPM)</label>
+<input class="input-field" id="song-tempo" type="number" value="85"/>
+</div>
+</div>
+<div class="mt-2">
+<label class="form-label" for="song-tags">Tags (Thèmes)</label>
+<input class="input-field" id="song-tags" type="text" value="Grâce, Hymne, Classique"/>
+<div class="flex flex-wrap gap-2 mt-2">
+<span class="bg-primary/20 text-primary border border-primary/30 px-2 py-1 rounded text-xs font-bold">Grâce</span>
+<span class="bg-primary/20 text-primary border border-primary/30 px-2 py-1 rounded text-xs font-bold">Hymne</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Media Links Card (Optional concept for pro feel) -->
+<div class="glass-panel rounded-xl p-md">
+<div class="flex items-center justify-between mb-md border-b border-outline-variant/20 pb-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">link</span>
+<h2 class="font-headline-md text-[18px] font-bold text-on-surface">Ressources Audio</h2>
+</div>
+</div>
+<div class="flex items-center gap-3 bg-surface-container-highest p-3 rounded-lg border border-outline-variant/30">
+<span class="material-symbols-outlined text-red-500">play_circle</span>
+<div class="flex-1 truncate">
+<span class="block text-sm font-bold text-on-surface">Lien YouTube</span>
+<span class="block text-xs text-on-surface-variant truncate">youtube.com/watch?v=...</span>
+</div>
+<button class="text-outline hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm">edit</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Right Column: Lyrics Editor (8 columns) -->
+<div class="xl:col-span-8 flex flex-col gap-md">
+<div class="glass-panel rounded-xl flex flex-col h-full overflow-hidden">
+<!-- Editor Toolbar -->
+<div class="bg-surface-container/80 backdrop-blur-md p-sm px-md flex items-center justify-between border-b border-outline-variant/20">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">format_align_left</span>
+<h2 class="font-headline-md text-[20px] font-bold text-on-surface">Paroles &amp; Structure</h2>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface-container-highest hover:bg-surface-bright text-on-surface px-3 py-1.5 rounded flex items-center gap-1 text-sm font-bold border border-outline-variant/30 transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                                Couplet
+                            </button>
+<button class="bg-surface-container-highest hover:bg-surface-bright text-on-surface px-3 py-1.5 rounded flex items-center gap-1 text-sm font-bold border border-outline-variant/30 transition-colors">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                                Refrain
+                            </button>
+</div>
+</div>
+<!-- Editor Workspace -->
+<div class="p-md flex-1 overflow-y-auto bg-surface-dim/30 flex flex-col gap-md">
+<!-- Block 1: Couplet 1 -->
+<div class="group relative bg-surface-container-low rounded-lg border border-outline-variant/20 focus-within:border-primary/50 focus-within:shadow-[0_0_15px_rgba(192,193,255,0.05)] transition-all">
+<!-- Drag Handle & Type Indicator -->
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-secondary rounded-l-lg opacity-80"></div>
+<div class="p-sm pl-md flex items-center justify-between border-b border-outline-variant/10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline cursor-grab hover:text-on-surface">drag_indicator</span>
+<span class="font-label-caps text-label-caps text-secondary uppercase tracking-wider bg-secondary/10 px-2 py-0.5 rounded">Couplet 1</span>
+</div>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+<button class="text-outline hover:text-primary p-1 rounded"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+<button class="text-outline hover:text-error p-1 rounded"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+<textarea class="w-full bg-transparent border-none text-on-surface p-md min-h-[120px] focus:ring-0 resize-y font-body-lg text-body-lg" placeholder="Saisissez les paroles ici...">Amazing grace! How sweet the sound
+That saved a wretch like me!
+I once was lost, but now am found;
+Was blind, but now I see.</textarea>
+</div>
+<!-- Block 2: Couplet 2 -->
+<div class="group relative bg-surface-container-low rounded-lg border border-outline-variant/20 focus-within:border-primary/50 transition-all">
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-secondary rounded-l-lg opacity-80"></div>
+<div class="p-sm pl-md flex items-center justify-between border-b border-outline-variant/10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline cursor-grab hover:text-on-surface">drag_indicator</span>
+<span class="font-label-caps text-label-caps text-secondary uppercase tracking-wider bg-secondary/10 px-2 py-0.5 rounded">Couplet 2</span>
+</div>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+<button class="text-outline hover:text-primary p-1 rounded"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+<button class="text-outline hover:text-error p-1 rounded"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+<textarea class="w-full bg-transparent border-none text-on-surface p-md min-h-[120px] focus:ring-0 resize-y font-body-lg text-body-lg" placeholder="Saisissez les paroles ici...">'Twas grace that taught my heart to fear,
+And grace my fears relieved;
+How precious did that grace appear
+The hour I first believed.</textarea>
+</div>
+<!-- Block 3: Chorus -->
+<div class="group relative bg-surface-container-low rounded-lg border border-outline-variant/20 focus-within:border-primary/50 transition-all">
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-primary rounded-l-lg opacity-80"></div>
+<div class="p-sm pl-md flex items-center justify-between border-b border-outline-variant/10 bg-primary/5">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline cursor-grab hover:text-on-surface">drag_indicator</span>
+<span class="font-label-caps text-label-caps text-primary uppercase tracking-wider bg-primary/20 px-2 py-0.5 rounded">Refrain</span>
+</div>
+<div class="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+<button class="text-outline hover:text-primary p-1 rounded"><span class="material-symbols-outlined text-[18px]">content_copy</span></button>
+<button class="text-outline hover:text-error p-1 rounded"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+<textarea class="w-full bg-transparent border-none text-on-surface p-md min-h-[100px] focus:ring-0 resize-y font-body-lg text-body-lg font-bold" placeholder="Saisissez les paroles du refrain...">[Instrumental ou variation spécifique si applicable - le chant original n'a pas de refrain distinct standard, utilisé ici pour démonstration]</textarea>
+</div>
+<!-- Add new block area -->
+<button class="w-full border-2 border-dashed border-outline-variant/40 rounded-lg p-md text-outline hover:text-primary hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 group">
+<div class="bg-surface-container rounded-full p-2 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-xl">add</span>
+</div>
+<span class="font-bold text-sm">Ajouter un nouveau bloc</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

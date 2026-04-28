@@ -19,6 +19,7 @@ import {
   isBuiltinTemplate,
 } from "@/lib/templates";
 import { usePlan } from "@/hooks/usePlan";
+import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 
 interface PlanTemplateDialogProps {
   open: boolean;
@@ -31,6 +32,7 @@ export function PlanTemplateDialog({ open, onClose }: PlanTemplateDialogProps) {
   const [selected, setSelected] = useState<PlanTemplate | null>(null);
   const [applying, setApplying] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -87,17 +89,17 @@ export function PlanTemplateDialog({ open, onClose }: PlanTemplateDialogProps) {
   }, [plan]);
 
   const handleDelete = useCallback(async (id: string, name: string) => {
-    if (!window.confirm(`Supprimer le modèle "${name}" ?`)) return;
     await deleteTemplate(id);
     const updated = await getTemplates();
     setTemplates(updated);
     if (selected?.id === id) setSelected(null);
+    setConfirmDelete(null);
     toast.success(`Modèle "${name}" supprimé`);
   }, [selected]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[560px] flex flex-col max-h-[80vh]">
+      <DialogContent className="sm:max-w-[640px] flex flex-col max-h-[80vh]">
         <DialogHeader className="shrink-0">
           <DialogTitle>Modèles de plans</DialogTitle>
           <DialogDescription>
@@ -134,11 +136,11 @@ export function PlanTemplateDialog({ open, onClose }: PlanTemplateDialogProps) {
                   <button
                     type="button"
                     aria-label={`Supprimer ${tpl.name}`}
-                    className="text-text-muted hover:text-danger transition-colors shrink-0 p-0.5"
-                    onClick={(e) => { e.stopPropagation(); void handleDelete(tpl.id, tpl.name); }}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                      className="text-text-muted hover:text-danger transition-colors shrink-0 p-0.5"
+                      onClick={(e) => { e.stopPropagation(); setConfirmDelete({ id: tpl.id, name: tpl.name }); }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                 )}
               </div>
 
@@ -148,7 +150,7 @@ export function PlanTemplateDialog({ open, onClose }: PlanTemplateDialogProps) {
                   <div key={i} className="flex items-center gap-1">
                     <KindBadge kind={item.kind} />
                     {item.title && (
-                      <span className="text-[10px] text-text-muted">{item.title}</span>
+                      <span className="text-xs text-text-muted">{item.title}</span>
                     )}
                   </div>
                 ))}
@@ -184,6 +186,16 @@ export function PlanTemplateDialog({ open, onClose }: PlanTemplateDialogProps) {
             </Button>
           </div>
         </div>
+
+        <ConfirmDialog
+          open={confirmDelete !== null}
+          title="Supprimer le modèle"
+          description={confirmDelete ? `Supprimer le modèle "${confirmDelete.name}" ?` : ""}
+          confirmLabel="Supprimer"
+          confirmVariant="destructive"
+          onConfirm={() => confirmDelete && void handleDelete(confirmDelete.id, confirmDelete.name)}
+          onCancel={() => setConfirmDelete(null)}
+        />
       </DialogContent>
     </Dialog>
   );

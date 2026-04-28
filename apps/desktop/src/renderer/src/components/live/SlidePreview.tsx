@@ -33,6 +33,7 @@ export function SlidePreview({
   const bg = variant === "current"
     ? "var(--current-slide)"
     : "var(--next-slide)";
+  const variantLabel = variant === "current" ? "En direct" : "Suivant";
 
   const isBlack = projectionState?.mode === "BLACK";
   const isWhite = projectionState?.mode === "WHITE";
@@ -58,81 +59,114 @@ export function SlidePreview({
     return () => clearInterval(id);
   }, [isTimer, current?.body, projectionState?.updatedAt, projectionState]);
 
+  const frameClassName = cn(
+    "relative flex items-center justify-center overflow-hidden rounded-xl border border-border",
+    onClick && "cursor-pointer transition-colors hover:border-primary/40 hover:ring-2 hover:ring-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+  );
+  const frameStyle: React.CSSProperties = { aspectRatio: "16 / 9" };
+  if (isBlack) {
+    frameStyle.backgroundColor = "#000";
+  } else if (isWhite) {
+    frameStyle.backgroundColor = "#fff";
+  } else if (
+    projectionState?.backgroundMode === "GRADIENT_LINEAR" &&
+    projectionState.backgroundGradientFrom &&
+    projectionState.backgroundGradientTo
+  ) {
+    const angle = projectionState.backgroundGradientAngle ?? 180;
+    frameStyle.background = `linear-gradient(${angle}deg, ${projectionState.backgroundGradientFrom}, ${projectionState.backgroundGradientTo})`;
+  } else if (
+    projectionState?.backgroundMode === "GRADIENT_RADIAL" &&
+    projectionState.backgroundGradientFrom &&
+    projectionState.backgroundGradientTo
+  ) {
+    frameStyle.background = `radial-gradient(circle, ${projectionState.backgroundGradientFrom}, ${projectionState.backgroundGradientTo})`;
+  } else {
+    frameStyle.backgroundColor = projectionState?.background ?? bg;
+  }
+
+  const previewContent = (
+    <>
+      <span className="absolute left-2 top-2 rounded-full bg-black/35 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-white/85">
+        {variantLabel}
+      </span>
+
+      {isBlack && (
+        <span className="text-white/30 text-xs uppercase tracking-widest">Noir</span>
+      )}
+      {isWhite && (
+        <span className="text-black/30 text-xs uppercase tracking-widest">Blanc</span>
+      )}
+
+      {!isBlack && !isWhite && current && current.kind !== "EMPTY" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center">
+          {current.kind === "TEXT" && (
+            <>
+              {isTimer ? (
+                <p
+                  className="text-base font-bold tabular-nums leading-none"
+                  style={{ color: projectionState?.foreground ?? "#fff" }}
+                >
+                  {countdown ?? current.body}
+                </p>
+              ) : (
+                <>
+                  {current.title && (
+                    <p
+                      className="w-full truncate text-xs font-semibold leading-tight"
+                      style={{ color: projectionState?.foreground ?? "#fff" }}
+                    >
+                      {current.title}
+                    </p>
+                  )}
+                  {current.body && (
+                    <p
+                      className="mt-1 line-clamp-4 w-full text-xs leading-snug opacity-90"
+                      style={{ color: projectionState?.foreground ?? "#fff" }}
+                    >
+                      {current.body}
+                    </p>
+                  )}
+                </>
+              )}
+            </>
+          )}
+          {current.kind === "MEDIA" && (
+            <div className="flex h-full w-full items-center justify-center opacity-60">
+              <span className="text-xs font-semibold uppercase tracking-wide text-white">
+                {current.mediaType ?? "Media"}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(!current || current.kind === "EMPTY") && !isBlack && !isWhite && (
+        <span className="text-xs uppercase tracking-wider text-white/35">Vide</span>
+      )}
+    </>
+  );
+
   return (
-    <div className={cn("flex flex-col gap-1", className)}>
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-md border border-border",
-          "flex items-center justify-center",
-          onClick && "cursor-pointer hover:ring-1 hover:ring-primary/50 transition-all"
-        )}
-        style={{
-          aspectRatio: "16 / 9",
-          backgroundColor: isBlack ? "#000" : isWhite ? "#fff" : (projectionState?.background ?? bg),
-        }}
-        role={onClick ? "button" : undefined}
-        onClick={onClick}
-        aria-label={label}
-      >
-        {/* Mode overlay */}
-        {isBlack && (
-          <span className="text-white/30 text-xs uppercase tracking-widest">Noir</span>
-        )}
-        {isWhite && (
-          <span className="text-black/30 text-xs uppercase tracking-widest">Blanc</span>
-        )}
-
-        {/* Content */}
-        {!isBlack && !isWhite && current && current.kind !== "EMPTY" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center">
-            {current.kind === "TEXT" && (
-              <>
-                {isTimer ? (
-                  /* Timer countdown display */
-                  <p
-                    className="text-sm font-bold tabular-nums leading-none"
-                    style={{ color: projectionState?.foreground ?? "#fff" }}
-                  >
-                    {countdown ?? current.body}
-                  </p>
-                ) : (
-                  <>
-                    {current.title && (
-                      <p
-                        className="text-[9px] font-semibold leading-tight truncate w-full text-center"
-                        style={{ color: projectionState?.foreground ?? "#fff" }}
-                      >
-                        {current.title}
-                      </p>
-                    )}
-                    {current.body && (
-                      <p
-                        className="text-[8px] leading-tight line-clamp-3 w-full text-center mt-0.5"
-                        style={{ color: projectionState?.foreground ?? "#fff" }}
-                      >
-                        {current.body}
-                      </p>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-            {current.kind === "MEDIA" && (
-              <div className="w-full h-full flex items-center justify-center opacity-50">
-                <span className="text-[9px] text-white uppercase">{current.mediaType ?? "Média"}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Empty state */}
-        {(!current || current.kind === "EMPTY") && !isBlack && !isWhite && (
-          <span className="text-[9px] opacity-30 uppercase tracking-wider text-white">Vide</span>
-        )}
-      </div>
+    <div className={cn("flex flex-col gap-2", className)}>
+      {onClick ? (
+        <button
+          type="button"
+          className={frameClassName}
+          style={frameStyle}
+          onClick={onClick}
+          aria-label={label ? `Projeter ${label}` : "Projeter l'aperçu"}
+        >
+          {previewContent}
+        </button>
+      ) : (
+        <div className={frameClassName} style={frameStyle}>
+          {previewContent}
+        </div>
+      )}
 
       {label && (
-        <p className="text-xs text-text-secondary text-center">{label}</p>
+        <p className="line-clamp-2 text-center text-sm font-medium text-text-secondary">{label}</p>
       )}
     </div>
   );

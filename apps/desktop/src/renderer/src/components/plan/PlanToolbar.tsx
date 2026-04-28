@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { ConfirmDialog } from "@/components/dialogs/ConfirmDialog";
 import { PlanTemplateDialog } from "@/components/dialogs/PlanTemplateDialog";
 import { usePlan } from "@/hooks/usePlan";
 import { isoToYmd } from "@/lib/date";
@@ -43,6 +44,7 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Plan background dialog state
@@ -182,10 +184,10 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
 
   const handleDelete = useCallback(async () => {
     if (!selectedPlanId) return;
-    if (!window.confirm(`Supprimer "${displayTitle}" ?`)) return;
     await deletePlan(selectedPlanId);
+    setConfirmDeleteOpen(false);
     toast.success("Plan supprimé");
-  }, [selectedPlanId, displayTitle, deletePlan]);
+  }, [selectedPlanId, deletePlan]);
 
   if (!plan) return null;
 
@@ -300,7 +302,7 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-danger focus:text-danger focus:bg-danger/10"
-              onClick={() => void handleDelete()}
+              onClick={() => setConfirmDeleteOpen(true)}
             >
               <Trash2 className="h-4 w-4" />
               Supprimer le plan
@@ -310,6 +312,15 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
       </div>
 
       <PlanTemplateDialog open={templateDialogOpen} onClose={() => setTemplateDialogOpen(false)} />
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        title="Supprimer le plan"
+        description={`Supprimer "${displayTitle}" ?`}
+        confirmLabel="Supprimer"
+        confirmVariant="destructive"
+        onConfirm={() => void handleDelete()}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
 
       {/* Plan background dialog */}
       <Dialog open={bgDialogOpen} onOpenChange={(v) => !v && setBgDialogOpen(false)}>
@@ -342,7 +353,7 @@ export function PlanToolbar({ onAddItem, onPreview }: PlanToolbarProps) {
                       key={btn.value}
                       type="button"
                       onClick={() => setBgMode(btn.value)}
-                      className={`px-1 py-1 rounded text-[10px] font-medium border transition-colors ${
+                      className={`px-1 py-1 rounded text-xs font-medium border transition-colors ${
                         bgMode === btn.value
                           ? "bg-primary text-primary-foreground border-primary"
                           : "border-border hover:bg-bg-elevated"

@@ -36,15 +36,20 @@ export function TimerTab() {
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <div className="space-y-3">
-        <p className="text-xs font-medium text-text-secondary">Durée</p>
+      <section className="space-y-3 rounded-2xl border border-border bg-bg-surface p-4">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">Minuterie</p>
+          <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+            Prépare un compte à rebours clair pour les pauses, transitions et annonces.
+          </p>
+        </div>
 
-        {/* Quick durations */}
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex flex-wrap gap-1.5">
           {[1, 5, 10, 15, 20, 30].map((m) => (
             <button
               key={m}
-              className="px-2.5 py-1 rounded text-xs font-medium border border-border hover:bg-bg-elevated transition-colors"
+              type="button"
+              className="rounded-xl border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-bg-elevated"
               onClick={() => { setMinutes(m); setSeconds(0); }}
             >
               {m} min
@@ -52,10 +57,9 @@ export function TimerTab() {
           ))}
         </div>
 
-        {/* Manual input */}
         <div className="flex items-center gap-2">
           <div className="flex flex-col gap-1 flex-1">
-            <label className="text-xs text-text-muted">Minutes</label>
+            <label className="text-sm text-text-muted">Minutes</label>
             <Input
               type="number"
               min={0}
@@ -67,7 +71,7 @@ export function TimerTab() {
           </div>
           <span className="text-lg font-bold text-text-secondary mt-4">:</span>
           <div className="flex flex-col gap-1 flex-1">
-            <label className="text-xs text-text-muted">Secondes</label>
+            <label className="text-sm text-text-muted">Secondes</label>
             <Input
               type="number"
               min={0}
@@ -79,20 +83,17 @@ export function TimerTab() {
           </div>
         </div>
 
-        {/* Adjust buttons */}
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           <Button variant="ghost" size="sm" onClick={() => adjust(-5)} disabled={minutes < 5}>−5 min</Button>
           <Button variant="ghost" size="sm" onClick={() => adjust(-1)} disabled={minutes < 1}>−1 min</Button>
           <Button variant="ghost" size="sm" onClick={() => adjust(1)}>+1 min</Button>
           <Button variant="ghost" size="sm" onClick={() => adjust(5)}>+5 min</Button>
         </div>
 
-        {/* Preview */}
-        <div className="flex items-center justify-center py-3 rounded-md bg-bg-elevated">
+        <div className="flex items-center justify-center rounded-xl border border-border bg-bg-elevated py-4">
           <span className="text-3xl font-bold tabular-nums text-text-primary">{displayDuration}</span>
         </div>
 
-        {/* Title */}
         <Input
           placeholder="Titre (ex : Pause café)"
           value={timerTitle}
@@ -109,7 +110,7 @@ export function TimerTab() {
           <Plus className="h-4 w-4" />
           Ajouter au plan
         </Button>
-      </div>
+      </section>
     </div>
   );
 }

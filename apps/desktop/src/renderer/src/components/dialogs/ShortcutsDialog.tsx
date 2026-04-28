@@ -8,7 +8,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
   SHORTCUT_DEFS,
   formatBinding,
@@ -89,7 +88,7 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-h-[80vh] max-w-3xl overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Keyboard className="h-5 w-5" />
@@ -104,10 +103,11 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
           </div>
         )}
 
-        <div className="py-1 space-y-4" key={version}>
+        <div className="max-h-[58vh] overflow-y-auto py-1" key={version}>
+          <div className="grid gap-4 md:grid-cols-2">
           {SHORTCUT_GROUPS.map((group, gi) => (
-            <div key={gi}>
-              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+            <div key={gi} className="rounded-2xl border border-border bg-bg-surface p-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
                 {group.label}
               </p>
               <div className="space-y-1">
@@ -121,11 +121,11 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
                     <div
                       key={def.action}
                       className={cn(
-                        "flex items-center gap-2 py-1 rounded px-1",
+                        "flex items-center gap-3 rounded-xl border border-transparent px-2 py-2",
                         isCapturing && "bg-primary/5 ring-1 ring-primary/30"
                       )}
                     >
-                      <span className="text-sm text-text-primary flex-1 min-w-0">
+                      <span className="min-w-0 flex-1 text-sm font-medium text-text-primary">
                         {def.label}
                       </span>
 
@@ -139,7 +139,7 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
                           bindings.slice(0, 2).map((b, bi) => (
                             <kbd
                               key={bi}
-                              className="px-2 py-0.5 text-xs rounded border border-border bg-bg-elevated font-mono"
+                              className="rounded-lg border border-border bg-bg-elevated px-2.5 py-1 text-xs font-mono"
                             >
                               {formatBinding(b)}
                             </kbd>
@@ -148,7 +148,7 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
                       </div>
 
                       {/* Boutons d'action */}
-                      <div className="flex gap-0.5 shrink-0">
+                      <div className="flex shrink-0 gap-1">
                         {isCapturing ? (
                           <Button
                             variant="ghost"
@@ -183,9 +183,9 @@ export function ShortcutsDialog({ open, onClose }: ShortcutsDialogProps) {
                   );
                 })}
               </div>
-              {gi < SHORTCUT_GROUPS.length - 1 && <Separator className="mt-3" />}
             </div>
           ))}
+          </div>
         </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-border">

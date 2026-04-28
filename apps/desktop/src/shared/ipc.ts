@@ -367,6 +367,9 @@ export type CpSyncStatus = {
 export type CpSyncStartResult = { ok: true; port: number; addresses: string[] } | { ok: false; error: string };
 export type CpSyncStopResult = { ok: true };
 
+export type CpPgConnectionState = "ONLINE" | "OFFLINE" | "SYNCING" | "SYNC_ERROR";
+export type CpPgSyncResult = { ok: true; pushed: number; overwritten: number } | { ok: false; error: string };
+
 export type CpDiagnosticsFolderState = {
   path: string;
   exists: boolean;
@@ -497,6 +500,12 @@ export interface CpApi {
     stop: () => Promise<CpSyncStopResult>;
     status: () => Promise<CpSyncStatus>;
     onStatusChange: (cb: (status: CpSyncStatus) => void) => () => void;
+  };
+  pgSync: {
+    getState: () => Promise<CpPgConnectionState>;
+    retrySync: () => Promise<CpPgSyncResult>;
+    onStateChange: (cb: (state: CpPgConnectionState) => void) => () => void;
+    onConflictWarning: (cb: (data: { overwritten: number; message: string }) => void) => () => void;
   };
   devtools: {
     open: (target: CpDevtoolsTarget) => Promise<CpDevtoolsOpenResult>;

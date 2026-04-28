@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDownAZ, CalendarArrowDown, Clock, Heart, Loader2, Music2, Plus, Search, TrendingUp, Upload, X } from "lucide-react";
+import { ArrowDownAZ, CalendarArrowDown, Clock, ExternalLink, Heart, Loader2, Music2, Plus, Search, TrendingUp, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,9 +38,10 @@ function saveSort(s: CpSongSortField) {
 interface SongsTabProps {
   onCreateSong?: () => void;
   onSelectSong?: (id: string) => void;
+  selectedSongId?: string | null;
 }
 
-export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
+export function SongsTab({ onCreateSong, onSelectSong, selectedSongId }: SongsTabProps) {
   const [query, setQuery] = useState("");
   const [songs, setSongs] = useState<CpSongListItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -161,7 +162,7 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
               <p className="text-sm font-medium text-text-secondary">
                 {query ? "Aucun résultat" : "Aucun chant"}
               </p>
-              <p className="text-xs leading-relaxed">
+                  <p className="text-sm leading-relaxed">
                 {query
                   ? `Aucun chant trouvé pour « ${query} »`
                   : "Crée ton premier chant ou importe une bibliothèque."}
@@ -190,7 +191,7 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
               if (favSongs.length === 0) return null;
               return (
                 <>
-                  <p className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                  <p className="flex items-center gap-1 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
                     <Heart className="h-2.5 w-2.5 fill-danger text-danger" />
                     Favoris
                   </p>
@@ -199,6 +200,7 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
                       key={`fav-${song.id}`}
                       song={song}
                       isFavorite={true}
+                      isSelected={selectedSongId === song.id}
                       onSelect={() => onSelectSong?.(song.id)}
                       onToggleFavorite={() => handleToggleFavorite(song.id)}
                     />
@@ -214,7 +216,7 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
               if (nonFav.length === 0) return null;
               return (
                 <>
-                  <p className="flex items-center gap-1 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                  <p className="flex items-center gap-1 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
                     <TrendingUp className="h-2.5 w-2.5" />
                     Fréquents
                   </p>
@@ -223,6 +225,7 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
                       key={`freq-${song.id}`}
                       song={song}
                       isFavorite={favoriteIds.has(song.id)}
+                      isSelected={selectedSongId === song.id}
                       onSelect={() => onSelectSong?.(song.id)}
                       onToggleFavorite={() => handleToggleFavorite(song.id)}
                     />
@@ -241,6 +244,7 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
                 key={song.id}
                 song={song}
                 isFavorite={favoriteIds.has(song.id)}
+                isSelected={selectedSongId === song.id}
                 onSelect={() => onSelectSong?.(song.id)}
                 onToggleFavorite={() => handleToggleFavorite(song.id)}
               />
@@ -275,13 +279,21 @@ export function SongsTab({ onCreateSong, onSelectSong }: SongsTabProps) {
 interface SongRowProps {
   song: CpSongListItem;
   isFavorite: boolean;
+  isSelected: boolean;
   onSelect: () => void;
   onToggleFavorite: () => void;
 }
 
-function SongRow({ song, isFavorite, onSelect, onToggleFavorite }: SongRowProps) {
+function SongRow({ song, isFavorite, isSelected, onSelect, onToggleFavorite }: SongRowProps) {
   return (
-    <div className="group/song flex items-center hover:bg-bg-elevated transition-colors">
+    <div
+      className={cn(
+        "group/song flex items-center border-y border-transparent transition-colors",
+        isSelected
+          ? "border-primary/20 bg-primary/8"
+          : "hover:bg-bg-elevated"
+      )}
+    >
       <button
         type="button"
         className="flex flex-1 min-w-0 items-center gap-2 px-3 py-2 text-left"
@@ -294,18 +306,33 @@ function SongRow({ song, isFavorite, onSelect, onToggleFavorite }: SongRowProps)
           )}
         </div>
       </button>
-      <button
-        type="button"
-        className={cn(
-          "shrink-0 opacity-0 group-hover/song:opacity-100 transition-opacity p-0.5 rounded mr-2",
-          isFavorite && "opacity-100"
-        )}
-        onClick={onToggleFavorite}
-        aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
-        aria-pressed={isFavorite || undefined}
-      >
-        <Heart className={cn("h-3 w-3", isFavorite ? "fill-danger text-danger" : "text-text-muted")} />
-      </button>
+      <div className="flex items-center gap-1 pr-2">
+        <Button
+          variant="ghost"
+          size="xs"
+          className={cn(
+            "gap-1 rounded-lg text-text-secondary",
+            isSelected && "text-primary"
+          )}
+          onClick={onSelect}
+          aria-label={`Ouvrir le detail de ${song.title}`}
+        >
+          <ExternalLink className="h-3 w-3" />
+          Ouvrir
+        </Button>
+        <button
+          type="button"
+          className={cn(
+            "rounded p-1 transition-colors hover:bg-bg-elevated hover:text-text-primary",
+            isFavorite ? "text-danger" : "text-text-muted"
+          )}
+          onClick={onToggleFavorite}
+          aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          aria-pressed={isFavorite || undefined}
+        >
+          <Heart className={cn("h-3.5 w-3.5", isFavorite && "fill-current")} />
+        </button>
+      </div>
     </div>
   );
 }

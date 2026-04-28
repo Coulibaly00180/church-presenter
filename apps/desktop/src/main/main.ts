@@ -30,6 +30,7 @@ import {
   type ScreenContext,
 } from "./ipc/screenState";
 import { ensureRuntimeDatabaseUrl, runSafeMigrationForPackagedRuntime } from "./db";
+import { syncManager } from "./sync/syncManager";
 import {
   parseDevtoolsTarget,
   parseFilesDeleteMediaPayload,
@@ -452,6 +453,25 @@ void app.whenReady().then(async () => {
   } catch (e) {
     console.error("registerSyncIpc failed", e);
   }
+
+  // PostgreSQL sync init (best-effort — app starts even if PG is unreachable)
+  void syncManager.initialize().catch((e: unknown) => {
+    console.error("[pgSync] initialize failed", e);
+  });
+
+  // Retry connection every 2 minutes if offline
+  setInterval(() => {
+    void syncManager.checkAndReconnect().catch((e: unknown) => {
+      console.error("[pgSync] checkAndReconnect failed", e);
+    });
+  }, 2 * 60 * 1000);
+
+  // Periodic pull every 2 hours if online
+  setInterval(() => {
+    void syncManager.periodicPull().catch((e: unknown) => {
+      console.error("[pgSync] periodicPull failed", e);
+    });
+  }, 2 * 60 * 60 * 1000);
 
   try {
     createRegieWindow();
@@ -1111,4 +1131,18 @@ ipcMain.handle("live:videoVolume", (_evt, rawVolume: unknown) => {
   (["A", "B", "C"] as ScreenKey[]).forEach((k) => {
     projWins[k]?.webContents.send("live:videoVolume", volume);
   });
+});
+
+// --------------------
+// PostgreSQL sync state IPC
+// --------------------
+ipcMain.handle("pgSync:getState", () => syncManager.getState());
+
+ipcMain.handle("pgSync:retrySync", async () => {
+  try {
+    await syncManager.checkAndReconnect();
+    return { ok: true, pushed: 0, overwritten: 0 };
+  } catch (e: unknown) {
+    return { ok: false, error: getErrorMessage(e) };
+  }
 });

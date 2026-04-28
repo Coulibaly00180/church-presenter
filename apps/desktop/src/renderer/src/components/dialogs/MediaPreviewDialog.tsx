@@ -2,6 +2,8 @@ import { X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -14,6 +16,12 @@ export function MediaPreviewDialog({ file, onClose }: MediaPreviewDialogProps) {
   return (
     <Dialog open={!!file} onOpenChange={(v) => !v && onClose()}>
       <DialogContent showClose={false} className="max-w-[92vw] w-[92vw] h-[90vh] p-0 flex flex-col gap-0">
+        <DialogTitle className="sr-only">
+          Apercu du media {file?.name ?? ""}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Visualisation rapide du media selectionne avant projection.
+        </DialogDescription>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
           <span className="text-sm font-medium text-text-primary truncate">

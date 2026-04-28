@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { ScreenSelector } from "@/components/live/ScreenSelector";
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
+import { ensureReadyForFreeProjection } from "@/lib/liveProjection";
+import { projectTextToScreen } from "@/projection/target";
 
 interface QuickTextDialogProps {
   open: boolean;
@@ -34,8 +36,11 @@ export function QuickTextDialog({ open, onClose }: QuickTextDialogProps) {
 
   const handleProject = useCallback(async () => {
     if (!text.trim()) return;
-    if (!live) { toast.error("Mode Direct inactif"); return; }
-    await window.cp.projection.setContentText({
+    const currentLive = await ensureReadyForFreeProjection(live);
+    if (!currentLive?.enabled) { toast.error("Mode Direct inactif"); return; }
+    await projectTextToScreen({
+      target: currentLive.target,
+      lockedScreens: currentLive.lockedScreens,
       title: title.trim() || undefined,
       body: text.trim(),
     });

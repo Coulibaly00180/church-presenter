@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Download, Image, Monitor, Moon, Palette, Sun, Upload, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ElementType } from "react";
+import { Download, Monitor, Moon, Palette, Sun, Type, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -16,63 +16,207 @@ interface SettingsDialogProps {
   onClose: () => void;
 }
 
-type Tab = "projection" | "screens" | "interface" | "data";
+type SettingsTab = "projection" | "screens" | "interface" | "data";
+
+type ProjectionPreset = {
+  id: string;
+  label: string;
+  description: string;
+  backgroundMode: CpBackgroundFillMode;
+  background: string;
+  backgroundGradientFrom: string;
+  backgroundGradientTo: string;
+  backgroundGradientAngle: number;
+  foregroundMode: CpForegroundFillMode;
+  foreground: string;
+  foregroundGradientFrom: string;
+  foregroundGradientTo: string;
+  textScale: number;
+  titleTextScale: number;
+  textFont: string;
+};
+
+const SETTINGS_TABS: Array<{
+  id: SettingsTab;
+  label: string;
+  description: string;
+  icon: ElementType;
+}> = [
+  { id: "projection", label: "Projection", description: "Presets, fond, texte et logo.", icon: Palette },
+  { id: "screens", label: "Ecrans", description: "Ouverture et modes miroir.", icon: Monitor },
+  { id: "interface", label: "Interface", description: "Theme et confort d'usage.", icon: Sun },
+  { id: "data", label: "Donnees", description: "Export et import de la bibliotheque.", icon: Download },
+];
+
+const PROJECTION_PRESETS: ProjectionPreset[] = [
+  {
+    id: "classic",
+    label: "Lecture claire",
+    description: "Fond sombre, texte clair, contraste stable.",
+    backgroundMode: "SOLID",
+    background: "#060606",
+    backgroundGradientFrom: "#060606",
+    backgroundGradientTo: "#060606",
+    backgroundGradientAngle: 180,
+    foregroundMode: "SOLID",
+    foreground: "#ffffff",
+    foregroundGradientFrom: "#ffffff",
+    foregroundGradientTo: "#ffffff",
+    textScale: 1,
+    titleTextScale: 0.92,
+    textFont: "system-ui",
+  },
+  {
+    id: "warm",
+    label: "Scene douce",
+    description: "Gradient chaud pour louange et annonces.",
+    backgroundMode: "GRADIENT_LINEAR",
+    background: "#141414",
+    backgroundGradientFrom: "#1f2937",
+    backgroundGradientTo: "#7c2d12",
+    backgroundGradientAngle: 155,
+    foregroundMode: "SOLID",
+    foreground: "#fff7ed",
+    foregroundGradientFrom: "#fff7ed",
+    foregroundGradientTo: "#fff7ed",
+    textScale: 1.05,
+    titleTextScale: 0.95,
+    textFont: "Georgia, serif",
+  },
+  {
+    id: "contrast",
+    label: "Impact fort",
+    description: "Texte plus grand pour salles lumineuses.",
+    backgroundMode: "GRADIENT_RADIAL",
+    background: "#0f172a",
+    backgroundGradientFrom: "#0f172a",
+    backgroundGradientTo: "#020617",
+    backgroundGradientAngle: 180,
+    foregroundMode: "GRADIENT",
+    foreground: "#ffffff",
+    foregroundGradientFrom: "#ffffff",
+    foregroundGradientTo: "#38bdf8",
+    textScale: 1.2,
+    titleTextScale: 1.08,
+    textFont: "Arial, sans-serif",
+  },
+];
+
+function getPreviewBackgroundStyle(params: {
+  bgMode: CpBackgroundFillMode;
+  bg: string;
+  bgFrom: string;
+  bgTo: string;
+  bgAngle: number;
+  bgImage: string;
+}): CSSProperties {
+  if (params.bgImage) {
+    return {
+      backgroundImage: `linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url(file://${params.bgImage})`,
+      backgroundPosition: "center",
+      backgroundSize: "cover",
+    };
+  }
+  if (params.bgMode === "GRADIENT_LINEAR") {
+    return { background: `linear-gradient(${params.bgAngle}deg, ${params.bgFrom}, ${params.bgTo})` };
+  }
+  if (params.bgMode === "GRADIENT_RADIAL") {
+    return { background: `radial-gradient(circle, ${params.bgFrom}, ${params.bgTo})` };
+  }
+  return { backgroundColor: params.bg };
+}
+
+function getPreviewTextStyle(params: {
+  fgMode: CpForegroundFillMode;
+  fg: string;
+  fgFrom: string;
+  fgTo: string;
+  textScale: number;
+  textFont: string;
+}): CSSProperties {
+  if (params.fgMode === "GRADIENT") {
+    return {
+      background: `linear-gradient(90deg, ${params.fgFrom}, ${params.fgTo})`,
+      WebkitBackgroundClip: "text",
+      backgroundClip: "text",
+      WebkitTextFillColor: "transparent",
+      color: "transparent",
+      fontSize: `${Math.round(16 * params.textScale)}px`,
+      fontFamily: params.textFont,
+    };
+  }
+  return {
+    color: params.fg,
+    fontSize: `${Math.round(16 * params.textScale)}px`,
+    fontFamily: params.textFont,
+  };
+}
+
+function getLogoPreviewPositionClass(position: CpLogoPosition): string {
+  switch (position) {
+    case "top-left":
+      return "left-3 top-3";
+    case "top-right":
+      return "right-3 top-3";
+    case "bottom-left":
+      return "left-3 bottom-3";
+    case "center":
+      return "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2";
+    case "bottom-right":
+    default:
+      return "right-3 bottom-3";
+  }
+}
 
 export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("projection");
-
-  // Projection — background
+  const [activeTab, setActiveTab] = useState<SettingsTab>("projection");
   const [bgMode, setBgMode] = useState<CpBackgroundFillMode>("SOLID");
   const [bg, setBg] = useState("#000000");
   const [bgFrom, setBgFrom] = useState("#000000");
-  const [bgTo, setBgTo] = useState("#1E1B4B");
+  const [bgTo, setBgTo] = useState("#1e1b4b");
   const [bgAngle, setBgAngle] = useState(180);
   const [bgImage, setBgImage] = useState("");
-
-  // Projection — foreground / text
   const [fgMode, setFgMode] = useState<CpForegroundFillMode>("SOLID");
   const [fg, setFg] = useState("#ffffff");
   const [fgFrom, setFgFrom] = useState("#ffffff");
-  const [fgTo, setFgTo] = useState("#A5B4FC");
-
-  // Projection — typography
+  const [fgTo, setFgTo] = useState("#a5b4fc");
   const [textFont, setTextFont] = useState("system-ui");
   const [textFontPath, setTextFontPath] = useState("");
   const [textFontLabel, setTextFontLabel] = useState("");
-
-  // Projection — text scale + logo
   const [textScale, setTextScale] = useState(1);
   const [titleTextScale, setTitleTextScale] = useState(1);
   const [logoPath, setLogoPath] = useState("");
   const [logoPosition, setLogoPosition] = useState<CpLogoPosition>("bottom-right");
   const [logoOpacity, setLogoOpacity] = useState(80);
   const [logoScale, setLogoScale] = useState(100);
-
-  // Interface theme
   const [theme, setTheme] = useState<CpTheme>("light");
-
-  // Screens
   const [screens, setScreens] = useState<CpScreenMeta[]>([]);
   const [screensLoading, setScreensLoading] = useState(false);
-
-  // Data
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  // Reload state each time dialog opens
+  const previewBackgroundStyle = useMemo(
+    () => getPreviewBackgroundStyle({ bgMode, bg, bgFrom, bgTo, bgAngle, bgImage }),
+    [bgMode, bg, bgFrom, bgTo, bgAngle, bgImage],
+  );
+  const previewTextStyle = useMemo(
+    () => getPreviewTextStyle({ fgMode, fg, fgFrom, fgTo, textScale, textFont }),
+    [fgMode, fg, fgFrom, fgTo, textScale, textFont],
+  );
+
   useEffect(() => {
     if (!open) return;
     void window.cp.projection.getState().then((state) => {
       setBgMode(state.backgroundMode ?? "SOLID");
       setBg(state.background ?? "#000000");
       setBgFrom(state.backgroundGradientFrom ?? "#000000");
-      setBgTo(state.backgroundGradientTo ?? "#1E1B4B");
+      setBgTo(state.backgroundGradientTo ?? "#1e1b4b");
       setBgAngle(state.backgroundGradientAngle ?? 180);
       setBgImage(state.backgroundImage ?? "");
       setFgMode(state.foregroundMode ?? "SOLID");
       setFg(state.foreground ?? "#ffffff");
       setFgFrom(state.foregroundGradientFrom ?? "#ffffff");
-      setFgTo(state.foregroundGradientTo ?? "#A5B4FC");
+      setFgTo(state.foregroundGradientTo ?? "#a5b4fc");
       setTextFont(state.textFont ?? "system-ui");
       setTextFontPath(state.textFontPath ?? "");
       setTextFontLabel(state.textFontPath ? state.textFontPath.split(/[\\/]/).pop() ?? "" : "");
@@ -83,17 +227,21 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       setLogoOpacity(state.logoOpacity ?? 80);
       setLogoScale(state.logoScale ?? 100);
     });
-    void window.cp.settings.getTheme().then((r) => {
-      if (r.ok && r.theme) setTheme(r.theme);
+    void window.cp.settings.getTheme().then((result) => {
+      if (result.ok && result.theme) setTheme(result.theme);
     });
     setScreensLoading(true);
-    void window.cp.screens.list().then((s) => {
-      setScreens(s);
+    void window.cp.screens.list().then((list) => {
+      setScreens(list);
       setScreensLoading(false);
     });
   }, [open]);
 
-  // ─── Projection handlers ───────────────────────────────────────────────────
+  const refreshScreens = useCallback(async () => {
+    const nextScreens = await window.cp.screens.list();
+    setScreens(nextScreens);
+  }, []);
+
   const handleApplyAppearance = useCallback(async () => {
     await window.cp.projection.setAppearance({
       background: bg,
@@ -115,66 +263,36 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
       logoOpacity,
       logoScale,
     });
-    toast.success("Apparence de projection appliquée");
+    toast.success("Apparence de projection appliquee");
   }, [bg, bgMode, bgFrom, bgTo, bgAngle, bgImage, fg, fgMode, fgFrom, fgTo, textFont, textFontPath, textScale, titleTextScale, logoPath, logoPosition, logoOpacity, logoScale]);
 
-  const handlePickLogo = useCallback(async () => {
-    const result = await window.cp.files.pickMedia();
-    if (result.ok && result.path) setLogoPath(result.path);
-  }, []);
-
-  const handleClearLogo = useCallback(async () => {
-    setLogoPath("");
-    await window.cp.projection.setAppearance({ logoPath: "" });
-    toast.success("Logo supprimé");
-  }, []);
-
-  const handlePickBgImage = useCallback(async () => {
-    const result = await window.cp.files.pickMedia();
-    if (result.ok && result.path) setBgImage(result.path);
-  }, []);
-
-  const handleClearBgImage = useCallback(() => {
+  const applyPreset = useCallback((preset: ProjectionPreset) => {
+    setBgMode(preset.backgroundMode);
+    setBg(preset.background);
+    setBgFrom(preset.backgroundGradientFrom);
+    setBgTo(preset.backgroundGradientTo);
+    setBgAngle(preset.backgroundGradientAngle);
+    setFgMode(preset.foregroundMode);
+    setFg(preset.foreground);
+    setFgFrom(preset.foregroundGradientFrom);
+    setFgTo(preset.foregroundGradientTo);
+    setTextScale(preset.textScale);
+    setTitleTextScale(preset.titleTextScale);
+    setTextFont(preset.textFont);
+    setTextFontPath("");
+    setTextFontLabel("");
     setBgImage("");
   }, []);
 
-  const handlePickFont = useCallback(async () => {
-    const result = await window.cp.files.pickFont();
-    if (result.ok && result.path) {
-      const validation = await window.cp.files.validateFont({ path: result.path });
-      if (validation.ok && validation.valid) {
-        setTextFontPath(result.path);
-        setTextFontLabel(result.path.split(/[\\/]/).pop() ?? "");
-        setTextFont(validation.family ?? "custom");
-      }
-    }
-  }, []);
-
-  const handleClearFont = useCallback(() => {
-    setTextFontPath("");
-    setTextFontLabel("");
-    setTextFont("system-ui");
-  }, []);
-
-  // ─── Interface handlers ────────────────────────────────────────────────────
-  const handleSetTheme = useCallback(async (t: CpTheme) => {
-    setTheme(t);
-    document.documentElement.classList.toggle("theme-dark", t === "dark");
-    await window.cp.settings.setTheme(t);
-  }, []);
-
-  // ─── Screen handlers ───────────────────────────────────────────────────────
-  const refreshScreens = useCallback(async () => {
-    const s = await window.cp.screens.list();
-    setScreens(s);
+  const handleSetTheme = useCallback(async (nextTheme: CpTheme) => {
+    setTheme(nextTheme);
+    document.documentElement.classList.toggle("theme-dark", nextTheme === "dark");
+    await window.cp.settings.setTheme(nextTheme);
   }, []);
 
   const handleToggleScreen = useCallback(async (key: ScreenKey, isOpen: boolean) => {
-    if (isOpen) {
-      await window.cp.screens.close(key);
-    } else {
-      await window.cp.screens.open(key);
-    }
+    if (isOpen) await window.cp.screens.close(key);
+    else await window.cp.screens.open(key);
     await refreshScreens();
   }, [refreshScreens]);
 
@@ -183,13 +301,12 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     await refreshScreens();
   }, [refreshScreens]);
 
-  // ─── Data handlers ─────────────────────────────────────────────────────────
   const handleExportAll = useCallback(async () => {
     setExporting(true);
     try {
       const result = await window.cp.data.exportAll();
-      if (result.ok) toast.success("Données exportées", { description: result.path });
-      else if (!result.canceled) toast.error("Export échoué");
+      if (result.ok) toast.success("Donnees exportees", { description: result.path });
+      else if (!result.canceled) toast.error("Export echoue");
     } finally {
       setExporting(false);
     }
@@ -200,671 +317,345 @@ export function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     try {
       const result = await window.cp.data.importAll({ mode: "MERGE" });
       if (result.ok) {
-        toast.success(
-          `Import terminé — ${result.counts.songs} chant${result.counts.songs !== 1 ? "s" : ""}, ${result.counts.plans} plan${result.counts.plans !== 1 ? "s" : ""}`,
-        );
+        toast.success(`Import termine - ${result.counts.songs} chant${result.counts.songs !== 1 ? "s" : ""}, ${result.counts.plans} plan${result.counts.plans !== 1 ? "s" : ""}`);
       } else if (!("canceled" in result)) {
-        toast.error("Import échoué", { description: "error" in result ? result.error : undefined });
+        toast.error("Import echoue", { description: "error" in result ? result.error : undefined });
       }
     } finally {
       setImporting(false);
     }
   }, []);
 
-  // ─── Tabs ──────────────────────────────────────────────────────────────────
-  const tabs: { id: Tab; label: string; Icon: React.ElementType }[] = [
-    { id: "projection", label: "Projection", Icon: Palette },
-    { id: "screens",    label: "Écrans",     Icon: Monitor },
-    { id: "interface",  label: "Interface",  Icon: Sun },
-    { id: "data",       label: "Données",    Icon: Download },
-  ];
+  const handlePickLogo = useCallback(async () => {
+    const result = await window.cp.files.pickMedia();
+    if (result.ok && result.path) setLogoPath(result.path);
+  }, []);
+
+  const handleClearLogo = useCallback(async () => {
+    setLogoPath("");
+    await window.cp.projection.setAppearance({ logoPath: "" });
+    toast.success("Logo retire");
+  }, []);
+
+  const handlePickBgImage = useCallback(async () => {
+    const result = await window.cp.files.pickMedia();
+    if (result.ok && result.path) setBgImage(result.path);
+  }, []);
+
+  const handlePickFont = useCallback(async () => {
+    const result = await window.cp.files.pickFont();
+    if (!result.ok || !result.path) return;
+    const validation = await window.cp.files.validateFont({ path: result.path });
+    if (!validation.ok || !validation.valid) return;
+    setTextFontPath(result.path);
+    setTextFontLabel(result.path.split(/[\\/]/).pop() ?? "");
+    setTextFont(validation.family ?? "custom");
+  }, []);
+
+  const activeTabMeta = SETTINGS_TABS.find((tab) => tab.id === activeTab) ?? SETTINGS_TABS[0]!;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[640px] flex flex-col max-h-[85vh]">
-        <DialogHeader className="shrink-0">
-          <DialogTitle>Paramètres</DialogTitle>
-          <DialogDescription>Configurez l'interface et la projection.</DialogDescription>
+    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <DialogContent className="h-[86vh] max-h-[86vh] w-[min(1120px,94vw)] max-w-[1120px] overflow-hidden p-0">
+        <DialogHeader className="border-b border-border px-6 py-5">
+          <DialogTitle>Parametres</DialogTitle>
+          <DialogDescription>Une seule fenetre pour regler projection, ecrans, interface et donnees.</DialogDescription>
         </DialogHeader>
-
-        {/* Tab bar */}
-        <div className="flex gap-0 border-b border-border -mx-6 px-6 shrink-0">
-          {tabs.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-2 text-sm border-b-2 -mb-px transition-colors",
-                activeTab === id
-                  ? "border-primary text-primary font-medium"
-                  : "border-transparent text-text-muted hover:text-text-primary",
-              )}
-              onClick={() => setActiveTab(id)}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Scrollable tab content */}
-        <div className="overflow-y-auto flex-1 min-h-0">
-
-          {/* ── Projection tab ─────────────────────────────────────────────── */}
-          {activeTab === "projection" && (
-            <div className="space-y-4 pt-1 pb-2">
-
-              {/* Background */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-text-secondary">Fond</p>
-                {/* Mode selector */}
-                <div className="flex gap-1">
-                  {([
-                    ["SOLID",           "Uni"],
-                    ["GRADIENT_LINEAR", "Dégradé"],
-                    ["GRADIENT_RADIAL", "Radial"],
-                  ] as [CpBackgroundFillMode, string][]).map(([mode, label]) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      className={cn(
-                        "text-xs px-2.5 py-1 rounded border transition-colors",
-                        bgMode === mode
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-text-muted hover:bg-bg-elevated",
-                      )}
-                      onClick={() => setBgMode(mode)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {bgMode === "SOLID" && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      aria-label="Couleur de fond"
-                      value={bg}
-                      onChange={(e) => setBg(e.target.value)}
-                      className="h-8 w-10 rounded border border-border cursor-pointer bg-transparent p-0.5"
-                    />
-                    <span className="text-xs text-text-muted font-mono uppercase">{bg}</span>
-                  </div>
-                )}
-
-                {(bgMode === "GRADIENT_LINEAR" || bgMode === "GRADIENT_RADIAL") && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-text-muted">De</span>
-                        <input
-                          type="color"
-                          aria-label="Couleur de début du dégradé"
-                          value={bgFrom}
-                          onChange={(e) => setBgFrom(e.target.value)}
-                          className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
-                        />
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-text-muted">À</span>
-                        <input
-                          type="color"
-                          aria-label="Couleur de fin du dégradé"
-                          value={bgTo}
-                          onChange={(e) => setBgTo(e.target.value)}
-                          className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
-                        />
-                      </div>
-                      {/* Gradient preview strip */}
-                      <div
-                        className="flex-1 h-7 rounded border border-border"
-                        ref={(el) => {
-                          if (!el) return;
-                          el.style.background = bgMode === "GRADIENT_RADIAL"
-                            ? `radial-gradient(circle, ${bgFrom}, ${bgTo})`
-                            : `linear-gradient(${bgAngle}deg, ${bgFrom}, ${bgTo})`;
-                        }}
-                      />
-                    </div>
-                    {bgMode === "GRADIENT_LINEAR" && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-muted shrink-0">Angle {bgAngle}°</span>
-                        <input
-                          type="range"
-                          aria-label="Angle du dégradé"
-                          min={0}
-                          max={360}
-                          step={15}
-                          value={bgAngle}
-                          onChange={(e) => setBgAngle(Number(e.target.value))}
-                          className="flex-1 accent-primary"
-                        />
-                      </div>
+        <div className="grid h-full min-h-0 grid-cols-[220px_minmax(0,1fr)_320px]">
+          <aside className="border-r border-border bg-bg-surface/70 px-3 py-4">
+            <div className="px-3 pb-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">Preferences</p>
+              <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                Reglages frequents visibles, options avancees ensuite.
+              </p>
+            </div>
+            <div className="space-y-1">
+              {SETTINGS_TABS.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = tab.id === activeTab;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    className={cn(
+                      "flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors",
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : "text-text-secondary hover:bg-bg-elevated hover:text-text-primary",
                     )}
-                  </div>
-                )}
-
-                {/* Background image */}
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs text-text-muted shrink-0">Image :</span>
-                  {bgImage ? (
-                    <>
-                      <span className="text-[10px] text-text-muted font-mono truncate flex-1">{bgImage.split(/[\\/]/).pop()}</span>
-                      <button
-                        type="button"
-                        className="text-xs text-danger hover:underline flex items-center gap-0.5 shrink-0"
-                        onClick={handleClearBgImage}
-                      >
-                        <X className="h-3 w-3" />
-                        Retirer
-                      </button>
-                    </>
-                  ) : (
-                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => void handlePickBgImage()}>
-                      <Upload className="h-3 w-3" />
-                      Choisir une image
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* Foreground / Text color */}
-              <div className="space-y-2 border-t border-border pt-3">
-                <p className="text-xs font-medium text-text-secondary">Couleur du texte</p>
-                <div className="flex gap-1">
-                  {([
-                    ["SOLID",    "Uni"],
-                    ["GRADIENT", "Dégradé"],
-                  ] as [CpForegroundFillMode, string][]).map(([mode, label]) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      className={cn(
-                        "text-xs px-2.5 py-1 rounded border transition-colors",
-                        fgMode === mode
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-text-muted hover:bg-bg-elevated",
-                      )}
-                      onClick={() => setFgMode(mode)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {fgMode === "SOLID" && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      aria-label="Couleur du texte"
-                      value={fg}
-                      onChange={(e) => setFg(e.target.value)}
-                      className="h-8 w-10 rounded border border-border cursor-pointer bg-transparent p-0.5"
-                    />
-                    <span className="text-xs text-text-muted font-mono uppercase">{fg}</span>
-                  </div>
-                )}
-
-                {fgMode === "GRADIENT" && (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-text-muted">De</span>
-                      <input
-                        type="color"
-                        aria-label="Couleur de début du dégradé de texte"
-                        value={fgFrom}
-                        onChange={(e) => setFgFrom(e.target.value)}
-                        className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
-                      />
+                    onClick={() => setActiveTab(tab.id)}
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <Icon className="mt-0.5 h-4 w-4 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">{tab.label}</p>
+                      <p className="mt-1 text-xs leading-relaxed">{tab.description}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-text-muted">À</span>
-                      <input
-                        type="color"
-                        aria-label="Couleur de fin du dégradé de texte"
-                        value={fgTo}
-                        onChange={(e) => setFgTo(e.target.value)}
-                        className="h-7 w-9 rounded border border-border cursor-pointer bg-transparent p-0.5"
-                      />
-                    </div>
-                    {/* Text gradient preview */}
-                    <div
-                      className="flex-1 h-7 rounded border border-border"
-                      ref={(el) => {
-                        if (!el) return;
-                        el.style.background = `linear-gradient(90deg, ${fgFrom}, ${fgTo})`;
-                      }}
-                    />
-                  </div>
-                )}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+          <div className="min-h-0 overflow-y-auto px-6 py-5">
+            <div className="mx-auto max-w-3xl space-y-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">{activeTabMeta.label}</p>
+                <h2 className="mt-1 text-xl font-semibold text-text-primary">{activeTabMeta.description}</h2>
               </div>
-
-              {/* Typography */}
-              <div className="space-y-2 border-t border-border pt-3">
-                <p className="text-xs font-medium text-text-secondary">Typographie</p>
-
-                {/* Font presets */}
-                <div className="flex flex-wrap gap-1">
-                  {([
-                    ["system-ui", "Système"],
-                    ["Georgia, serif", "Georgia"],
-                    ["'Courier New', monospace", "Courier"],
-                    ["Arial, sans-serif", "Arial"],
-                  ] as [string, string][]).map(([font, label]) => (
-                    <button
-                      key={font}
-                      type="button"
-                      className={cn(
-                        "text-xs px-2.5 py-1 rounded border transition-colors",
-                        textFont === font && !textFontPath
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-text-muted hover:bg-bg-elevated",
-                      )}
-                      onClick={() => { setTextFont(font); setTextFontPath(""); setTextFontLabel(""); }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Custom font */}
-                <div className="flex items-center gap-2">
-                  {textFontPath ? (
-                    <>
-                      <span className={cn(
-                        "text-xs px-2.5 py-1 rounded border border-primary bg-primary/10 text-primary truncate max-w-[180px]",
-                      )}>
-                        {textFontLabel}
-                      </span>
-                      <button
-                        type="button"
-                        className="text-xs text-danger hover:underline flex items-center gap-0.5 shrink-0"
-                        onClick={handleClearFont}
-                      >
-                        <X className="h-3 w-3" />
-                        Retirer
-                      </button>
-                    </>
-                  ) : (
-                    <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={() => void handlePickFont()}>
-                      <Upload className="h-3 w-3" />
-                      Police personnalisée
-                    </Button>
-                  )}
-                </div>
-
-                {/* Body text size slider */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-text-secondary">Taille du corps (centre)</label>
-                    <span className="text-xs text-text-muted tabular-nums">{Math.round(textScale * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    aria-label="Taille du corps"
-                    min={0.5}
-                    max={5}
-                    step={0.05}
-                    value={textScale}
-                    onChange={(e) => setTextScale(Number(e.target.value))}
-                    className="w-full accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-text-muted">
-                    <span>50%</span>
-                    <span>100%</span>
-                    <span>500%</span>
-                  </div>
-                </div>
-
-                {/* Title text size slider */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-text-secondary">Taille du titre (haut gauche)</label>
-                    <span className="text-xs text-text-muted tabular-nums">{Math.round(titleTextScale * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    aria-label="Taille du titre"
-                    min={0.5}
-                    max={5}
-                    step={0.05}
-                    value={titleTextScale}
-                    onChange={(e) => setTitleTextScale(Number(e.target.value))}
-                    className="w-full accent-primary"
-                  />
-                  <div className="flex justify-between text-[10px] text-text-muted">
-                    <span>50%</span>
-                    <span>100%</span>
-                    <span>500%</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Logo */}
-              <div className="space-y-2 pt-1 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-text-secondary">Logo (overlay projection)</label>
-                  {logoPath && (
-                    <button
-                      type="button"
-                      className="text-xs text-danger hover:underline flex items-center gap-0.5"
-                      onClick={() => void handleClearLogo()}
-                    >
-                      <X className="h-3 w-3" />
-                      Supprimer
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  {logoPath ? (
-                    <img
-                      src={`file://${logoPath}`}
-                      alt="Logo"
-                      className="h-10 rounded border border-border object-contain bg-bg-elevated px-1"
-                    />
-                  ) : (
-                    <div className="flex h-10 w-14 items-center justify-center rounded border border-dashed border-border bg-bg-elevated">
-                      <Image className="h-4 w-4 text-text-muted opacity-50" />
+              {activeTab === "projection" && (
+                <>
+                  <section className="space-y-3 rounded-2xl border border-border bg-bg-surface p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-base font-semibold text-text-primary">Presets rapides</h3>
+                        <p className="mt-1 text-sm leading-relaxed text-text-secondary">Commencez par une base saine, puis ajustez seulement ce qui compte.</p>
+                      </div>
+                      <Button size="sm" onClick={() => void handleApplyAppearance()}>Appliquer</Button>
                     </div>
-                  )}
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => void handlePickLogo()}>
-                    <Upload className="h-3.5 w-3.5" />
-                    {logoPath ? "Changer" : "Choisir un logo"}
-                  </Button>
-                </div>
-                {logoPath && (
-                  <p className="text-[10px] text-text-muted truncate font-mono">{logoPath.split(/[\\/]/).pop()}</p>
-                )}
-
-                {/* Logo position */}
-                {logoPath && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-text-secondary">Position</label>
-                    <div className="grid grid-cols-3 grid-rows-3 gap-1 w-[76px]">
-                      {([
-                        ["top-left",     "↖", "col-start-1 row-start-1"],
-                        ["top-right",    "↗", "col-start-3 row-start-1"],
-                        ["center",       "·", "col-start-2 row-start-2"],
-                        ["bottom-left",  "↙", "col-start-1 row-start-3"],
-                        ["bottom-right", "↘", "col-start-3 row-start-3"],
-                      ] as [CpLogoPosition, string, string][]).map(([pos, arrow, gridCls]) => (
-                        <button
-                          key={pos}
-                          type="button"
-                          aria-label={pos}
-                          className={cn(
-                            "h-6 w-6 flex items-center justify-center rounded text-xs border transition-colors",
-                            gridCls,
-                            logoPosition === pos
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border hover:bg-bg-elevated text-text-muted",
-                          )}
-                          onClick={() => setLogoPosition(pos)}
-                        >
-                          {arrow}
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {PROJECTION_PRESETS.map((preset) => (
+                        <button key={preset.id} type="button" className="rounded-2xl border border-border bg-bg-base px-4 py-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5" onClick={() => applyPreset(preset)}>
+                          <p className="text-sm font-semibold text-text-primary">{preset.label}</p>
+                          <p className="mt-2 text-sm leading-relaxed text-text-secondary">{preset.description}</p>
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* Logo opacity */}
-                {logoPath && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium text-text-secondary">Opacité</label>
-                      <span className="text-xs text-text-muted tabular-nums">{logoOpacity}%</span>
+                  </section>
+                  <section className="space-y-4 rounded-2xl border border-border bg-bg-surface p-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-text-primary">Fond et contraste</h3>
+                      <p className="mt-1 text-sm text-text-secondary">Choisissez un rendu simple et lisible avant les options avancees.</p>
                     </div>
-                    <input
-                      type="range"
-                      aria-label="Opacité du logo"
-                      min={10}
-                      max={100}
-                      step={5}
-                      value={logoOpacity}
-                      onChange={(e) => setLogoOpacity(Number(e.target.value))}
-                      className="w-full accent-primary"
-                    />
-                  </div>
-                )}
-
-                {/* Logo scale */}
-                {logoPath && (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-medium text-text-secondary">Taille</label>
-                      <span className="text-xs text-text-muted tabular-nums">{logoScale}%</span>
+                    <div className="flex flex-wrap gap-2">
+                      {([["SOLID", "Uni"], ["GRADIENT_LINEAR", "Degrade lineaire"], ["GRADIENT_RADIAL", "Degrade radial"]] as Array<[CpBackgroundFillMode, string]>).map(([mode, label]) => (
+                        <button key={mode} type="button" className={cn("rounded-xl border px-3 py-2 text-sm font-medium transition-colors", bgMode === mode ? "border-primary bg-primary/10 text-primary" : "border-border text-text-secondary hover:bg-bg-elevated")} onClick={() => setBgMode(mode)}>{label}</button>
+                      ))}
                     </div>
-                    <input
-                      type="range"
-                      aria-label="Taille du logo"
-                      min={25}
-                      max={400}
-                      step={5}
-                      value={logoScale}
-                      onChange={(e) => setLogoScale(Number(e.target.value))}
-                      className="w-full accent-primary"
-                    />
-                    <div className="flex justify-between text-[10px] text-text-muted">
-                      <span>25%</span>
-                      <span>100%</span>
-                      <span>400%</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Live preview */}
-              <div
-                className="flex items-center justify-center rounded-md h-20 font-medium select-none relative overflow-hidden"
-                ref={(el) => {
-                  if (!el) return;
-                  if (bgMode === "GRADIENT_LINEAR") {
-                    el.style.background = `linear-gradient(${bgAngle}deg, ${bgFrom}, ${bgTo})`;
-                  } else if (bgMode === "GRADIENT_RADIAL") {
-                    el.style.background = `radial-gradient(circle, ${bgFrom}, ${bgTo})`;
-                  } else {
-                    el.style.background = "";
-                    el.style.backgroundColor = bg;
-                  }
-                  el.style.fontSize = `${Math.round(16 * textScale)}px`;
-                }}
-              >
-                <span
-                  ref={(el) => {
-                    if (!el) return;
-                    if (fgMode === "GRADIENT") {
-                      el.style.background = `linear-gradient(90deg, ${fgFrom}, ${fgTo})`;
-                      el.style.webkitBackgroundClip = "text";
-                      el.style.webkitTextFillColor = "transparent";
-                      el.style.backgroundClip = "text";
-                      el.style.color = "";
-                    } else {
-                      el.style.background = "";
-                      el.style.webkitBackgroundClip = "";
-                      el.style.webkitTextFillColor = "";
-                      el.style.backgroundClip = "";
-                      el.style.color = fg;
-                    }
-                  }}
-                >
-                  Aperçu du texte projeté
-                </span>
-                {logoPath && (() => {
-                  const previewPosClass = {
-                    "bottom-right": "bottom-1 right-1",
-                    "bottom-left":  "bottom-1 left-1",
-                    "top-right":    "top-1 right-1",
-                    "top-left":     "top-1 left-1",
-                    "center":       "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
-                  }[logoPosition] ?? "bottom-1 right-1";
-                  return (
-                    <img
-                      src={`file://${logoPath}`}
-                      alt=""
-                      aria-hidden
-                      className={`absolute max-h-[30%] max-w-[20%] object-contain pointer-events-none ${previewPosClass}`}
-                      ref={(el) => { if (el) el.style.opacity = String(logoOpacity / 100); }}
-                    />
-                  );
-                })()}
-              </div>
-
-              <Button className="w-full" onClick={() => void handleApplyAppearance()}>
-                Appliquer
-              </Button>
-            </div>
-          )}
-
-          {/* ── Screens tab (US-101) ────────────────────────────────────────── */}
-          {activeTab === "screens" && (
-            <div className="space-y-3 pt-1 pb-2">
-              {screensLoading ? (
-                <p className="text-sm text-text-muted py-4 text-center">Chargement…</p>
-              ) : screens.length === 0 ? (
-                <p className="text-sm text-text-muted py-4 text-center">Aucun écran disponible.</p>
-              ) : (
-                screens.map((screen) => (
-                  <div key={screen.key} className="rounded-lg border border-border p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-4 w-4 text-text-secondary" />
-                        <span className="text-sm font-semibold">Écran {screen.key}</span>
-                        <span className={cn(
-                          "text-xs px-1.5 py-0.5 rounded-full font-medium",
-                          screen.isOpen
-                            ? "bg-success/15 text-success"
-                            : "bg-bg-elevated text-text-muted",
-                        )}>
-                          {screen.isOpen ? "Ouvert" : "Fermé"}
-                        </span>
+                    {bgMode === "SOLID" ? (
+                      <div className="grid gap-3 md:grid-cols-[160px_minmax(0,1fr)]">
+                        <label className="text-sm font-medium text-text-secondary">Couleur principale</label>
+                        <div className="flex items-center gap-3">
+                          <input type="color" value={bg} onChange={(event) => setBg(event.target.value)} aria-label="Couleur du fond" className="h-11 w-14 rounded-xl border border-border bg-transparent p-1" />
+                          <span className="rounded-full border border-border bg-bg-elevated px-3 py-1.5 text-sm text-text-muted">{bg}</span>
+                        </div>
                       </div>
-                      <Button
-                        variant={screen.isOpen ? "outline" : "default"}
-                        size="sm"
-                        onClick={() => void handleToggleScreen(screen.key, screen.isOpen)}
-                      >
-                        {screen.isOpen ? "Fermer" : "Ouvrir"}
-                      </Button>
-                    </div>
-
-                    {/* Mirror mode (only for B and C) */}
-                    {screen.key !== "A" && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-text-secondary shrink-0">Mode :</span>
-                        <button
-                          type="button"
-                          className={cn(
-                            "text-xs px-2 py-1 rounded border transition-colors",
-                            screen.mirror.kind === "FREE"
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border text-text-muted hover:bg-bg-elevated",
-                          )}
-                          onClick={() => void handleSetMirror(screen.key, { kind: "FREE" })}
-                        >
-                          Indépendant
-                        </button>
-                        <button
-                          type="button"
-                          className={cn(
-                            "text-xs px-2 py-1 rounded border transition-colors",
-                            screen.mirror.kind === "MIRROR"
-                              ? "border-primary bg-primary/10 text-primary"
-                              : "border-border text-text-muted hover:bg-bg-elevated",
-                          )}
-                          onClick={() => void handleSetMirror(screen.key, { kind: "MIRROR", from: "A" })}
-                        >
-                          Miroir de A
-                        </button>
-                      </div>
+                    ) : (
+                      <>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="rounded-xl border border-border bg-bg-base px-4 py-3"><label className="text-sm font-medium text-text-secondary">Couleur de depart</label><div className="mt-2 flex items-center gap-3"><input type="color" value={bgFrom} onChange={(event) => setBgFrom(event.target.value)} aria-label="Couleur de depart" className="h-11 w-14 rounded-xl border border-border bg-transparent p-1" /><span className="text-sm text-text-muted">{bgFrom}</span></div></div>
+                          <div className="rounded-xl border border-border bg-bg-base px-4 py-3"><label className="text-sm font-medium text-text-secondary">Couleur d'arrivee</label><div className="mt-2 flex items-center gap-3"><input type="color" value={bgTo} onChange={(event) => setBgTo(event.target.value)} aria-label="Couleur d'arrivee" className="h-11 w-14 rounded-xl border border-border bg-transparent p-1" /><span className="text-sm text-text-muted">{bgTo}</span></div></div>
+                        </div>
+                        {bgMode === "GRADIENT_LINEAR" && (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between"><label className="text-sm font-medium text-text-secondary">Angle du degrade</label><span className="text-sm text-text-muted">{bgAngle} deg</span></div>
+                            <input type="range" min={0} max={360} step={15} value={bgAngle} onChange={(event) => setBgAngle(Number(event.target.value))} aria-label="Angle du degrade" className="w-full accent-primary" />
+                          </div>
+                        )}
+                      </>
                     )}
+                    <details className="rounded-2xl border border-border bg-bg-base px-4 py-3">
+                      <summary className="cursor-pointer list-none text-sm font-semibold text-text-primary">Options avancees du fond</summary>
+                      <div className="mt-4 space-y-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Button variant="outline" size="sm" className="gap-2" onClick={() => void handlePickBgImage()}><Upload className="h-4 w-4" />Choisir une image</Button>
+                          {bgImage && (
+                            <>
+                              <span className="max-w-[260px] truncate text-sm text-text-secondary">{bgImage.split(/[\\/]/).pop()}</span>
+                              <Button variant="ghost" size="sm" className="gap-2 text-text-secondary" onClick={() => setBgImage("")}><X className="h-4 w-4" />Retirer</Button>
+                            </>
+                          )}
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="rounded-xl border border-border bg-bg-surface px-4 py-3">
+                            <p className="text-sm font-semibold text-text-primary">Couleur du texte</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {([["SOLID", "Uni"], ["GRADIENT", "Degrade"]] as Array<[CpForegroundFillMode, string]>).map(([mode, label]) => (
+                                <button key={mode} type="button" className={cn("rounded-xl border px-3 py-2 text-sm font-medium transition-colors", fgMode === mode ? "border-primary bg-primary/10 text-primary" : "border-border text-text-secondary hover:bg-bg-elevated")} onClick={() => setFgMode(mode)}>{label}</button>
+                              ))}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-3">
+                              <input type="color" value={fg} onChange={(event) => setFg(event.target.value)} aria-label="Couleur du texte" className="h-11 w-14 rounded-xl border border-border bg-transparent p-1" />
+                              {fgMode === "GRADIENT" && (
+                                <>
+                                  <input type="color" value={fgFrom} onChange={(event) => setFgFrom(event.target.value)} aria-label="Couleur de debut du texte" className="h-11 w-14 rounded-xl border border-border bg-transparent p-1" />
+                                  <input type="color" value={fgTo} onChange={(event) => setFgTo(event.target.value)} aria-label="Couleur de fin du texte" className="h-11 w-14 rounded-xl border border-border bg-transparent p-1" />
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-border bg-bg-surface px-4 py-3">
+                            <div className="flex items-center justify-between"><label className="text-sm font-medium text-text-secondary">Taille du titre</label><span className="text-sm text-text-muted">{Math.round(titleTextScale * 100)}%</span></div>
+                            <input type="range" min={0.5} max={5} step={0.05} value={titleTextScale} onChange={(event) => setTitleTextScale(Number(event.target.value))} aria-label="Taille du titre" className="mt-2 w-full accent-primary" />
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  </section>
+                  <section className="space-y-4 rounded-2xl border border-border bg-bg-surface p-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-text-primary">Typographie et logo</h3>
+                      <p className="mt-1 text-sm text-text-secondary">Les reglages frequents restent visibles, le reste descend dans des panneaux.</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {[{ value: "system-ui", label: "Systeme" }, { value: "Georgia, serif", label: "Serif" }, { value: "Arial, sans-serif", label: "Sans" }].map((fontOption) => (
+                        <button key={fontOption.value} type="button" className={cn("rounded-xl border px-4 py-3 text-left transition-colors", textFont === fontOption.value && !textFontPath ? "border-primary bg-primary/10 text-primary" : "border-border bg-bg-base text-text-secondary hover:bg-bg-elevated")} onClick={() => { setTextFont(fontOption.value); setTextFontPath(""); setTextFontLabel(""); }}>
+                          <p className="text-sm font-semibold">{fontOption.label}</p>
+                          <p className="mt-1 text-sm">{fontOption.value}</p>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => void handlePickFont()}><Type className="h-4 w-4" />Police personnalisee</Button>
+                      {textFontPath && (
+                        <>
+                          <span className="max-w-[260px] truncate text-sm text-text-secondary">{textFontLabel}</span>
+                          <Button variant="ghost" size="sm" className="gap-2 text-text-secondary" onClick={() => { setTextFont("system-ui"); setTextFontPath(""); setTextFontLabel(""); }}><X className="h-4 w-4" />Retirer</Button>
+                        </>
+                      )}
+                    </div>
+                    <div className="space-y-3 rounded-xl border border-border bg-bg-base px-4 py-3">
+                      <div className="flex items-center justify-between"><label className="text-sm font-medium text-text-secondary">Taille du corps</label><span className="text-sm text-text-muted">{Math.round(textScale * 100)}%</span></div>
+                      <input type="range" min={0.5} max={5} step={0.05} value={textScale} onChange={(event) => setTextScale(Number(event.target.value))} aria-label="Taille du corps" className="w-full accent-primary" />
+                    </div>
+                    <details className="rounded-2xl border border-border bg-bg-base px-4 py-3">
+                      <summary className="cursor-pointer list-none text-sm font-semibold text-text-primary">Reglages avances du logo</summary>
+                      <div className="mt-4 space-y-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Button variant="outline" size="sm" className="gap-2" onClick={() => void handlePickLogo()}><Upload className="h-4 w-4" />{logoPath ? "Changer le logo" : "Choisir un logo"}</Button>
+                          {logoPath && (
+                            <>
+                              <span className="max-w-[260px] truncate text-sm text-text-secondary">{logoPath.split(/[\\/]/).pop()}</span>
+                              <Button variant="ghost" size="sm" className="gap-2 text-text-secondary" onClick={() => void handleClearLogo()}><X className="h-4 w-4" />Supprimer</Button>
+                            </>
+                          )}
+                        </div>
+                        {logoPath && (
+                          <>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="rounded-xl border border-border bg-bg-surface px-4 py-3"><div className="flex items-center justify-between"><label className="text-sm font-medium text-text-secondary">Opacite</label><span className="text-sm text-text-muted">{logoOpacity}%</span></div><input type="range" min={10} max={100} step={5} value={logoOpacity} onChange={(event) => setLogoOpacity(Number(event.target.value))} aria-label="Opacite du logo" className="mt-2 w-full accent-primary" /></div>
+                              <div className="rounded-xl border border-border bg-bg-surface px-4 py-3"><div className="flex items-center justify-between"><label className="text-sm font-medium text-text-secondary">Taille</label><span className="text-sm text-text-muted">{logoScale}%</span></div><input type="range" min={25} max={400} step={5} value={logoScale} onChange={(event) => setLogoScale(Number(event.target.value))} aria-label="Taille du logo" className="mt-2 w-full accent-primary" /></div>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium text-text-secondary">Position</label>
+                              <div className="flex flex-wrap gap-2">
+                                {([["top-left", "Haut gauche"], ["top-right", "Haut droite"], ["center", "Centre"], ["bottom-left", "Bas gauche"], ["bottom-right", "Bas droite"]] as Array<[CpLogoPosition, string]>).map(([position, label]) => (
+                                  <button key={position} type="button" className={cn("rounded-xl border px-3 py-2 text-sm font-medium transition-colors", logoPosition === position ? "border-primary bg-primary/10 text-primary" : "border-border text-text-secondary hover:bg-bg-elevated")} onClick={() => setLogoPosition(position)}>{label}</button>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </details>
+                  </section>
+                </>
+              )}
+              {activeTab === "screens" && (
+                <section className="space-y-4 rounded-2xl border border-border bg-bg-surface p-4">
+                  {screensLoading ? (
+                    <p className="text-sm text-text-muted">Chargement des ecrans...</p>
+                  ) : screens.length === 0 ? (
+                    <p className="text-sm text-text-muted">Aucun ecran disponible.</p>
+                  ) : (
+                    screens.map((screen) => (
+                      <div key={screen.key} className="rounded-2xl border border-border bg-bg-base p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div>
+                            <p className="text-base font-semibold text-text-primary">Ecran {screen.key}</p>
+                            <p className="mt-1 text-sm text-text-secondary">{screen.isOpen ? "Projection ouverte" : "Projection fermee"}</p>
+                          </div>
+                          <Button variant={screen.isOpen ? "outline" : "default"} size="sm" onClick={() => void handleToggleScreen(screen.key, screen.isOpen)}>
+                            {screen.isOpen ? "Fermer" : "Ouvrir"}
+                          </Button>
+                        </div>
+                        {screen.key !== "A" && (
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <button type="button" className={cn("rounded-xl border px-3 py-2 text-sm font-medium transition-colors", screen.mirror.kind === "FREE" ? "border-primary bg-primary/10 text-primary" : "border-border text-text-secondary hover:bg-bg-elevated")} onClick={() => void handleSetMirror(screen.key, { kind: "FREE" })}>Independant</button>
+                            <button type="button" className={cn("rounded-xl border px-3 py-2 text-sm font-medium transition-colors", screen.mirror.kind === "MIRROR" ? "border-primary bg-primary/10 text-primary" : "border-border text-text-secondary hover:bg-bg-elevated")} onClick={() => void handleSetMirror(screen.key, { kind: "MIRROR", from: "A" })}>Miroir de A</button>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </section>
+              )}
+              {activeTab === "interface" && (
+                <>
+                  <section className="space-y-4 rounded-2xl border border-border bg-bg-surface p-4">
+                    <div>
+                      <h3 className="text-base font-semibold text-text-primary">Theme de l'application</h3>
+                      <p className="mt-1 text-sm text-text-secondary">Choisissez le contraste general du poste operateur.</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <button type="button" className={cn("rounded-2xl border px-4 py-5 text-left transition-colors", theme === "light" ? "border-primary bg-primary/10 text-primary" : "border-border bg-bg-base text-text-secondary hover:bg-bg-elevated")} onClick={() => void handleSetTheme("light")}><Sun className="h-5 w-5" /><p className="mt-3 text-base font-semibold">Clair</p><p className="mt-1 text-sm">Palette lumineuse pour les postes bien eclaires.</p></button>
+                      <button type="button" className={cn("rounded-2xl border px-4 py-5 text-left transition-colors", theme === "dark" ? "border-primary bg-primary/10 text-primary" : "border-border bg-bg-base text-text-secondary hover:bg-bg-elevated")} onClick={() => void handleSetTheme("dark")}><Moon className="h-5 w-5" /><p className="mt-3 text-base font-semibold">Sombre</p><p className="mt-1 text-sm">Meilleur confort visuel dans une regie plus obscure.</p></button>
+                    </div>
+                  </section>
+                  <section className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-2xl border border-border bg-bg-surface p-4"><p className="text-sm font-semibold text-text-primary">Lisibilite</p><p className="mt-2 text-sm leading-relaxed text-text-secondary">Les zones critiques restent au-dessus de 12 px et gardent des contrastes marques.</p></div>
+                    <div className="rounded-2xl border border-border bg-bg-surface p-4"><p className="text-sm font-semibold text-text-primary">Raccourcis</p><p className="mt-2 text-sm leading-relaxed text-text-secondary">La fenetre de raccourcis garde sa capture clavier avec des espacements et etats plus coherents.</p></div>
+                  </section>
+                </>
+              )}
+              {activeTab === "data" && (
+                <section className="space-y-4 rounded-2xl border border-border bg-bg-surface p-4">
+                  <div className="rounded-2xl border border-border bg-bg-base p-4">
+                    <p className="text-base font-semibold text-text-primary">Exporter toutes les donnees</p>
+                    <p className="mt-2 text-sm leading-relaxed text-text-secondary">Sauvegarde chants et plans dans un seul fichier JSON.</p>
+                    <Button variant="outline" size="sm" className="mt-4 gap-2" onClick={() => void handleExportAll()} disabled={exporting}><Download className="h-4 w-4" />{exporting ? "Export en cours..." : "Exporter"}</Button>
                   </div>
-                ))
+                  <div className="rounded-2xl border border-border bg-bg-base p-4">
+                    <p className="text-base font-semibold text-text-primary">Importer une sauvegarde</p>
+                    <p className="mt-2 text-sm leading-relaxed text-text-secondary">Fusionne les donnees d'un export avec la bibliotheque existante.</p>
+                    <Button variant="outline" size="sm" className="mt-4 gap-2" onClick={() => void handleImportAll()} disabled={importing}><Upload className="h-4 w-4" />{importing ? "Import en cours..." : "Importer"}</Button>
+                  </div>
+                </section>
               )}
             </div>
-          )}
-
-          {/* ── Interface tab ───────────────────────────────────────────────── */}
-          {activeTab === "interface" && (
-            <div className="space-y-4 pt-1 pb-2">
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-text-secondary">Thème de l'interface</p>
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex-1 flex flex-col items-center gap-2 py-4 rounded-lg border-2 transition-colors",
-                      theme === "light"
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-bg-elevated",
-                    )}
-                    onClick={() => void handleSetTheme("light")}
-                  >
-                    <Sun className="h-6 w-6" />
-                    <span className="text-xs font-medium">Clair</span>
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      "flex-1 flex flex-col items-center gap-2 py-4 rounded-lg border-2 transition-colors",
-                      theme === "dark"
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-bg-elevated",
-                    )}
-                    onClick={() => void handleSetTheme("dark")}
-                  >
-                    <Moon className="h-6 w-6" />
-                    <span className="text-xs font-medium">Sombre</span>
-                  </button>
+          </div>
+          <aside className="border-l border-border bg-bg-surface/70 px-5 py-5">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">Apercu projection</p>
+                <h3 className="mt-1 text-base font-semibold text-text-primary">Controle permanent</h3>
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+                  Le rendu projetable reste visible pendant tout le reglage.
+                </p>
+              </div>
+              <div className="relative overflow-hidden rounded-3xl border border-border px-6 py-8 shadow-sm" style={previewBackgroundStyle}>
+                <p className="max-w-[220px] font-semibold leading-snug" style={{ ...previewTextStyle, fontSize: `${Math.round(13 * titleTextScale)}px` }}>
+                  Titre du slide
+                </p>
+                <p className="mt-6 max-w-[220px] leading-relaxed" style={previewTextStyle}>
+                  Apercu du texte projete pour verifier contraste, taille et respiration.
+                </p>
+                {logoPath && (
+                  <img
+                    src={`file://${logoPath}`}
+                    alt=""
+                    aria-hidden
+                    className={cn("pointer-events-none absolute object-contain", getLogoPreviewPositionClass(logoPosition))}
+                    style={{ maxWidth: `${logoScale / 2}%`, maxHeight: `${logoScale / 2}%`, opacity: logoOpacity / 100 }}
+                  />
+                )}
+              </div>
+              <div className="space-y-3 rounded-2xl border border-border bg-bg-base p-4">
+                <p className="text-sm font-semibold text-text-primary">Resume actif</p>
+                <div className="space-y-2 text-sm text-text-secondary">
+                  <div className="flex items-center justify-between gap-3"><span>Theme</span><span className="font-medium text-text-primary">{theme === "dark" ? "Sombre" : "Clair"}</span></div>
+                  <div className="flex items-center justify-between gap-3"><span>Corps</span><span className="font-medium text-text-primary">{Math.round(textScale * 100)}%</span></div>
+                  <div className="flex items-center justify-between gap-3"><span>Titre</span><span className="font-medium text-text-primary">{Math.round(titleTextScale * 100)}%</span></div>
+                  <div className="flex items-center justify-between gap-3"><span>Police</span><span className="max-w-[150px] truncate font-medium text-text-primary">{textFontLabel || textFont}</span></div>
+                  <div className="flex items-center justify-between gap-3"><span>Logo</span><span className="font-medium text-text-primary">{logoPath ? "Actif" : "Inactif"}</span></div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* ── Data tab ────────────────────────────────────────────────────── */}
-          {activeTab === "data" && (
-            <div className="space-y-3 pt-1 pb-2">
-              <div className="rounded-lg border border-border p-4 space-y-3">
-                <div>
-                  <p className="text-sm font-medium">Exporter toutes les données</p>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    Sauvegarde chants et plans dans un fichier JSON.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => void handleExportAll()}
-                  disabled={exporting}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  {exporting ? "Export en cours…" : "Exporter"}
+              {activeTab === "projection" && (
+                <Button className="w-full" onClick={() => void handleApplyAppearance()}>
+                  Appliquer la projection
                 </Button>
-              </div>
-
-              <div className="rounded-lg border border-border p-4 space-y-3">
-                <div>
-                  <p className="text-sm font-medium">Importer des données</p>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    Importe un fichier JSON exporté (fusion avec les données existantes).
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => void handleImportAll()}
-                  disabled={importing}
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  {importing ? "Import en cours…" : "Importer"}
-                </Button>
-              </div>
+              )}
             </div>
-          )}
-
+          </aside>
         </div>
       </DialogContent>
     </Dialog>

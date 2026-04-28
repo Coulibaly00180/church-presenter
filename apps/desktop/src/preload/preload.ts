@@ -23,6 +23,7 @@ import type {
   CpScreenStateEventPayload,
   CpScreenWindowEventPayload,
   CpSyncStatus,
+  CpPgConnectionState,
   ScreenKey,
   ScreenMirrorMode,
   CpSongSortField,
@@ -196,6 +197,21 @@ const cpApi: CpApi = {
       const handler = (_: unknown, payload: CpSyncStatus) => cb(payload);
       ipcRenderer.on("sync:status", handler);
       return () => ipcRenderer.removeListener("sync:status", handler);
+    },
+  },
+
+  pgSync: {
+    getState: () => ipcRenderer.invoke("pgSync:getState"),
+    retrySync: () => ipcRenderer.invoke("pgSync:retrySync"),
+    onStateChange: (cb: (state: CpPgConnectionState) => void) => {
+      const handler = (_: unknown, payload: { state: CpPgConnectionState }) => cb(payload.state);
+      ipcRenderer.on("pgSync:stateChange", handler);
+      return () => ipcRenderer.removeListener("pgSync:stateChange", handler);
+    },
+    onConflictWarning: (cb: (data: { overwritten: number; message: string }) => void) => {
+      const handler = (_: unknown, data: { overwritten: number; message: string }) => cb(data);
+      ipcRenderer.on("pgSync:conflictWarning", handler);
+      return () => ipcRenderer.removeListener("pgSync:conflictWarning", handler);
     },
   },
 

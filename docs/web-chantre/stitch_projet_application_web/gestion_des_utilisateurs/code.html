@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="fr"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WorshipFlow - Gestion des Utilisateurs</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-primary-fixed": "#07006c",
+                      "primary-container": "#8083ff",
+                      "on-error-container": "#ffdad6",
+                      "on-surface": "#dae2fd",
+                      "on-primary-container": "#0d0096",
+                      "primary-fixed": "#e1e0ff",
+                      "on-surface-variant": "#c7c4d7",
+                      "inverse-on-surface": "#283044",
+                      "secondary-fixed-dim": "#3cddc7",
+                      "inverse-surface": "#dae2fd",
+                      "on-secondary-fixed-variant": "#005047",
+                      "on-background": "#dae2fd",
+                      "on-tertiary-fixed-variant": "#891933",
+                      "surface-tint": "#c0c1ff",
+                      "tertiary-container": "#ea6479",
+                      "tertiary": "#ffb2b9",
+                      "outline-variant": "#464554",
+                      "on-tertiary-container": "#5b001a",
+                      "on-tertiary-fixed": "#400010",
+                      "on-primary": "#1000a9",
+                      "surface": "#0b1326",
+                      "error-container": "#93000a",
+                      "surface-container-highest": "#2d3449",
+                      "tertiary-fixed": "#ffdadc",
+                      "error": "#ffb4ab",
+                      "on-secondary-container": "#004d44",
+                      "surface-bright": "#31394d",
+                      "primary-fixed-dim": "#c0c1ff",
+                      "on-primary-fixed-variant": "#2f2ebe",
+                      "inverse-primary": "#494bd6",
+                      "primary": "#c0c1ff",
+                      "on-error": "#690005",
+                      "surface-container": "#171f33",
+                      "surface-container-low": "#131b2e",
+                      "surface-dim": "#0b1326",
+                      "surface-variant": "#2d3449",
+                      "outline": "#908fa0",
+                      "secondary-fixed": "#62fae3",
+                      "on-secondary": "#003731",
+                      "on-tertiary": "#67001f",
+                      "secondary-container": "#03c6b2",
+                      "tertiary-fixed-dim": "#ffb2b9",
+                      "on-secondary-fixed": "#00201c",
+                      "background": "#0b1326",
+                      "surface-container-lowest": "#060e20",
+                      "secondary": "#44e2cd",
+                      "surface-container-high": "#222a3d"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container-max": "1280px",
+                      "sm": "12px",
+                      "gutter": "24px",
+                      "xs": "4px",
+                      "lg": "48px",
+                      "md": "24px",
+                      "base": "8px",
+                      "xl": "80px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "Manrope"
+                      ],
+                      "label-caps": [
+                              "Manrope"
+                      ],
+                      "body-lg": [
+                              "Manrope"
+                      ],
+                      "display-xl": [
+                              "Manrope"
+                      ],
+                      "body-md": [
+                              "Manrope"
+                      ],
+                      "headline-md": [
+                              "Manrope"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "1",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.6",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-xl": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.1",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.3",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        body {
+            background: radial-gradient(circle at 50% 0%, rgba(13, 0, 150, 0.15) 0%, rgba(11, 19, 38, 1) 50%);
+            background-color: theme('colors.background');
+            background-attachment: fixed;
+            color: theme('colors.on-background');
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .btn-gradient {
+            background: linear-gradient(135deg, #8083ff, #494bd6);
+            transition: all 0.3s ease;
+        }
+        .btn-gradient:hover {
+            box-shadow: 0 0 20px rgba(128, 131, 255, 0.4);
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md antialiased min-h-screen flex">
+<!-- SideNavBar (WEB) -->
+<nav class="hidden md:flex bg-slate-950/90 backdrop-blur-2xl text-indigo-400 font-['Manrope'] text-sm font-semibold h-screen w-64 border-r border-white/10 shadow-2xl shadow-black fixed left-0 top-0 flex flex-col pt-20 pb-8 px-4 z-50">
+<div class="mb-12 px-4">
+<div class="w-12 h-12 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-indigo-400" style="font-variation-settings: 'FILL' 1;">church</span>
+</div>
+<h2 class="text-xl font-extrabold text-indigo-400">WorshipFlow</h2>
+<p class="text-xs text-indigo-400/60 mt-1 uppercase tracking-widest font-bold">Exuberant &amp; Organized</p>
+</div>
+<ul class="flex flex-col gap-2 flex-grow">
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+                    Tableau de Bord
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined">library_music</span>
+                    Bibliothèque
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined">event_note</span>
+                    Plans
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg bg-gradient-to-r from-indigo-500/20 to-transparent text-indigo-400 border-l-4 border-indigo-500 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined">group</span>
+                    Utilisateurs
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/5 transition-colors duration-200 hover:translate-x-1 transition-transform" href="#">
+<span class="material-symbols-outlined">account_circle</span>
+                    Profil
+                </a>
+</li>
+</ul>
+</nav>
+<!-- TopAppBar -->
+<header class="bg-slate-950/80 backdrop-blur-xl text-indigo-500 dark:text-indigo-400 font-['Manrope'] font-bold tracking-tight docked full-width top-0 z-40 border-b border-white/10 shadow-lg shadow-indigo-500/5 fixed top-0 left-0 w-full flex justify-between items-center px-6 h-16 md:pl-72">
+<div class="flex items-center gap-4">
+<h1 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500 md:hidden">WorshipFlow</h1>
+<div class="hidden md:block">
+<!-- Empty div to push search right on desktop if needed, or placeholder for breadcrumbs -->
+</div>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative hidden sm:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="bg-surface-container-high border border-white/10 rounded-full pl-10 pr-4 py-1.5 text-sm focus:outline-none focus:border-indigo-500/50 text-slate-200 placeholder-slate-500 transition-colors w-64" placeholder="Rechercher..." type="text"/>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/5 hover:text-indigo-300 transition-all active:scale-95 duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden border-2 border-indigo-500/30 cursor-pointer">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="close-up portrait of a smiling young man with short hair wearing a dark shirt, soft studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuArAEnu8c-JhRYJb4H12OY1icLpL1prasKTX307KSyZ78wxkzsGVLFHOs1cpGduBbacK8K_AKEYYQjgmss9B2nsShOue2UEiCGX-UM9Y1T3xebt2P6EcGb6VVE9KmSPJdIhcOc2L3GrcL4-_nOhJmn4qRsB851oMQmBtVlg6dNmsEsiwz6MpeO7hQHJwmWwR-i2GjGTqly0ZNFovKDBMKThLTdQYpvNAgxKS_bfx22ctXvoR_u2rsJXOyfNAbXKTkD5bqwPq4SwvbQ"/>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 pt-24 pb-12 px-6 md:pl-72 w-full max-w-container-max mx-auto">
+<!-- Header Section -->
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-lg">
+<div>
+<h1 class="font-display-xl text-display-xl text-on-surface mb-2">Gestion des Utilisateurs</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant">Gérez les accès et les rôles de votre équipe.</p>
+</div>
+<button class="btn-gradient text-white font-headline-md text-headline-md px-6 py-3 rounded-lg flex items-center gap-2 shadow-lg shadow-indigo-500/20 whitespace-nowrap active:scale-95 duration-200">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+                Nouvel Utilisateur
+            </button>
+</div>
+<!-- Filters & Search Bar (Content Area) -->
+<div class="glass-panel rounded-xl p-4 mb-8 flex flex-wrap gap-4 items-center justify-between">
+<div class="flex gap-2 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0">
+<button class="px-4 py-1.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-label-caps text-label-caps whitespace-nowrap">TOUS</button>
+<button class="px-4 py-1.5 rounded-full bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent hover:border-white/10 font-label-caps text-label-caps whitespace-nowrap transition-colors">ADMINISTRATEURS</button>
+<button class="px-4 py-1.5 rounded-full bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent hover:border-white/10 font-label-caps text-label-caps whitespace-nowrap transition-colors">CHANTRES</button>
+<button class="px-4 py-1.5 rounded-full bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent hover:border-white/10 font-label-caps text-label-caps whitespace-nowrap transition-colors">LECTEURS</button>
+</div>
+<div class="relative w-full sm:w-72">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">search</span>
+<input class="w-full bg-surface-container-high border border-white/5 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-500/50 text-slate-200 placeholder-slate-500 transition-colors" placeholder="Rechercher un membre..." type="text"/>
+</div>
+</div>
+<!-- Users Table Container -->
+<div class="glass-panel rounded-xl overflow-hidden shadow-2xl shadow-black/50">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-white/10 bg-surface-container-low/50">
+<th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Membre</th>
+<th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider hidden md:table-cell">Contact</th>
+<th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Rôle</th>
+<th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider hidden sm:table-cell">Statut</th>
+<th class="py-4 px-6 font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-white/5 font-body-md text-body-md">
+<!-- User Row 1 -->
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-white/10 flex-shrink-0">
+<img alt="Sarah Connor" class="w-full h-full object-cover" data-alt="headshot of a smiling woman with long brown hair against a light background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCw241kx7B1k34D7TFZhEE7kDYLg7Afz_iEmvxm8Nc2B7OnXnWLC-KZDpbhIcnaCtuGXUyzz_Zn81S2K4yz5fKiPrKESAJmLb6aQEP5HdkdLfvPY-iFhXwyZAhnCArm_71RbJQTFhjnUnXGnUDYSRnN4nV7T0jfkS2caVw_HDnQgVfmacKGyKHcZ80AP72qU4Qh3Mk6De4wrtPv9ls89XcZNgIb-H8nwa7SX7Eox7j1YDgEDwtzBwU8VW5eZavUeGlmaeH5GUbVBLQ"/>
+</div>
+<div>
+<p class="font-bold text-on-surface">Sarah Connor</p>
+<p class="text-sm text-slate-400 md:hidden">sarah.c@worshipflow.com</p>
+</div>
+</div>
+</td>
+<td class="py-4 px-6 hidden md:table-cell text-slate-400">sarah.c@worshipflow.com</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-tertiary-container/20 text-tertiary border border-tertiary/30 font-label-caps text-label-caps">
+<span class="material-symbols-outlined text-[14px]">admin_panel_settings</span>
+                                    ADMIN
+                                </span>
+</td>
+<td class="py-4 px-6 hidden sm:table-cell">
+<span class="flex items-center gap-2 text-secondary-fixed-dim text-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed-dim shadow-[0_0_8px_rgba(60,221,199,0.6)]"></span>
+                                    Actif
+                                </span>
+</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-slate-400 hover:text-primary-container hover:bg-white/5 transition-colors" title="Modifier">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 rounded-lg text-slate-400 hover:text-secondary-fixed-dim hover:bg-white/5 transition-colors" title="Réinitialiser MDP">
+<span class="material-symbols-outlined text-[20px]">lock_reset</span>
+</button>
+<button class="p-2 rounded-lg text-slate-400 hover:text-error hover:bg-white/5 transition-colors" title="Désactiver">
+<span class="material-symbols-outlined text-[20px]">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- User Row 2 -->
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container/20 border border-primary-container/30 flex items-center justify-center text-primary-container font-bold flex-shrink-0">
+                                        MJ
+                                    </div>
+<div>
+<p class="font-bold text-on-surface">Marc Johnson</p>
+<p class="text-sm text-slate-400 md:hidden">marc.j@worshipflow.com</p>
+</div>
+</div>
+</td>
+<td class="py-4 px-6 hidden md:table-cell text-slate-400">marc.j@worshipflow.com</td>
+<td class="py-4 px-6">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container/10 text-primary-container border border-primary-container/20 font-label-caps text-label-caps">
+<span class="material-symbols-outlined text-[14px]">mic</span>
+                                    CHANTRE
+                                </span>
+</td>
+<td class="py-4 px-6 hidden sm:table-cell">
+<span class="flex items-center gap-2 text-secondary-fixed-dim text-sm">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed-dim shadow-[0_0_8px_rgba(60,221,199,0.6)]"></span>
+                                    Actif
+                                </span>
+</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-slate-400 hover:text-primary-container hover:bg-white/5 transition-colors" title="Modifier">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 rounded-lg text-slate-400 hover:text-secondary-fixed-dim hover:bg-white/5 transition-colors" title="Réinitialiser MDP">
+<span class="material-symbols-outlined text-[20px]">lock_reset</span>
+</button>
+<button class="p-2 rounded-lg text-slate-400 hover:text-error hover:bg-white/5 transition-colors" title="Désactiver">
+<span class="material-symbols-outlined text-[20px]">block</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- User Row 3 -->
+<tr class="hover:bg-white/[0.02] transition-colors group">
+<td class="py-4 px-6">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full overflow-hidden border border-white/10 flex-shrink-0 opacity-60">
+<img alt="David Chen" class="w-full h-full object-cover grayscale" data-alt="headshot of a smiling man with glasses, professional portrait" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQg_mIF0R_MM82u1uN8lJrjICduYqXPOKfIx8LZPGfRhc8EWEzEn7NBmgFguPn3KVD0p9Nz3WsQgc03oPM9feL265zSNkaLapcYqx5-noWbPTD48WMDqXMPzHMa2VTWPGMJCnBNuFiHydTFljCSSfJ_x_k8USdpDkcC-HSRouQqr8kgvJBmuM5K8xNIV4yDG5nDABr9LNxtB5riDaT8kC1ohrL4vlO0CFbD7f5NR0ZcXVc36S2vZYS6e8ZA2i0Gl7WoK6Utx590g4"/>
+</div>
+<div>
+<p class="font-bold text-on-surface opacity-60">David Chen</p>
+<p class="text-sm text-slate-400 opacity-60 md:hidden">d.chen@worshipflow.com</p>
+</div>
+</div>
+</td>
+<td class="py-4 px-6 hidden md:table-cell text-slate-400 opacity-60">d.chen@worshipflow.com</td>
+<td class="py-4 px-6 opacity-60">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-fixed-dim/10 text-secondary-fixed-dim border border-secondary-fixed-dim/20 font-label-caps text-label-caps">
+<span class="material-symbols-outlined text-[14px]">menu_book</span>
+                                    LECTEUR
+                                </span>
+</td>
+<td class="py-4 px-6 hidden sm:table-cell">
+<span class="flex items-center gap-2 text-slate-500 text-sm">
+<span class="w-2 h-2 rounded-full bg-slate-500"></span>
+                                    Inactif
+                                </span>
+</td>
+<td class="py-4 px-6 text-right">
+<div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-2 rounded-lg text-slate-400 hover:text-primary-container hover:bg-white/5 transition-colors" title="Modifier">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-2 rounded-lg text-slate-400 hover:text-secondary-fixed-dim hover:bg-white/5 transition-colors" title="Réactiver">
+<span class="material-symbols-outlined text-[20px]">settings_backup_restore</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="px-6 py-4 border-t border-white/5 bg-surface-container-lowest/30 flex items-center justify-between">
+<span class="text-sm text-slate-400">Affichage de 1 à 3 sur 12 utilisateurs</span>
+<div class="flex gap-2">
+<button class="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 text-slate-400 hover:bg-white/5 hover:text-white transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 rounded-lg flex items-center justify-center border border-white/10 text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (MOBILE ONLY - Simulated for context if needed, but per rules, SideNav is for web, bottom for mobile top-level destinations. Since this is an admin sub-page or destination, we handle responsive nav.) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full bg-slate-950/90 backdrop-blur-2xl border-t border-white/10 flex justify-around items-center h-16 px-2 z-50">
+<a class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-indigo-400 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">dashboard</span>
+<span class="text-[10px] font-bold">Dashboard</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-indigo-400 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">library_music</span>
+<span class="text-[10px] font-bold">Bibliothèque</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 text-indigo-400 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]" style="font-variation-settings: 'FILL' 1;">group</span>
+<span class="text-[10px] font-bold">Utilisateurs</span>
+</a>
+<a class="flex flex-col items-center gap-1 p-2 text-slate-500 hover:text-indigo-400 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">account_circle</span>
+<span class="text-[10px] font-bold">Profil</span>
+</a>
+</nav>
+</body></html>

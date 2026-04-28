@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WorshipFlow Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary": "#b3c5ff",
+                        "on-primary": "#122a76",
+                        "primary-container": "#2f4492",
+                        "on-primary-container": "#dce1ff",
+                        "secondary": "#bfc6dc",
+                        "on-secondary": "#293041",
+                        "secondary-container": "#3f4759",
+                        "on-secondary-container": "#dbe2f9",
+                        "tertiary": "#dfbbf9",
+                        "on-tertiary": "#402358",
+                        "tertiary-container": "#583a70",
+                        "on-tertiary-container": "#f8d8ff",
+                        "error": "#ffb4ab",
+                        "on-error": "#690005",
+                        "error-container": "#93000a",
+                        "on-error-container": "#ffdad6",
+                        "background": "#0b1326",
+                        "on-background": "#e2e2ea",
+                        "surface": "#0b1326",
+                        "on-surface": "#e2e2ea",
+                        "surface-variant": "#44464f",
+                        "on-surface-variant": "#c4c6d0",
+                        "outline": "#8e9099",
+                        "outline-variant": "#44464f",
+                        "shadow": "#000000",
+                        "scrim": "#000000",
+                        "inverse-surface": "#e2e2ea",
+                        "inverse-on-surface": "#2e3036",
+                        "inverse-primary": "#485dac",
+                        "surface-dim": "#0b1326",
+                        "surface-bright": "#31394d",
+                        "surface-container-lowest": "#060e20",
+                        "surface-container-low": "#131b2e",
+                        "surface-container": "#182033",
+                        "surface-container-high": "#222a3e",
+                        "surface-container-highest": "#2d3549"
+                    },
+                    "borderRadius": {
+                        "none": "0",
+                        "sm": "0.125rem",
+                        "DEFAULT": "0.5rem",
+                        "md": "0.5rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "2xl": "1rem",
+                        "3xl": "1.5rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-margin": "20px",
+                        "base": "4px",
+                        "sm": "8px",
+                        "md": "16px",
+                        "gutter": "16px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "xl": "40px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Manrope"],
+                        "display-xl": ["Manrope"],
+                        "label-sm": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "headline-lg": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "lyrics-view": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "display-xl": ["48px", {"lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-sm": ["12px", {"lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                        "headline-md": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-md": ["16px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "lyrics-view": ["22px", {"lineHeight": "1.7", "letterSpacing": "0.01em", "fontWeight": "500"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Manrope', sans-serif; background-color: #0b1326; color: #e2e2ea; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen font-body-md selection:bg-primary/30 selection:text-primary">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-40 border-b border-white/10 bg-slate-950/80 backdrop-blur-xl flex justify-between items-center h-16 px-6 shadow-lg shadow-indigo-500/5">
+<div class="flex items-center gap-4">
+<!-- Mobile Search Icon -->
+<button class="md:hidden text-indigo-400 hover:text-indigo-300 transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="hidden md:block">
+<span class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500 tracking-tight">WorshipFlow</span>
+</div>
+</div>
+<div class="absolute left-1/2 -translate-x-1/2 md:hidden">
+<span class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-500 tracking-tight">WorshipFlow</span>
+</div>
+<div class="flex items-center gap-4">
+<!-- Search on Right -->
+<div class="relative hidden md:block w-64 mr-2">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" style="font-variation-settings: 'FILL' 0;">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-white/5 rounded-full border border-white/10 focus:border-indigo-500 focus:bg-white/10 outline-none text-sm font-medium text-slate-200 placeholder:text-slate-400 transition-all focus:ring-2 focus:ring-indigo-500/20" placeholder="Search..." type="text"/>
+</div>
+<button class="text-indigo-500 dark:text-indigo-400 hover:bg-white/5 hover:text-indigo-300 transition-all p-2 rounded-full active:scale-95 duration-200 cursor-pointer">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<div class="w-9 h-9 rounded-full bg-surface-variant overflow-hidden border-2 border-indigo-500/30 hover:border-indigo-500 transition-colors cursor-pointer">
+<img alt="User avatar" class="w-full h-full object-cover" data-alt="Portrait of a smiling man with short hair wearing a casual shirt, soft natural lighting, clean background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-Ec-qRmuEkg43a79VhKZF58OvOVsAXHoOvoiOGNcXqgXYeI0aaeXryfLU7q_7tI_JiRYlwqgsEhmOvDZgT5k9Hv1ybcF-rEGS5rDe1Sbgp5vYMLuJ3IOwri-4x6z-TmYywyo3ejFXN-TLgK4Vr10JEWuwJ3w_SYeHL7zAwgS1xFQNxlR1NrRm8CSF28sWVSsZLWBCHOM9jLPWne6qqqHHx2p6ynKu_Kraby3dZ_nE-DoWHb8JUFOXjAvDuodHC9puvOiHRTsIEKw"/>
+</div>
+</div>
+</header>
+<div class="flex pt-16 h-screen overflow-hidden">
+<!-- SideNavBar (Desktop) -->
+<nav class="fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 border-r border-white/10 bg-slate-950/90 backdrop-blur-2xl hidden md:flex flex-col py-8 gap-4 z-30 shadow-2xl shadow-black">
+<div class="px-6 mb-6 flex flex-col gap-2">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+<span class="material-symbols-outlined">church</span>
+</div>
+<div>
+<h2 class="font-['Manrope'] text-[16px] font-bold text-slate-200">Grace Worship</h2>
+<p class="font-['Manrope'] text-[12px] font-semibold text-indigo-400">Exuberant &amp; Organized</p>
+</div>
+</div>
+<button class="mt-6 w-full py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-lg font-['Manrope'] text-sm font-bold shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 active:scale-95">
+<span class="material-symbols-outlined text-[18px]">add</span> New Setlist
+                </button>
+</div>
+<div class="flex-1 flex flex-col gap-1 px-3">
+<a class="flex items-center gap-3 py-2.5 px-3 rounded-lg text-slate-400 font-['Manrope'] text-sm font-semibold hover:bg-white/5 hover:text-indigo-300 hover:translate-x-1 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span>Tableau de Bord</span>
+</a>
+<a class="flex items-center gap-3 py-2.5 px-3 rounded-lg text-slate-400 font-['Manrope'] text-sm font-semibold hover:bg-white/5 hover:text-indigo-300 hover:translate-x-1 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="library_music">library_music</span>
+<span>Bibliothèque</span>
+</a>
+<a class="flex items-center gap-3 py-2.5 px-3 rounded-lg bg-gradient-to-r from-indigo-500/20 to-transparent text-indigo-400 font-['Manrope'] text-sm font-bold border-l-4 border-indigo-500 hover:translate-x-1 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="event_note" style="font-variation-settings: 'FILL' 1;">event_note</span>
+<span>Plans</span>
+</a>
+<a class="flex items-center gap-3 py-2.5 px-3 rounded-lg text-slate-400 font-['Manrope'] text-sm font-semibold hover:bg-white/5 hover:text-indigo-300 hover:translate-x-1 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span>Utilisateurs</span>
+</a>
+<a class="flex items-center gap-3 py-2.5 px-3 rounded-lg text-slate-400 font-['Manrope'] text-sm font-semibold hover:bg-white/5 hover:text-indigo-300 hover:translate-x-1 transition-all duration-200 ease-in-out" href="#">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+<span>Profil</span>
+</a>
+</div>
+<div class="px-3 mt-auto border-t border-white/10 pt-4">
+<a class="flex items-center gap-3 py-2 px-3 rounded-lg text-slate-400 font-['Manrope'] text-sm font-semibold hover:bg-white/5 hover:text-indigo-300 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="help_outline">help_outline</span>
+<span>Help</span>
+</a>
+<a class="flex items-center gap-3 py-2 px-3 rounded-lg text-slate-400 font-['Manrope'] text-sm font-semibold hover:bg-white/5 hover:text-indigo-300 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span>Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content -->
+<main class="flex-1 md:ml-64 overflow-y-auto bg-background pb-20 md:pb-8 relative">
+<!-- Background decorative glow -->
+<div class="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="absolute top-1/3 right-0 w-80 h-80 bg-violet-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+<div class="max-w-[1200px] mx-auto p-4 md:p-8 space-y-xl relative z-10">
+<!-- Welcome Section -->
+<section class="mb-lg">
+<h1 class="font-['Manrope'] text-4xl font-bold text-slate-100 mb-2 tracking-tight">Good morning, Jean Dupont</h1>
+<p class="font-body-md text-body-md text-slate-400">Here is your worship overview for the week.</p>
+</section>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<!-- Next Service Card (Featured) -->
+<div class="md:col-span-2 bg-surface-container-lowest/50 backdrop-blur-sm rounded-2xl border border-white/5 p-6 relative overflow-hidden flex flex-col justify-between min-h-[300px] shadow-xl shadow-black/20 group">
+<!-- Decorative background element -->
+<div class="absolute -right-20 -top-20 w-64 h-64 bg-gradient-to-br from-indigo-500/20 to-violet-500/20 rounded-full blur-2xl pointer-events-none group-hover:scale-110 transition-transform duration-700"></div>
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-6">
+<div>
+<span class="inline-block px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-label-sm text-xs font-bold rounded-full mb-3 uppercase tracking-wider">Upcoming Service</span>
+<h2 class="font-['Manrope'] text-2xl font-bold text-slate-100">Sunday Worship</h2>
+<p class="font-body-md text-sm text-slate-400 flex items-center gap-2 mt-1">
+<span class="material-symbols-outlined text-[18px] text-indigo-400">calendar_month</span> Oct 29, 2023 • 10:00 AM
+                                    </p>
+</div>
+<button class="w-12 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-500 text-white flex items-center justify-center hover:shadow-lg hover:shadow-indigo-500/30 hover:-translate-y-1 transition-all active:scale-95">
+<span class="material-symbols-outlined text-2xl">play_arrow</span>
+</button>
+</div>
+<div class="space-y-3">
+<p class="font-label-sm text-xs text-slate-500 uppercase tracking-wider mb-2 font-bold">Setlist Preview</p>
+<div class="bg-white/5 backdrop-blur-md rounded-xl p-3 flex items-center justify-between border border-white/5 hover:border-indigo-500/30 hover:bg-white/10 transition-all cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-slate-300 font-bold text-sm shadow-inner shadow-black/50">1</div>
+<div>
+<p class="font-body-md text-[15px] font-bold text-slate-200">Amazing Grace (My Chains Are Gone)</p>
+<p class="font-label-sm text-[12px] text-slate-400 mt-0.5">Key: G • 72 BPM</p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-slate-400">more_vert</span>
+</button>
+</div>
+<div class="bg-white/5 backdrop-blur-md rounded-xl p-3 flex items-center justify-between border border-white/5 hover:border-indigo-500/30 hover:bg-white/10 transition-all cursor-pointer">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-lg bg-surface-container-highest flex items-center justify-center text-slate-300 font-bold text-sm shadow-inner shadow-black/50">2</div>
+<div>
+<p class="font-body-md text-[15px] font-bold text-slate-200">10,000 Reasons (Bless the Lord)</p>
+<p class="font-label-sm text-[12px] text-slate-400 mt-0.5">Key: G • 73 BPM</p>
+</div>
+</div>
+<button class="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-slate-400">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Learning Progress -->
+<div class="bg-surface-container-lowest/50 backdrop-blur-sm rounded-2xl border border-white/5 p-6 flex flex-col shadow-xl shadow-black/20">
+<div class="flex items-center gap-3 mb-6">
+<div class="w-8 h-8 rounded-lg bg-violet-500/20 text-violet-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">trending_up</span>
+</div>
+<h3 class="font-['Manrope'] text-[18px] font-bold text-slate-200">Learning Progress</h3>
+</div>
+<div class="flex-1 flex flex-col justify-center gap-8">
+<div class="text-center relative">
+<div class="inline-flex items-center justify-center w-32 h-32 rounded-full relative">
+<!-- Simulated progress arc -->
+<svg class="absolute top-0 left-0 w-full h-full transform -rotate-90 drop-shadow-[0_0_8px_rgba(99,102,241,0.5)]" viewbox="0 0 100 100">
+<circle class="text-surface-container-highest stroke-current" cx="50" cy="50" fill="none" r="44" stroke-width="8"></circle>
+<circle class="text-indigo-500 stroke-dasharray-[200] stroke-dashoffset-[80] stroke-current" cx="50" cy="50" fill="none" r="44" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="flex flex-col items-center z-10">
+<span class="font-['Manrope'] text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-violet-400">12</span>
+</div>
+</div>
+<p class="font-label-sm text-xs text-slate-400 mt-4 uppercase tracking-wider font-bold">Songs Mastered</p>
+</div>
+<div class="bg-white/5 p-4 rounded-xl border border-white/5">
+<div class="flex justify-between items-center mb-3">
+<span class="font-body-md text-[14px] font-semibold text-slate-300">In Progress</span>
+<span class="font-label-sm text-[10px] font-bold text-violet-300 bg-violet-500/20 px-2.5 py-1 rounded-md uppercase tracking-wider">5 Songs</span>
+</div>
+<div class="w-full bg-surface-container-highest h-2.5 rounded-full overflow-hidden shadow-inner">
+<div class="bg-gradient-to-r from-indigo-500 to-violet-500 h-full w-[40%] rounded-full relative">
+<div class="absolute inset-0 bg-white/20 w-full h-full animate-[shimmer_2s_infinite] -translate-x-full" style="background-image: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Favorite Songs Section -->
+<section>
+<div class="flex justify-between items-end mb-6">
+<div>
+<h3 class="font-['Manrope'] text-[20px] font-bold text-slate-200">Favorite Songs</h3>
+<p class="font-body-md text-[14px] text-slate-400 mt-1">Quick access to your regular repertoire.</p>
+</div>
+<a class="font-label-sm text-xs text-indigo-400 hover:text-indigo-300 font-bold hover:underline uppercase tracking-wider transition-colors" href="#">View All</a>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+<!-- Song Card 1 -->
+<div class="bg-surface-container-lowest/50 backdrop-blur-sm rounded-xl border border-white/5 p-5 hover:border-indigo-500/30 hover:bg-white/5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.3)] transition-all duration-300 cursor-pointer group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<h4 class="font-['Manrope'] text-[16px] font-bold text-slate-200 mb-5 group-hover:text-indigo-300 transition-colors">Way Maker</h4>
+<div class="flex justify-between items-end">
+<div class="flex flex-col gap-2">
+<span class="font-label-sm text-[11px] font-bold text-slate-300 bg-white/10 px-2.5 py-1 rounded-md w-fit border border-white/5">Key: E</span>
+<span class="font-label-sm text-[11px] font-bold text-slate-400 bg-black/20 px-2.5 py-1 rounded-md w-fit">68 BPM</span>
+</div>
+<button class="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-indigo-500 hover:text-white">
+<span class="material-symbols-outlined text-[20px]">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Song Card 2 -->
+<div class="bg-surface-container-lowest/50 backdrop-blur-sm rounded-xl border border-white/5 p-5 hover:border-indigo-500/30 hover:bg-white/5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.3)] transition-all duration-300 cursor-pointer group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-violet-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<h4 class="font-['Manrope'] text-[16px] font-bold text-slate-200 mb-5 group-hover:text-violet-300 transition-colors">Oceans (Where Feet May Fail)</h4>
+<div class="flex justify-between items-end">
+<div class="flex flex-col gap-2">
+<span class="font-label-sm text-[11px] font-bold text-slate-300 bg-white/10 px-2.5 py-1 rounded-md w-fit border border-white/5">Key: D</span>
+<span class="font-label-sm text-[11px] font-bold text-slate-400 bg-black/20 px-2.5 py-1 rounded-md w-fit">65 BPM</span>
+</div>
+<button class="w-10 h-10 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-violet-500 hover:text-white">
+<span class="material-symbols-outlined text-[20px]">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Song Card 3 -->
+<div class="bg-surface-container-lowest/50 backdrop-blur-sm rounded-xl border border-white/5 p-5 hover:border-indigo-500/30 hover:bg-white/5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.3)] transition-all duration-300 cursor-pointer group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<h4 class="font-['Manrope'] text-[16px] font-bold text-slate-200 mb-5 group-hover:text-indigo-300 transition-colors">Build My Life</h4>
+<div class="flex justify-between items-end">
+<div class="flex flex-col gap-2">
+<span class="font-label-sm text-[11px] font-bold text-slate-300 bg-white/10 px-2.5 py-1 rounded-md w-fit border border-white/5">Key: G</span>
+<span class="font-label-sm text-[11px] font-bold text-slate-400 bg-black/20 px-2.5 py-1 rounded-md w-fit">70 BPM</span>
+</div>
+<button class="w-10 h-10 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-indigo-500 hover:text-white">
+<span class="material-symbols-outlined text-[20px]">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Song Card 4 -->
+<div class="bg-surface-container-lowest/50 backdrop-blur-sm rounded-xl border border-white/5 p-5 hover:border-indigo-500/30 hover:bg-white/5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.3)] transition-all duration-300 cursor-pointer group relative overflow-hidden">
+<div class="absolute top-0 left-0 w-1 h-full bg-violet-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<h4 class="font-['Manrope'] text-[16px] font-bold text-slate-200 mb-5 group-hover:text-violet-300 transition-colors">Goodness of God</h4>
+<div class="flex justify-between items-end">
+<div class="flex flex-col gap-2">
+<span class="font-label-sm text-[11px] font-bold text-slate-300 bg-white/10 px-2.5 py-1 rounded-md w-fit border border-white/5">Key: Ab</span>
+<span class="font-label-sm text-[11px] font-bold text-slate-400 bg-black/20 px-2.5 py-1 rounded-md w-fit">63 BPM</span>
+</div>
+<button class="w-10 h-10 rounded-full bg-violet-500/20 text-violet-400 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-violet-500 hover:text-white">
+<span class="material-symbols-outlined text-[20px]">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+</div>
+<!-- BottomNavBar (Mobile) -->
+<nav class="fixed bottom-0 w-full z-50 border-t border-white/10 bg-slate-950/90 backdrop-blur-xl md:hidden flex justify-around items-center px-4 pb-safe h-16 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+<a class="flex flex-col items-center justify-center text-slate-400 hover:text-indigo-300 font-['Manrope'] text-[10px] font-bold uppercase tracking-wider w-full h-full active:bg-white/5 transition-colors tap-highlight-transparent" href="#">
+<span class="material-symbols-outlined mb-1 text-[22px]" data-icon="dashboard">dashboard</span>
+            Accueil
+        </a>
+<a class="flex flex-col items-center justify-center text-indigo-400 font-bold font-['Manrope'] text-[10px] uppercase tracking-wider w-full h-full relative tap-highlight-transparent" href="#">
+<div class="absolute top-0 w-8 h-1 bg-indigo-500 rounded-b-full"></div>
+<span class="material-symbols-outlined mb-1 text-[22px]" data-icon="event_note" style="font-variation-settings: 'FILL' 1;">event_note</span>
+            Plans
+        </a>
+<a class="flex flex-col items-center justify-center text-slate-400 hover:text-indigo-300 font-['Manrope'] text-[10px] font-bold uppercase tracking-wider w-full h-full active:bg-white/5 transition-colors tap-highlight-transparent" href="#">
+<span class="material-symbols-outlined mb-1 text-[22px]" data-icon="library_music">library_music</span>
+            Chants
+        </a>
+<a class="flex flex-col items-center justify-center text-slate-400 hover:text-indigo-300 font-['Manrope'] text-[10px] font-bold uppercase tracking-wider w-full h-full active:bg-white/5 transition-colors tap-highlight-transparent" href="#">
+<span class="material-symbols-outlined mb-1 text-[22px]" data-icon="more_horiz">more_horiz</span>
+            Plus
+        </a>
+</nav>
+<style>
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+</style>
+</body></html>

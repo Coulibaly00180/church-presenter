@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { Clipboard, ClipboardList, Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { usePlan } from "@/hooks/usePlan";
 import { useLive } from "@/hooks/useLive";
@@ -32,7 +33,21 @@ import { isPlanKindMedia } from "@/lib/planKinds";
 
 const restrictToVerticalAxis: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
-export function PlanEditor() {
+interface QuickStartConfig {
+  visible: boolean;
+  importing: boolean;
+  onDismiss: () => void;
+  onCreateSong: () => void;
+  onImportData: () => void;
+}
+
+interface PlanEditorProps {
+  quickStart?: QuickStartConfig;
+  onInspectItem?: (itemId: string) => void;
+  inspectedItemId?: string | null;
+}
+
+export function PlanEditor({ quickStart, onInspectItem, inspectedItemId }: PlanEditorProps) {
   const { plan, reorder, loadingPlan, addItem, removeItems } = usePlan();
   const { live } = useLive();
   const [activeItem, setActiveItem] = useState<CpPlanItem | null>(null);
@@ -45,6 +60,7 @@ export function PlanEditor() {
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [clipboard, setClipboard] = useState<CpPlanItem | null>(null);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
 
   const handleCopyItem = useCallback((item: CpPlanItem) => {
     setClipboard(item);
@@ -65,14 +81,12 @@ export function PlanEditor() {
     });
   }, [clipboard, addItem]);
 
-  // Ctrl+V → paste
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "v" && clipboard) {
-        // Don't intercept when typing in inputs/textareas
-        const tag = (e.target as HTMLElement).tagName;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "v" && clipboard) {
+        const tag = (event.target as HTMLElement).tagName;
         if (tag === "INPUT" || tag === "TEXTAREA") return;
-        e.preventDefault();
+        event.preventDefault();
         void handlePaste();
       }
     };
@@ -100,7 +114,7 @@ export function PlanEditor() {
   );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const item = plan?.items.find((i) => i.id === event.active.id);
+    const item = plan?.items.find((candidate) => candidate.id === event.active.id);
     setActiveItem(item ?? null);
   }, [plan]);
 
@@ -123,6 +137,10 @@ export function PlanEditor() {
   }, [plan, reorder]);
 
   const handleEdit = useCallback((item: CpPlanItem) => {
+    if (onInspectItem) {
+      onInspectItem(item.id);
+      return;
+    }
     if (item.kind === "SONG_BLOCK" && item.refId) {
       setEditSongId(item.refId);
       setSongEditorOpen(true);
@@ -134,12 +152,16 @@ export function PlanEditor() {
       setEditItem(item);
       setEditItemOpen(true);
     }
-  }, []);
+  }, [onInspectItem]);
 
   const handleEditBackground = useCallback((item: CpPlanItem) => {
+    if (onInspectItem) {
+      onInspectItem(item.id);
+      return;
+    }
     setEditItem(item);
     setEditItemOpen(true);
-  }, []);
+  }, [onInspectItem]);
 
   const handleSelectKind = useCallback(async (kind: CpPlanItemKind) => {
     if (kind === "SONG_BLOCK") {
@@ -158,7 +180,13 @@ export function PlanEditor() {
   if (!plan) {
     return (
       <>
-        <Dashboard />
+        <Dashboard
+          showQuickStart={quickStart?.visible}
+          importingData={quickStart?.importing}
+          onDismissQuickStart={quickStart?.onDismiss}
+          onCreateSong={quickStart?.onCreateSong}
+          onImportData={quickStart?.onImportData}
+        />
         <AddItemDialog
           open={addDialogOpen}
           onClose={() => setAddDialogOpen(false)}
@@ -169,8 +197,9 @@ export function PlanEditor() {
   }
 
   const currentCursor = live?.enabled && live.planId === plan.id ? live.cursor : -1;
+  const liveItem = currentCursor >= 0 ? plan.items[currentCursor] : null;
 
-  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
   const filteredItems = normalizedQuery
     ? plan.items.filter((item) => {
         const title = item.title?.toLowerCase() ?? "";
@@ -183,41 +212,57 @@ export function PlanEditor() {
     <div className="flex flex-1 flex-col overflow-hidden">
       <PlanToolbar onAddItem={() => setAddDialogOpen(true)} onPreview={() => setPreviewOpen(true)} />
 
-      {/* Search bar */}
       {plan.items.length > 0 && (
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-bg-surface shrink-0">
-          <Search className="h-3.5 w-3.5 text-text-muted shrink-0" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Rechercher dans le plan…"
-            className="flex-1 text-xs bg-transparent outline-none text-text-primary placeholder:text-text-muted"
-            aria-label="Rechercher dans le plan"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery("")}
-              className="text-text-muted hover:text-text-primary"
-              aria-label="Effacer la recherche"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+        <div className="flex items-center gap-3 border-b border-border bg-bg-surface px-4 py-3 shrink-0">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Rechercher dans le plan…"
+              className="h-9 bg-bg-base/70 pl-9 pr-9 text-sm"
+              aria-label="Rechercher dans le plan"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted transition-colors hover:text-text-primary"
+                aria-label="Effacer la recherche"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {normalizedQuery && (
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="rounded-full border border-border bg-bg-elevated px-2.5 py-1 text-xs font-medium text-text-secondary">
+                {filteredItems.length} résultat{filteredItems.length > 1 ? "s" : ""}
+              </span>
+              <Button
+                variant="ghost"
+                size="xs"
+                className="rounded-lg text-text-secondary"
+                onClick={() => setSearchQuery("")}
+              >
+                Effacer
+              </Button>
+            </div>
           )}
         </div>
       )}
 
       {loadingPlan ? (
         <div className="flex flex-1 items-center justify-center">
-          <div className="text-sm text-text-muted animate-pulse">Chargement…</div>
+          <div className="animate-pulse text-sm text-text-muted">Chargement…</div>
         </div>
       ) : plan.items.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-text-muted px-8 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center text-text-muted">
           <ClipboardList className="h-14 w-14 opacity-20" />
           <div className="space-y-1.5">
             <p className="text-sm font-medium text-text-secondary">Plan vide</p>
-            <p className="text-xs leading-relaxed">
+            <p className="text-sm leading-relaxed">
               Ajoute du contenu depuis le panneau de gauche : chants, versets bibliques,
               annonces, médias ou minuterie.
             </p>
@@ -236,10 +281,19 @@ export function PlanEditor() {
         <>
           <ScrollArea className="flex-1">
             {normalizedQuery ? (
-              // Search mode: plain list, no DnD
               <div className="flex flex-col gap-1 p-3">
                 {filteredItems.length === 0 ? (
-                  <p className="text-xs text-text-muted text-center py-6">Aucun résultat pour « {searchQuery} »</p>
+                  <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                    <p className="text-sm font-medium text-text-secondary">
+                      Aucun résultat pour « {searchQuery} »
+                    </p>
+                    <p className="max-w-xs text-sm leading-relaxed text-text-muted">
+                      Essayez un autre mot-clé ou effacez le filtre pour retrouver tout le plan.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => setSearchQuery("")}>
+                      Effacer la recherche
+                    </Button>
+                  </div>
                 ) : (
                   filteredItems.map((item) => {
                     const originalIndex = plan.items.indexOf(item);
@@ -250,6 +304,7 @@ export function PlanEditor() {
                         index={originalIndex}
                         isCurrentLive={originalIndex === currentCursor}
                         isSelected={selectedItemIds.has(item.id)}
+                        isInspectorActive={inspectedItemId === item.id}
                         onEdit={handleEdit}
                         onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
                         onCopy={handleCopyItem}
@@ -265,10 +320,10 @@ export function PlanEditor() {
                 collisionDetection={closestCenter}
                 modifiers={[restrictToVerticalAxis]}
                 onDragStart={handleDragStart}
-                onDragEnd={(e) => void handleDragEnd(e)}
+                onDragEnd={(event) => void handleDragEnd(event)}
               >
                 <SortableContext
-                  items={plan.items.map((i) => i.id)}
+                  items={plan.items.map((item) => item.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="flex flex-col gap-1 p-3">
@@ -279,6 +334,7 @@ export function PlanEditor() {
                         index={index}
                         isCurrentLive={index === currentCursor}
                         isSelected={selectedItemIds.has(item.id)}
+                        isInspectorActive={inspectedItemId === item.id}
                         onEdit={handleEdit}
                         onEditBackground={item.kind === "SONG_BLOCK" ? handleEditBackground : undefined}
                         onCopy={handleCopyItem}
@@ -295,12 +351,16 @@ export function PlanEditor() {
             )}
           </ScrollArea>
 
-          {/* Footer — selection mode or normal */}
           {selectedItemIds.size > 0 ? (
-            <div className="flex items-center justify-between px-4 py-2 border-t border-danger/30 bg-danger/5 shrink-0">
-              <span className="text-xs text-danger font-medium">
-                {selectedItemIds.size} élément{selectedItemIds.size > 1 ? "s" : ""} sélectionné{selectedItemIds.size > 1 ? "s" : ""}
-              </span>
+            <div className="flex items-center justify-between border-t border-danger/30 bg-danger/5 px-4 py-2 shrink-0">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-danger">
+                  Sélection multiple
+                </p>
+                <p className="text-sm font-medium text-danger">
+                  {selectedItemIds.size} élément{selectedItemIds.size > 1 ? "s" : ""} sélectionné{selectedItemIds.size > 1 ? "s" : ""}
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -322,13 +382,23 @@ export function PlanEditor() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between px-4 py-2 border-t border-border bg-bg-surface shrink-0">
-              <span className="text-xs text-text-muted">
-                {plan.items.length} élément{plan.items.length !== 1 ? "s" : ""}
-              </span>
-              <div className="flex items-center gap-1">
+            <div className="flex items-center justify-between border-t border-border bg-bg-surface px-4 py-2 shrink-0">
+              <div className="min-w-0">
+                <p className="text-xs text-text-muted">
+                  {plan.items.length} élément{plan.items.length !== 1 ? "s" : ""}
+                </p>
+                {liveItem && (
+                  <p className="truncate text-xs text-primary">
+                    En direct: {liveItem.title?.trim() || "Élément actif"}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
                 {clipboard && (
-                  <>
+                  <div className="flex items-center gap-2 rounded-full border border-border bg-bg-elevated px-2 py-1">
+                    <span className="max-w-[160px] truncate text-xs text-text-secondary">
+                      Presse-papiers: {clipboard.title ?? "Élément copié"}
+                    </span>
                     <Button
                       variant="ghost"
                       size="xs"
@@ -341,14 +411,13 @@ export function PlanEditor() {
                     </Button>
                     <button
                       type="button"
-                      className="text-text-muted hover:text-text-primary transition-colors"
+                      className="text-text-muted transition-colors hover:text-text-primary"
                       onClick={() => setClipboard(null)}
                       aria-label="Effacer le presse-papier"
                     >
                       <X className="h-3 w-3" />
                     </button>
-                    <span className="text-border text-xs mx-0.5">|</span>
-                  </>
+                  </div>
                 )}
                 <Button
                   variant="ghost"

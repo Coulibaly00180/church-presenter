@@ -1,0 +1,26 @@
+# Context : racine du monorepo (docker compose -f docker-compose.local.yml up)
+FROM node:22-alpine
+WORKDIR /workspace
+
+RUN apk add --no-cache openssl
+
+# Lockfile racine + manifests workspace
+COPY package.json package-lock.json ./
+COPY apps/web/package.json ./apps/web/
+
+# Install dépendances workspace web (inclut devDependencies pour next dev)
+RUN npm ci --workspace=apps/web --ignore-scripts
+
+# Copie des sources dans apps/web/ — les volumes montent par-dessus en dev
+COPY apps/web/prisma ./apps/web/prisma/
+COPY apps/web/src ./apps/web/src/
+COPY apps/web/next.config.ts apps/web/tsconfig.json apps/web/postcss.config.mjs ./apps/web/
+
+# Génération du client Prisma (depuis apps/web pour que le chemin output soit correct)
+RUN cd apps/web && npx prisma generate
+
+WORKDIR /workspace/apps/web
+
+EXPOSE 3000
+
+CMD ["../../node_modules/.bin/next", "dev", "--turbopack", "--hostname", "0.0.0.0"]

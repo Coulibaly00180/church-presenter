@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLive } from "@/hooks/useLive";
 import { usePlan } from "@/hooks/usePlan";
+import type { BibleInspectorPreview } from "@/lib/workspaceInspector";
 import { parseReference } from "@/bible/parseRef";
 import {
   getLSG1910Chapter,
@@ -25,6 +26,7 @@ import {
 } from "@/bible/lookupLSG1910";
 import { searchVerses, listTranslations, getChapter, type BollsVerse } from "@/bible/bollsApi";
 import { projectPlanItemToTarget } from "@/lib/projection";
+import { ensureReadyForFreeProjection } from "@/lib/liveProjection";
 import { projectTextToScreen } from "@/projection/target";
 import type { PlanItem } from "@/lib/types";
 
@@ -52,7 +54,11 @@ async function loadChapter(translation: string, bookId: number, chapter: number)
   return vs.map((v) => ({ bookId: String(bookId), bookName: "", chapter, verse: v.verse, text: v.text }));
 }
 
-export function BibleTab() {
+interface BibleTabProps {
+  onInspectPreview?: (preview: BibleInspectorPreview | null) => void;
+}
+
+export function BibleTab({ onInspectPreview }: BibleTabProps) {
   const { live } = useLive();
   const { addItem } = usePlan();
 
@@ -101,6 +107,7 @@ export function BibleTab() {
   const [searchTotal, setSearchTotal] = useState(0);
   const [searching, setSearching] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [selectedSearchResultPk, setSelectedSearchResultPk] = useState<number | null>(null);
 
   // Load book catalog + available translations
   useEffect(() => {
@@ -211,6 +218,76 @@ export function BibleTab() {
     return `${selectedBook.name} ${selectedChapter}:${suffix}`;
   }, [selectedBook, selectedChapter, selectedVerses]);
 
+  const getBookName = useCallback((bookId: number) => {
+    return books.find((book) => book.bookid === bookId)?.name ?? `Livre ${bookId}`;
+  }, [books]);
+
+  const getTranslationLabel = useCallback((shortName: string) => {
+    for (const group of translations) {
+      const match = group.translations.find((entry) => entry.short_name === shortName);
+      if (match) return match.full_name;
+    }
+    return shortName;
+  }, [translations]);
+
+  const buildSelectionPreview = useCallback((): BibleInspectorPreview | null => {
+    if (!selectedBook || !selectedChapter || selectedVerses.size === 0) return null;
+
+    const sorted = [...selectedVerses].sort((a, b) => a - b);
+    return {
+      id: `browse:${translation}:${selectedBook.bookid}:${selectedChapter}:${sorted.join(",")}`,
+      title: buildVerseTitle(),
+      subtitle: `${getTranslationLabel(translation)} · ${projMode === "verse" && sorted.length === 1 ? "Verset" : "Passage"}`,
+      content: buildVerseContent(),
+      itemKind: projMode === "verse" && sorted.length === 1 ? "BIBLE_VERSE" : "BIBLE_PASSAGE",
+      translation: getTranslationLabel(translation),
+    };
+  }, [
+    buildVerseContent,
+    buildVerseTitle,
+    getTranslationLabel,
+    projMode,
+    selectedBook,
+    selectedChapter,
+    selectedVerses,
+    translation,
+  ]);
+
+  useEffect(() => {
+    if (!onInspectPreview) return;
+
+    if (mode === "browse") {
+      onInspectPreview(buildSelectionPreview());
+      return;
+    }
+
+    if (mode === "search" && selectedSearchResultPk !== null) {
+      const match = searchResults.find((result) => result.pk === selectedSearchResultPk);
+      if (match) {
+        onInspectPreview({
+          id: `search:${translation}:${match.pk}`,
+          title: `${getBookName(match.book)} ${match.chapter}:${match.verse}`,
+          subtitle: `${getTranslationLabel(translation)} · Resultat`,
+          content: `${match.verse}. ${match.text}`,
+          itemKind: "BIBLE_VERSE",
+          translation: getTranslationLabel(translation),
+        });
+        return;
+      }
+    }
+
+    onInspectPreview(null);
+  }, [
+    buildSelectionPreview,
+    getBookName,
+    getTranslationLabel,
+    mode,
+    onInspectPreview,
+    searchResults,
+    selectedSearchResultPk,
+    translation,
+  ]);
+
   // ── Projection helpers ────────────────────────────────────────────────────────
 
   /** Project a single verse immediately.
@@ -218,7 +295,7 @@ export function BibleTab() {
    * closures when rapid keypresses fire before React re-renders after a live state update.
    */
   const handleProjectSingle = useCallback(async (verse: OfflineVerse) => {
-    const currentLive = liveRef.current;
+    const currentLive = await ensureReadyForFreeProjection(liveRef.current);
     const currentBook = selectedBookRef.current;
     const currentChapter = selectedChapterRef.current;
     const currentTranslation = translationRef.current;
@@ -428,6 +505,8 @@ export function BibleTab() {
 
   const handleProject = useCallback(async () => {
     if (!live?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
+    const currentLive = await ensureReadyForFreeProjection(liveRef.current);
+    if (!currentLive?.enabled) return;
 
     if (projMode === "verse") {
       // Project the first selected verse and activate keyboard cursor
@@ -459,23 +538,20 @@ export function BibleTab() {
         }).filter((x): x is { label: string; body: string } => x !== null);
       }
       await projectTextToScreen({
-        target: live.target,
+        target: currentLive.target,
         title: buildVerseTitle(),
         body: content,
         secondaryTexts,
-        lockedScreens: live.lockedScreens,
+        lockedScreens: currentLive.lockedScreens,
       });
     }
   }, [live, projMode, selectedVerses, verses, selectedBook, selectedChapter, comparisonTranslations, buildVerseContent, buildVerseTitle, handleProjectSingle]);
 
   // ── Search handlers ───────────────────────────────────────────────────────────
 
-  const getBookName = useCallback((bookId: number) => {
-    return books.find((b) => b.bookid === bookId)?.name ?? `Livre ${bookId}`;
-  }, [books]);
-
   const handleSearchInput = useCallback((query: string) => {
     setSearchQuery(query);
+    setSelectedSearchResultPk(null);
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     if (!query.trim()) {
       setSearchResults([]);
@@ -502,6 +578,7 @@ export function BibleTab() {
     setTranslation(t);
     setSearchResults([]);
     setSearchTotal(0);
+    setSelectedSearchResultPk(null);
     if (searchQuery.trim()) {
       setSearching(true);
       void searchVerses(t, searchQuery, { limit: 25 })
@@ -529,7 +606,7 @@ export function BibleTab() {
   }, [addItem, getBookName, translation]);
 
   const handleProjectVerse = useCallback(async (verse: BollsVerse) => {
-    const currentLive = liveRef.current;
+    const currentLive = await ensureReadyForFreeProjection(liveRef.current);
     if (!currentLive?.enabled) { toast.error("Activez Mode Direct ou Mode Libre pour projeter"); return; }
     const bookName = getBookName(verse.book);
     const fakeItem: PlanItem = {
@@ -553,25 +630,34 @@ export function BibleTab() {
         <div className="flex gap-1">
           <Button
             variant={mode === "browse" ? "default" : "ghost"}
-            size="xs"
-            className="flex-1 gap-1"
-            onClick={() => setMode("browse")}
+            size="sm"
+            className="flex-1 gap-1.5"
+            onClick={() => {
+              setMode("browse");
+              setSelectedSearchResultPk(null);
+            }}
           >
             <BookOpen className="h-3.5 w-3.5" />
-            Parcourir
+            Rapide
           </Button>
           <Button
             variant={mode === "search" ? "default" : "ghost"}
-            size="xs"
-            className="flex-1 gap-1"
+            size="sm"
+            className="flex-1 gap-1.5"
             onClick={() => setMode("search")}
           >
             <Search className="h-3.5 w-3.5" />
-            Rechercher
+            Avance
           </Button>
         </div>
 
         {/* Translation selector — always visible, grouped by language */}
+        <p className="text-xs leading-relaxed text-text-muted">
+          {mode === "browse"
+            ? "Reference rapide, parcours du texte et ajout direct au plan."
+            : "Recherche globale, traductions comparees et options bibliques avancees."}
+        </p>
+
         <Select value={translation} onValueChange={handleTranslationChange}>
           <SelectTrigger className="h-8 text-xs">
             <SelectValue placeholder="Traduction…" />
@@ -579,7 +665,7 @@ export function BibleTab() {
           <SelectContent className="max-h-64">
             {translations.map((group) => (
               <SelectGroup key={group.language}>
-                <SelectLabel className="text-[10px] text-text-muted uppercase tracking-wide py-1">
+                <SelectLabel className="text-xs text-text-muted uppercase tracking-wide py-1">
                   {group.language}
                 </SelectLabel>
                 {group.translations.map((t) => (
@@ -593,54 +679,62 @@ export function BibleTab() {
         </Select>
 
         {/* Comparison translations panel */}
-        <div className="flex flex-wrap items-center gap-1">
-          {comparisonTranslations.map((t) => (
-            <span
-              key={t}
-              className="flex items-center gap-0.5 text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded-full"
-            >
-              {t}
-              <button
-                type="button"
-                className="hover:text-accent/60"
-                onClick={() => setComparisonTranslations((prev) => prev.filter((x) => x !== t))}
-                aria-label={`Retirer ${t}`}
-              >
-                <X className="h-2.5 w-2.5" />
-              </button>
-            </span>
-          ))}
-          {comparisonTranslations.length < 3 && (
-            <Select
-              value=""
-              onValueChange={(v) => {
-                if (v && !comparisonTranslations.includes(v) && v !== translation)
-                  setComparisonTranslations((prev) => [...prev, v]);
-              }}
-            >
-              <SelectTrigger className="h-6 text-[10px] w-auto px-2 border-dashed gap-1">
-                <Plus className="h-2.5 w-2.5" />
-                Comparer
-              </SelectTrigger>
-              <SelectContent className="max-h-64">
-                {translations.map((group) => (
-                  <SelectGroup key={group.language}>
-                    <SelectLabel className="text-[10px] text-text-muted uppercase tracking-wide py-1">
-                      {group.language}
-                    </SelectLabel>
-                    {group.translations
-                      .filter((t) => t.short_name !== translation && !comparisonTranslations.includes(t.short_name))
-                      .map((t) => (
-                        <SelectItem key={t.short_name} value={t.short_name} className="text-xs">
-                          {t.full_name}
-                        </SelectItem>
-                      ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
+        {mode === "search" && (
+          <div className="space-y-1.5 rounded-xl border border-border bg-bg-elevated/30 px-3 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-muted">
+              Comparaisons
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {comparisonTranslations.map((entry) => (
+                <span
+                  key={entry}
+                  className="flex items-center gap-1 rounded-full bg-accent/20 px-2 py-1 text-xs text-accent"
+                >
+                  {entry}
+                  <button
+                    type="button"
+                    className="transition-colors hover:text-accent/60"
+                    onClick={() => setComparisonTranslations((prev) => prev.filter((value) => value !== entry))}
+                    aria-label={`Retirer ${entry}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
+              {comparisonTranslations.length < 3 && (
+                <Select
+                  value=""
+                  onValueChange={(value) => {
+                    if (value && !comparisonTranslations.includes(value) && value !== translation) {
+                      setComparisonTranslations((prev) => [...prev, value]);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-auto gap-1 border-dashed px-2 text-xs">
+                    <Plus className="h-3 w-3" />
+                    Comparer
+                  </SelectTrigger>
+                  <SelectContent className="max-h-64">
+                    {translations.map((group) => (
+                      <SelectGroup key={group.language}>
+                        <SelectLabel className="text-xs text-text-muted uppercase tracking-wide py-1">
+                          {group.language}
+                        </SelectLabel>
+                        {group.translations
+                          .filter((entry) => entry.short_name !== translation && !comparisonTranslations.includes(entry.short_name))
+                          .map((entry) => (
+                            <SelectItem key={entry.short_name} value={entry.short_name} className="text-xs">
+                              {entry.full_name}
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Content area */}
@@ -712,7 +806,7 @@ export function BibleTab() {
               />
             </div>
             {searchTotal > 0 && (
-              <p className="text-[10px] text-text-muted mt-1">
+              <p className="mt-1 text-xs text-text-muted">
                 {searchTotal} résultat{searchTotal > 1 ? "s" : ""}
                 {searchTotal > 25 ? " (25 affichés)" : ""}
               </p>
@@ -724,13 +818,15 @@ export function BibleTab() {
               <Loader2 className="h-5 w-5 animate-spin text-text-muted" />
             </div>
           ) : searchResults.length > 0 ? (
-            <SearchResultsView
-              results={searchResults}
-              getBookName={getBookName}
-              onAdd={(v) => void handleAddVerse(v)}
-              onProject={(v) => void handleProjectVerse(v)}
-              live={isLive}
-            />
+             <SearchResultsView
+               results={searchResults}
+               getBookName={getBookName}
+               onAdd={(v) => void handleAddVerse(v)}
+               onProject={(v) => void handleProjectVerse(v)}
+               onInspect={(v) => setSelectedSearchResultPk(v.pk)}
+               selectedResultPk={selectedSearchResultPk}
+               live={isLive}
+             />
           ) : searchQuery.trim() && !searching ? (
             <div className="flex flex-1 items-center justify-center">
               <p className="text-sm text-text-muted">Aucun résultat</p>
@@ -859,7 +955,7 @@ function VersesView({
           <button
             type="button"
             className={cn(
-              "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors",
+              "px-2 py-0.5 rounded text-xs font-semibold transition-colors",
               projMode === "verse"
                 ? "bg-primary/10 text-primary"
                 : "text-text-muted hover:bg-bg-elevated"
@@ -872,7 +968,7 @@ function VersesView({
           <button
             type="button"
             className={cn(
-              "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors",
+              "px-2 py-0.5 rounded text-xs font-semibold transition-colors",
               projMode === "passage"
                 ? "bg-primary/10 text-primary"
                 : "text-text-muted hover:bg-bg-elevated"
@@ -916,7 +1012,7 @@ function VersesView({
                   {verse.text}
                 </span>
                 {isCursor && (
-                  <span className="ml-auto shrink-0 text-[9px] font-bold text-primary mt-0.5">
+                  <span className="ml-auto mt-0.5 shrink-0 text-xs font-bold text-primary">
                     ▶
                   </span>
                 )}
@@ -930,7 +1026,7 @@ function VersesView({
       <div className="flex flex-col gap-1.5 px-3 py-2 border-t border-border shrink-0">
         {/* Keyboard nav hint — verse mode */}
         {projMode === "verse" && (
-          <p className="flex items-center justify-center gap-1 text-[10px] text-text-muted">
+          <p className="flex items-center justify-center gap-1 text-xs text-text-muted">
             <Keyboard className="h-3 w-3 opacity-50" />
             {isLive ? "← → pour naviguer · clic pour projeter" : "← → pour naviguer · Projeter pour commencer"}
           </p>
@@ -954,7 +1050,7 @@ function VersesView({
             Ajouter tout le chapitre au plan
           </Button>
         ) : (
-          <p className="text-[10px] text-text-muted text-center">Sélectionnez des versets</p>
+          <p className="text-center text-xs text-text-muted">Sélectionnez des versets</p>
         )}
       </div>
     </div>
@@ -968,12 +1064,16 @@ function SearchResultsView({
   getBookName,
   onAdd,
   onProject,
+  onInspect,
+  selectedResultPk,
   live,
 }: {
   results: BollsVerse[];
   getBookName: (id: number) => string;
   onAdd: (v: BollsVerse) => void;
   onProject: (v: BollsVerse) => void;
+  onInspect: (v: BollsVerse) => void;
+  selectedResultPk: number | null;
   live: boolean;
 }) {
   return (
@@ -982,10 +1082,22 @@ function SearchResultsView({
         {results.map((verse) => {
           const ref = `${getBookName(verse.book)} ${verse.chapter}:${verse.verse}`;
           return (
-            <div key={verse.pk} className="px-3 py-2 group">
-              <p className="text-xs font-medium text-text-secondary mb-0.5">{ref}</p>
-              <p className="text-sm text-text-primary leading-relaxed">{verse.text}</p>
-              <div className="flex gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div
+              key={verse.pk}
+              className={cn(
+                "px-3 py-2 transition-colors",
+                selectedResultPk === verse.pk && "bg-primary/8"
+              )}
+            >
+              <button
+                type="button"
+                className="w-full text-left"
+                onClick={() => onInspect(verse)}
+              >
+                <p className="mb-0.5 text-xs font-medium text-text-secondary">{ref}</p>
+                <p className="text-sm leading-relaxed text-text-primary">{verse.text}</p>
+              </button>
+              <div className="mt-1.5 flex gap-1.5">
                 <Button
                   variant="outline"
                   size="xs"

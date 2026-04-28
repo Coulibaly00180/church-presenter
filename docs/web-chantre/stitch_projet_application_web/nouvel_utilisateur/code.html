@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>WorshipFlow - Create User</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-fixed": "#00201c",
+                        "surface-container-lowest": "#060e20",
+                        "on-primary": "#1000a9",
+                        "error-container": "#93000a",
+                        "surface-container": "#171f33",
+                        "surface-container-low": "#131b2e",
+                        "inverse-primary": "#494bd6",
+                        "on-tertiary-fixed-variant": "#891933",
+                        "tertiary": "#ffb2b9",
+                        "inverse-on-surface": "#283044",
+                        "surface-dim": "#0b1326",
+                        "secondary": "#44e2cd",
+                        "primary-container": "#8083ff",
+                        "tertiary-fixed": "#ffdadc",
+                        "outline": "#908fa0",
+                        "error": "#ffb4ab",
+                        "background": "#0b1326",
+                        "on-primary-fixed": "#07006c",
+                        "secondary-fixed": "#62fae3",
+                        "on-secondary-container": "#004d44",
+                        "surface-bright": "#31394d",
+                        "on-primary-container": "#0d0096",
+                        "surface-container-high": "#222a3d",
+                        "primary-fixed-dim": "#c0c1ff",
+                        "secondary-fixed-dim": "#3cddc7",
+                        "on-primary-fixed-variant": "#2f2ebe",
+                        "surface-variant": "#2d3449",
+                        "inverse-surface": "#dae2fd",
+                        "on-tertiary-container": "#5b001a",
+                        "primary": "#c0c1ff",
+                        "on-secondary-fixed-variant": "#005047",
+                        "on-error": "#690005",
+                        "on-background": "#dae2fd",
+                        "surface-container-highest": "#2d3449",
+                        "on-tertiary": "#67001f",
+                        "on-secondary": "#003731",
+                        "surface-tint": "#c0c1ff",
+                        "outline-variant": "#464554",
+                        "on-surface": "#dae2fd",
+                        "tertiary-container": "#ea6479",
+                        "primary-fixed": "#e1e0ff",
+                        "on-tertiary-fixed": "#400010",
+                        "on-surface-variant": "#c7c4d7",
+                        "tertiary-fixed-dim": "#ffb2b9",
+                        "secondary-container": "#03c6b2",
+                        "on-error-container": "#ffdad6",
+                        "surface": "#0b1326"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "xl": "80px",
+                        "lg": "48px",
+                        "sm": "12px",
+                        "base": "8px",
+                        "xs": "4px",
+                        "md": "24px"
+                    },
+                    "fontFamily": {
+                        "label-caps": ["Manrope"],
+                        "body-lg": ["Manrope"],
+                        "headline-md": ["Manrope"],
+                        "display-xl": ["Manrope"],
+                        "body-md": ["Manrope"],
+                        "headline-lg": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "label-caps": ["12px", { "lineHeight": "1", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "700" }],
+                        "display-xl": ["48px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "-0.01em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(23, 31, 51, 0.4);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .glow-button {
+            transition: all 0.3s ease;
+        }
+        .glow-button:hover {
+            box-shadow: 0 0 20px rgba(128, 131, 255, 0.4);
+            transform: translateY(-2px);
+        }
+        .input-glow:focus-within {
+            border-color: #44e2cd;
+            box-shadow: 0 0 0 1px rgba(68, 226, 205, 0.2);
+        }
+        /* Custom Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #8083ff;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #8083ff;
+        }
+        .toggle-checkbox:checked + .toggle-label:after {
+            transform: translateX(100%);
+            border-color: white;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex antialiased">
+<!-- SideNavBar -->
+<nav class="hidden md:flex bg-slate-950/90 backdrop-blur-2xl font-manrope text-sm font-semibold h-screen w-64 border-r border-white/10 border-r border-white/5 shadow-2xl fixed left-0 top-0 h-full flex flex-col pt-20 z-40">
+<div class="px-6 pb-8">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-white" data-icon="church">church</span>
+</div>
+<div>
+<h1 class="text-xl font-bold text-white tracking-tight">WorshipFlow</h1>
+<p class="text-xs text-slate-400 font-medium mt-0.5">Lead with Spirit</p>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto py-4 flex flex-col gap-2 px-3">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-white/5 hover:translate-x-1 transition-all duration-300 hover:glow-sm group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-indigo-400 transition-colors" data-icon="dashboard">dashboard</span>
+<span>Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-white/5 hover:translate-x-1 transition-all duration-300 hover:glow-sm group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-indigo-400 transition-colors" data-icon="library_music">library_music</span>
+<span>Library</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-white/5 hover:translate-x-1 transition-all duration-300 hover:glow-sm group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-indigo-400 transition-colors" data-icon="event_note">event_note</span>
+<span>Plans</span>
+</a>
+<!-- Active State: Users -->
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-r from-violet-600/20 to-indigo-600/20 text-indigo-300 border-r-2 border-indigo-500 hover:translate-x-1 transition-all duration-300 hover:glow-sm relative" href="#">
+<span class="material-symbols-outlined text-lg text-indigo-400" data-icon="group">group</span>
+<span class="font-bold">Users</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-white/5 hover:translate-x-1 transition-all duration-300 hover:glow-sm group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-indigo-400 transition-colors" data-icon="account_circle">account_circle</span>
+<span>Profile</span>
+</a>
+</div>
+<div class="p-4 mt-auto border-t border-white/5">
+<button class="w-full mb-4 bg-surface-container-high hover:bg-surface-bright text-primary border border-white/10 rounded-xl py-3 px-4 font-bold text-sm transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="admin_panel_settings">admin_panel_settings</span>
+                Admin Panel
+            </button>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-white/5 hover:translate-x-1 transition-all duration-300 group" href="#">
+<span class="material-symbols-outlined text-lg group-hover:text-rose-400 transition-colors" data-icon="logout">logout</span>
+<span class="group-hover:text-rose-400 transition-colors">Logout</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 md:ml-64 flex flex-col min-h-screen relative">
+<!-- TopNavBar (Mobile Only since Desktop has SideNav) -->
+<header class="md:hidden sticky top-0 z-50 flex items-center justify-between px-6 h-16 w-full bg-slate-950/80 backdrop-blur-xl font-manrope border-b border-white/10 border-b border-white/5 shadow-[0_4px_20px_rgba(99,102,241,0.1)]">
+<div class="flex items-center gap-3">
+<span class="text-2xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-violet-400 to-indigo-400">WorshipFlow</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-400 hover:text-slate-200 transition-colors hover:bg-white/5 transition-all duration-200 p-2 rounded-full active:scale-95 transition-transform">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<img alt="User profile" class="w-8 h-8 rounded-full border border-white/20" data-alt="Close up portrait of a smiling man with short hair and a slight beard, wearing a light blue collared shirt, against a blurred outdoor background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD-bNQLyjR5lUUwKA3C44sjaJ5u3jLSIN3HdcxwzlZk9XmJJMDATcVtyizCkvpDpOXuTqGCnB4vSzF2iM0Lmft6kyovJs5I5An6plQG55eJGwUXO3i-Fiz5DEaOMSfgD-fVPUks6Et0m9FYJhnU6ZsYwBnn5C8pKEQypDW0L1yVuUqy_YUvtMl_36Fu4ahBKLsLZRQn4A-A6NNez3aCqaVCZIchU-BhESIOYRLcHjdcyIhFQIfcGCUYrUvXJyQ2j0UJR1S0isQLxfY"/>
+</div>
+</header>
+<div class="p-gutter lg:p-lg xl:p-xl max-w-container-max mx-auto w-full flex-1 flex flex-col justify-center items-center">
+<div class="w-full max-w-2xl">
+<!-- Header -->
+<div class="mb-lg">
+<h2 class="font-headline-lg text-headline-lg text-on-surface mb-2">Add New User</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">Provision a new account for your worship team members.</p>
+</div>
+<!-- Form Container -->
+<div class="glass-panel rounded-xl p-lg relative overflow-hidden">
+<!-- Ambient Glow Effect behind form -->
+<div class="absolute -top-24 -right-24 w-64 h-64 bg-primary-container/20 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-24 -left-24 w-64 h-64 bg-secondary/10 rounded-full blur-3xl pointer-events-none"></div>
+<form class="relative z-10 flex flex-col gap-lg">
+<!-- Personal Info Section -->
+<div class="flex flex-col gap-md">
+<h3 class="font-headline-md text-headline-md text-primary-fixed mb-sm flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="badge">badge</span>
+                                Identity
+                            </h3>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- Full Name -->
+<div class="flex flex-col gap-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase ml-1" for="fullName">Full Name</label>
+<div class="relative input-glow rounded-lg bg-surface-container-low border border-outline-variant transition-all overflow-hidden flex items-center">
+<span class="material-symbols-outlined text-outline ml-3" data-icon="person">person</span>
+<input class="w-full bg-transparent border-none text-on-surface font-body-md text-body-md focus:ring-0 placeholder:text-outline p-3" id="fullName" name="fullName" placeholder="e.g. David Psalmist" required="" type="text"/>
+</div>
+</div>
+<!-- Email -->
+<div class="flex flex-col gap-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant uppercase ml-1" for="email">Email Address</label>
+<div class="relative input-glow rounded-lg bg-surface-container-low border border-outline-variant transition-all overflow-hidden flex items-center">
+<span class="material-symbols-outlined text-outline ml-3" data-icon="mail">mail</span>
+<input class="w-full bg-transparent border-none text-on-surface font-body-md text-body-md focus:ring-0 placeholder:text-outline p-3" id="email" name="email" placeholder="david@church.org" required="" type="email"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-px w-full bg-outline-variant/30"></div>
+<!-- Role Section -->
+<div class="flex flex-col gap-md">
+<h3 class="font-headline-md text-headline-md text-primary-fixed mb-sm flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="shield_person">shield_person</span>
+                                Access Role
+                            </h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-sm">
+<!-- Role: Lecteur -->
+<label class="cursor-pointer relative">
+<input checked="" class="peer sr-only" name="role" type="radio" value="lecteur"/>
+<div class="glass-panel p-4 rounded-xl border border-outline-variant/50 hover:bg-surface-container-high transition-all peer-checked:border-secondary peer-checked:bg-secondary/10 peer-checked:shadow-[inset_0_0_0_1px_rgba(68,226,205,0.5)] flex flex-col items-center text-center gap-2 h-full">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-outline peer-checked:text-secondary mb-1 transition-colors">
+<span class="material-symbols-outlined" data-icon="menu_book">menu_book</span>
+</div>
+<span class="font-body-lg text-body-lg text-on-surface font-bold">Lecteur</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant normal-case font-normal leading-tight">View plans and attachments only.</span>
+</div>
+</label>
+<!-- Role: Chantre -->
+<label class="cursor-pointer relative">
+<input class="peer sr-only" name="role" type="radio" value="chantre"/>
+<div class="glass-panel p-4 rounded-xl border border-outline-variant/50 hover:bg-surface-container-high transition-all peer-checked:border-secondary peer-checked:bg-secondary/10 peer-checked:shadow-[inset_0_0_0_1px_rgba(68,226,205,0.5)] flex flex-col items-center text-center gap-2 h-full">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-outline peer-checked:text-secondary mb-1 transition-colors">
+<span class="material-symbols-outlined" data-icon="mic">mic</span>
+</div>
+<span class="font-body-lg text-body-lg text-on-surface font-bold">Chantre</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant normal-case font-normal leading-tight">Can suggest songs and manage library.</span>
+</div>
+</label>
+<!-- Role: Admin -->
+<label class="cursor-pointer relative">
+<input class="peer sr-only" name="role" type="radio" value="admin"/>
+<div class="glass-panel p-4 rounded-xl border border-outline-variant/50 hover:bg-surface-container-high transition-all peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:shadow-[inset_0_0_0_1px_rgba(192,193,255,0.5)] flex flex-col items-center text-center gap-2 h-full">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-outline peer-checked:text-primary mb-1 transition-colors">
+<span class="material-symbols-outlined" data-icon="manage_accounts">manage_accounts</span>
+</div>
+<span class="font-body-lg text-body-lg text-on-surface font-bold">Admin</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant normal-case font-normal leading-tight">Full access to create plans and manage users.</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Divider -->
+<div class="h-px w-full bg-outline-variant/30"></div>
+<!-- Security Section -->
+<div class="flex flex-col gap-md">
+<h3 class="font-headline-md text-headline-md text-primary-fixed mb-sm flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="lock">lock</span>
+                                Security
+                            </h3>
+<div class="flex items-center justify-between bg-surface-container-low p-4 rounded-lg border border-outline-variant/50">
+<div>
+<p class="font-body-lg text-body-lg text-on-surface font-bold">Generate Password Automatically</p>
+<p class="font-label-caps text-label-caps text-on-surface-variant normal-case font-normal mt-1">A secure password will be emailed to the user.</p>
+</div>
+<!-- Toggle Switch -->
+<div class="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
+<input checked="" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 top-0 left-0 transition-transform duration-300 border-surface-container-high" id="toggle" name="toggle" type="checkbox"/>
+<label class="toggle-label block overflow-hidden h-6 rounded-full bg-surface-container-highest cursor-pointer border border-outline-variant/30 transition-colors duration-300" for="toggle"></label>
+</div>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex items-center justify-end gap-4 mt-sm pt-md border-t border-white/5">
+<button class="font-body-md text-body-md font-bold text-on-surface-variant hover:text-on-surface px-6 py-3 rounded-lg transition-colors" type="button">
+                                Cancel
+                            </button>
+<button class="glow-button font-body-md text-body-md font-bold text-on-primary bg-gradient-to-r from-inverse-primary to-primary-container px-8 py-3 rounded-lg flex items-center gap-2" type="submit">
+                                Create User
+                                <span class="material-symbols-outlined text-sm" data-icon="person_add">person_add</span>
+</button>
+</div>
+</form>
+</div>
+</div>
+</div>
+</main>
+</body></html>
