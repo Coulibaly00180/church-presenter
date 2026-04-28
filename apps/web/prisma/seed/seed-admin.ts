@@ -4,35 +4,49 @@ import { hash } from "bcryptjs"
 const prisma = new PrismaClient()
 
 async function main() {
-  const email = process.env["ADMIN_EMAIL"]
-  const password = process.env["ADMIN_PASSWORD"]
+  const email     = process.env["ADMIN_EMAIL"]
+  const password  = process.env["ADMIN_PASSWORD"]
+  const firstName = process.env["ADMIN_FIRST_NAME"] ?? "Admin"
+  const lastName  = process.env["ADMIN_LAST_NAME"]  ?? ""
+  const username  = process.env["ADMIN_USERNAME"]   ?? "admin"
 
   if (!email || !password) {
-    throw new Error("ADMIN_EMAIL et ADMIN_PASSWORD sont requis")
+    console.error("Usage: ADMIN_EMAIL=... ADMIN_PASSWORD=... npx tsx prisma/seed/seed-admin.ts")
+    process.exit(1)
   }
 
-  const existing = await prisma.user.findUnique({ where: { email } })
-  if (existing) {
-    console.log(`Utilisateur ADMIN déjà existant : ${email}`)
+  const [byEmail, byUsername] = await Promise.all([
+    prisma.user.findUnique({ where: { email } }),
+    prisma.user.findUnique({ where: { username } }),
+  ])
+
+  if (byEmail) {
+    console.log(`Admin déjà existant : ${email}`)
     return
+  }
+  if (byUsername) {
+    console.error(`Le pseudo "${username}" est déjà pris. Définir ADMIN_USERNAME.`)
+    process.exit(1)
   }
 
   const passwordHash = await hash(password, 12)
+  const fullName = `${firstName} ${lastName}`.trim()
+
   const admin = await prisma.user.create({
     data: {
-      name: "Administrateur",
+      firstName,
+      lastName,
+      username,
+      name: fullName,
       email,
       passwordHash,
       role: "ADMIN",
     },
   })
 
-  console.log(`✓ Admin créé : ${admin.email} (id: ${admin.id})`)
+  console.log(`✓ Admin créé : ${admin.email} | pseudo : ${admin.username} | id : ${admin.id}`)
 }
 
 main()
-  .catch((e) => {
-    console.error(e)
-    process.exit(1)
-  })
+  .catch((e) => { console.error(e); process.exit(1) })
   .finally(() => prisma.$disconnect())

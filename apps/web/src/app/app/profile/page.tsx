@@ -9,7 +9,7 @@ export default async function ProfilePage() {
 
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, role: true, createdAt: true, lastLoginAt: true },
+    select: { id: true, firstName: true, lastName: true, username: true, name: true, email: true, role: true, createdAt: true, lastLoginAt: true },
   })
 
   const [favCount, masteredCount] = await Promise.all([

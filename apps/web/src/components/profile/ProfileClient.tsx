@@ -6,6 +6,9 @@ import { Heart, TrendingUp, User } from "lucide-react"
 
 type ProfileUser = {
   id: string
+  firstName: string
+  lastName: string
+  username: string
   name: string
   email: string
   role: string
@@ -14,9 +17,10 @@ type ProfileUser = {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  ADMIN: "Administrateur",
-  CHANTRE: "Chantre",
-  LECTEUR: "Lecteur",
+  ADMIN:               "Administrateur",
+  RESPONSABLE_CHANTRE: "Responsable Chantre",
+  CHANTRE:             "Chantre",
+  LECTEUR:             "Lecteur",
 }
 
 export function ProfileClient({
@@ -28,13 +32,13 @@ export function ProfileClient({
   favCount: number
   masteredCount: number
 }) {
-  const [name, setName] = useState(user.name)
+  const [username, setUsername] = useState(user.username)
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [savingInfo, setSavingInfo] = useState(false)
   const [isPendingPwd, startSavingPwd] = useTransition()
 
-  const initials = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
+  const initials = `${user.firstName[0] ?? ""}${user.lastName[0] ?? ""}`.toUpperCase() || "?"
 
   async function saveInfo(e: React.FormEvent) {
     e.preventDefault()
@@ -43,10 +47,10 @@ export function ProfileClient({
       const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ username }),
       })
       const json = await res.json()
-      if (json.ok) toast.success("Profil mis à jour")
+      if (json.ok) toast.success("Pseudo mis à jour")
       else toast.error(json.error ?? "Erreur")
     } finally {
       setSavingInfo(false)
@@ -79,10 +83,10 @@ export function ProfileClient({
   return (
     <div className="page-container max-w-3xl">
       <p className="eyebrow">Mon Espace</p>
-      <h1 className="page-title mb-8">Profil Utilisateur</h1>
+      <h1 className="page-title mb-8">Profil</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left — avatar + stats */}
+        {/* Colonne gauche */}
         <div className="flex flex-col gap-4">
           <div className="card flex flex-col items-center text-center">
             <div
@@ -91,13 +95,14 @@ export function ProfileClient({
             >
               {initials}
             </div>
-            <p className="font-bold" style={{ color: "var(--color-primary)" }}>{name}</p>
+            <p className="font-bold" style={{ color: "var(--color-primary)" }}>{user.name}</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--color-on-surface-variant)" }}>@{user.username}</p>
             <p className="text-xs mt-0.5" style={{ color: "var(--color-on-surface-variant)" }}>{user.email}</p>
             <span
               className="mt-2 px-2.5 py-1 text-xs font-semibold rounded-full"
               style={{ background: "rgba(255,255,255,0.07)", color: "var(--color-on-surface-variant)" }}
             >
-              {ROLE_LABELS[user.role]}
+              {ROLE_LABELS[user.role] ?? user.role}
             </span>
           </div>
 
@@ -113,52 +118,50 @@ export function ProfileClient({
               <p className="text-xs" style={{ color: "var(--color-on-surface-variant)" }}>Maîtrisés</p>
             </div>
           </div>
-
-          <div className="card">
-            <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: "var(--color-on-surface-variant)" }}>
-              Paramètres
-            </p>
-            <div className="flex flex-col gap-3">
-              {[
-                { label: "Notifications push", desc: "Alertes de service" },
-                { label: "Répétitions fréquentes", desc: "Rappels répétition" },
-              ].map(({ label, desc }) => (
-                <div key={label} className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: "var(--color-on-surface)" }}>{label}</p>
-                    <p className="text-xs" style={{ color: "var(--color-on-surface-variant)" }}>{desc}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="w-9 h-5 rounded-full relative transition-colors"
-                    style={{ background: "var(--color-surface-high)" }}
-                    aria-label={label}
-                  >
-                    <span
-                      className="absolute left-0.5 top-0.5 w-4 h-4 rounded-full shadow-sm transition-transform"
-                      style={{ background: "var(--color-outline)" }}
-                    />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* Right — forms */}
+        {/* Colonne droite */}
         <div className="lg:col-span-2 flex flex-col gap-4">
           <form onSubmit={saveInfo} className="card">
             <h2 className="text-sm font-bold flex items-center gap-2 mb-4" style={{ color: "var(--color-primary)" }}>
               <User size={15} />
-              Informations personnelles
+              Informations
             </h2>
             <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="input-label">Prénom</label>
+                  <input
+                    value={user.firstName}
+                    disabled
+                    className="input"
+                    style={{ opacity: 0.5, cursor: "not-allowed" }}
+                  />
+                </div>
+                <div>
+                  <label className="input-label">Nom</label>
+                  <input
+                    value={user.lastName}
+                    disabled
+                    className="input"
+                    style={{ opacity: 0.5, cursor: "not-allowed" }}
+                  />
+                </div>
+              </div>
               <div>
-                <label className="input-label">Nom complet</label>
+                <label className="input-label">
+                  Pseudo
+                  <span className="ml-1.5 text-xs font-normal" style={{ color: "var(--color-on-surface-variant)" }}>
+                    — utilisé pour la connexion
+                  </span>
+                </label>
                 <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))}
+                  minLength={3}
+                  required
                   className="input"
+                  placeholder="mon_pseudo"
                 />
               </div>
               <div>
@@ -173,15 +176,15 @@ export function ProfileClient({
             </div>
             <div className="flex justify-end mt-4">
               <button type="submit" disabled={savingInfo} className="btn btn-primary btn-sm">
-                {savingInfo ? "Sauvegarde…" : "Enregistrer"}
+                {savingInfo ? "Sauvegarde…" : "Enregistrer le pseudo"}
               </button>
             </div>
           </form>
 
           <form onSubmit={savePassword} className="card">
             <h2 className="text-sm font-bold mb-4" style={{ color: "var(--color-primary)" }}>Sécurité</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
+            <div className="flex flex-col gap-3">
+              <div>
                 <label className="input-label">Nouveau mot de passe</label>
                 <input
                   type="password"
@@ -193,7 +196,7 @@ export function ProfileClient({
                   className="input"
                 />
               </div>
-              <div className="col-span-2">
+              <div>
                 <label className="input-label">Confirmer le mot de passe</label>
                 <input
                   type="password"

@@ -4,10 +4,14 @@ import { useState, useTransition } from "react"
 import { Plus, Trash2, UserCheck, UserX } from "lucide-react"
 import { toast } from "sonner"
 import { NewUserDialog } from "./NewUserDialog"
-import { canDeleteUser, canChangeUserRole, allowedRolesToAssign, type AppRole } from "@/lib/roles"
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog"
+import { canDeleteUser, canChangeUserRole, allowedRolesToAssign } from "@/lib/roles"
 
 type User = {
   id: string
+  firstName: string
+  lastName: string
+  username: string
   name: string
   email: string
   role: string
@@ -44,6 +48,7 @@ export function UserTableClient({
   const [users, setUsers] = useState(initial)
   const [filter, setFilter] = useState<Filter>("ALL")
   const [showNew, setShowNew] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
   const [isPending, startTransition] = useTransition()
 
   const filtered = filter === "ALL" ? users : users.filter((u) => u.role === filter)
@@ -76,7 +81,11 @@ export function UserTableClient({
   }
 
   function deleteUser(user: User) {
-    if (!confirm(`Supprimer ${user.name} ? Cette action est irréversible.`)) return
+    setConfirmDelete(user)
+  }
+
+  function doDelete(user: User) {
+    setConfirmDelete(null)
     startTransition(async () => {
       const res = await fetch(`/api/users/${user.id}`, { method: "DELETE" })
       if (res.ok) {
@@ -139,9 +148,9 @@ export function UserTableClient({
           <thead>
             <tr>
               <th>Membre</th>
-              <th>Contact</th>
+              <th className="hidden sm:table-cell">Contact</th>
               <th>Rôle</th>
-              <th>Statut</th>
+              <th className="hidden md:table-cell">Statut</th>
               <th className="text-right">Actions</th>
             </tr>
           </thead>
@@ -160,7 +169,10 @@ export function UserTableClient({
                       >
                         {initials}
                       </div>
-                      <span className="font-medium" style={{ color: "var(--color-on-surface)" }}>{user.name}</span>
+                      <div>
+                        <p className="font-medium leading-tight" style={{ color: "var(--color-on-surface)" }}>{user.name}</p>
+                        <p className="text-xs" style={{ color: "var(--color-on-surface-variant)" }}>@{user.username}</p>
+                      </div>
                       {isSelf && (
                         <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.07)", color: "var(--color-on-surface-variant)" }}>
                           Vous
@@ -168,13 +180,13 @@ export function UserTableClient({
                       )}
                     </div>
                   </td>
-                  <td style={{ color: "var(--color-on-surface-variant)" }}>{user.email}</td>
+                  <td className="hidden sm:table-cell" style={{ color: "var(--color-on-surface-variant)" }}>{user.email}</td>
                   <td>
                     <span className={ROLE_BADGE[user.role] ?? "badge"}>
                       {ROLE_LABELS[user.role] ?? user.role}
                     </span>
                   </td>
-                  <td>
+                  <td className="hidden md:table-cell">
                     <span
                       className="flex items-center gap-1.5 text-xs font-medium w-fit"
                       style={{ color: user.isActive ? "var(--color-mastered)" : "var(--color-on-surface-variant)" }}
@@ -237,6 +249,16 @@ export function UserTableClient({
           allowedRoles={creatableRoles}
         />
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Supprimer l'utilisateur"
+        description={confirmDelete ? `Supprimer ${confirmDelete.name} (@${confirmDelete.username}) ? Cette action est irréversible.` : ""}
+        confirmLabel="Supprimer"
+        variant="destructive"
+        onConfirm={() => confirmDelete && doDelete(confirmDelete)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

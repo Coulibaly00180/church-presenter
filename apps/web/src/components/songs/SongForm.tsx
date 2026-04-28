@@ -130,7 +130,7 @@ export function SongForm({ initial }: Props) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
       {/* Left col — Informations */}
       <div className="flex flex-col gap-6">
         <section className="card">

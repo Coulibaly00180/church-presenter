@@ -13,10 +13,13 @@ vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }))
 import { GET, POST } from "./route"
 
 function makeAdmin() {
-  return { user: { id: "admin-1", name: "Admin", email: "a@a.com", role: "ADMIN" } }
+  return { user: { id: "admin-1", firstName: "Admin", lastName: "", username: "admin", name: "Admin", email: "a@a.com", role: "ADMIN" } }
 }
 function makeChantre() {
-  return { user: { id: "user-1", name: "User", email: "u@u.com", role: "CHANTRE" } }
+  return { user: { id: "user-1", firstName: "Jean", lastName: "Dupont", username: "jean", name: "Jean Dupont", email: "u@u.com", role: "CHANTRE" } }
+}
+function makeResponsable() {
+  return { user: { id: "rc-1", firstName: "Marie", lastName: "K", username: "marie_k", name: "Marie K", email: "rc@a.com", role: "RESPONSABLE_CHANTRE" } }
 }
 
 const basePlan = {
@@ -33,11 +36,11 @@ describe("GET /api/plans", () => {
 
   it("retourne 401 sans session", async () => {
     mockAuth.mockResolvedValue(null)
-    expect((await GET(new Request("http://localhost"))).status).toBe(401)
+    expect((await GET()).status).toBe(401)
   })
 
   it("retourne la liste pour un chantre", async () => {
-    const res = await GET(new Request("http://localhost"))
+    const res = await GET()
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.ok).toBe(true)
@@ -65,9 +68,15 @@ describe("POST /api/plans", () => {
     expect((await POST(makeReq(validPayload))).status).toBe(401)
   })
 
-  it("retourne 403 si non admin", async () => {
+  it("retourne 403 si CHANTRE", async () => {
     mockAuth.mockResolvedValue(makeChantre())
     expect((await POST(makeReq(validPayload))).status).toBe(403)
+  })
+
+  it("retourne 201 si RESPONSABLE_CHANTRE", async () => {
+    mockAuth.mockResolvedValue(makeResponsable())
+    const res = await POST(makeReq(validPayload))
+    expect(res.status).toBe(201)
   })
 
   it("retourne 400 si date invalide", async () => {

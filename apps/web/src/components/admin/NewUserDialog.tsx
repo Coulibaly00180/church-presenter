@@ -7,6 +7,9 @@ import type { AppRole } from "@/lib/roles"
 
 type User = {
   id: string
+  firstName: string
+  lastName: string
+  username: string
   name: string
   email: string
   role: string
@@ -31,11 +34,32 @@ export function NewUserDialog({
   onCreated: (user: User) => void
   allowedRoles: AppRole[]
 }) {
-  const [name, setName] = useState("")
+  const [firstName, setFirstName] = useState("")
+  const [lastName, setLastName] = useState("")
+  const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [role, setRole] = useState<AppRole>(allowedRoles[0] ?? "CHANTRE")
   const [saving, setSaving] = useState(false)
+
+  // Auto-générer un pseudo depuis prénom+nom
+  function suggestUsername(fn: string, ln: string) {
+    return (fn + (ln ? "_" + ln : "")).toLowerCase().replace(/[^a-z0-9_.-]/g, "").slice(0, 20)
+  }
+
+  function handleFirstNameChange(v: string) {
+    setFirstName(v)
+    if (!username || username === suggestUsername(firstName, lastName)) {
+      setUsername(suggestUsername(v, lastName))
+    }
+  }
+
+  function handleLastNameChange(v: string) {
+    setLastName(v)
+    if (!username || username === suggestUsername(firstName, lastName)) {
+      setUsername(suggestUsername(firstName, v))
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -44,7 +68,7 @@ export function NewUserDialog({
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password, role }),
+        body: JSON.stringify({ firstName, lastName, username, email, password, role }),
       })
       const json = await res.json()
       if (!json.ok) {
@@ -68,24 +92,68 @@ export function NewUserDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {[
-            { label: "Nom complet", value: name, onChange: setName, type: "text", placeholder: "Jean Dupont" },
-            { label: "Email", value: email, onChange: setEmail, type: "email", placeholder: "jean@exemple.com" },
-            { label: "Mot de passe", value: password, onChange: setPassword, type: "password", placeholder: "Min. 8 caractères" },
-          ].map(({ label, value, onChange, type, placeholder }) => (
-            <div key={label}>
-              <label className="input-label">{label}</label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="input-label">Prénom</label>
               <input
-                type={type}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder={placeholder}
+                type="text"
+                value={firstName}
+                onChange={(e) => handleFirstNameChange(e.target.value)}
+                placeholder="Jean"
                 required
-                minLength={type === "password" ? 8 : undefined}
                 className="input"
               />
             </div>
-          ))}
+            <div>
+              <label className="input-label">Nom</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => handleLastNameChange(e.target.value)}
+                placeholder="Dupont"
+                required
+                className="input"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="input-label">Pseudo <span style={{ color: "var(--color-on-surface-variant)", fontWeight: 400 }}>(pour la connexion)</span></label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))}
+              placeholder="jean_dupont"
+              required
+              minLength={3}
+              className="input"
+            />
+          </div>
+
+          <div>
+            <label className="input-label">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="jean@exemple.com"
+              required
+              className="input"
+            />
+          </div>
+
+          <div>
+            <label className="input-label">Mot de passe</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Min. 8 caractères"
+              required
+              minLength={8}
+              className="input"
+            />
+          </div>
 
           <div>
             <label className="input-label">Rôle</label>

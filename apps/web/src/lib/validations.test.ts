@@ -68,7 +68,9 @@ describe("UpdateSongSchema", () => {
 
 describe("CreateUserSchema", () => {
   const validUser = {
-    name: "Jean Dupont",
+    firstName: "Jean",
+    lastName: "Dupont",
+    username: "jean_dupont",
     email: "jean@exemple.com",
     password: "motdepasse123",
     role: "CHANTRE" as const,
@@ -90,8 +92,16 @@ describe("CreateUserSchema", () => {
     expect(CreateUserSchema.safeParse({ ...validUser, role: "SUPERADMIN" }).success).toBe(false)
   })
 
+  it("rejette un prénom vide", () => {
+    expect(CreateUserSchema.safeParse({ ...validUser, firstName: "" }).success).toBe(false)
+  })
+
+  it("rejette un pseudo trop court", () => {
+    expect(CreateUserSchema.safeParse({ ...validUser, username: "ab" }).success).toBe(false)
+  })
+
   it("utilise CHANTRE comme rôle par défaut", () => {
-    const result = CreateUserSchema.safeParse({ name: "X", email: "x@x.com", password: "password123" })
+    const result = CreateUserSchema.safeParse({ firstName: "X", lastName: "Y", username: "xy_test", email: "x@x.com", password: "password123" })
     expect(result.success).toBe(true)
     if (result.success) expect(result.data.role).toBe("CHANTRE")
   })

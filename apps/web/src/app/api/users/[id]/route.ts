@@ -8,11 +8,14 @@ import { canChangeUserRole, canDeleteUser, canAccessUserAdmin } from "@/lib/role
 type Params = { params: Promise<{ id: string }> }
 
 const UpdateUserSchema = z.object({
-  name: z.string().min(1).optional(),
-  email: z.string().email().optional(),
-  role: z.enum(["ADMIN", "RESPONSABLE_CHANTRE", "CHANTRE", "LECTEUR"]).optional(),
-  isActive: z.boolean().optional(),
-  password: z.string().min(8).optional(),
+  firstName: z.string().min(1).optional(),
+  lastName:  z.string().min(1).optional(),
+  username:  z.string().min(3).regex(/^[a-z0-9_.-]+$/i).optional(),
+  name:      z.string().min(1).optional(),
+  email:     z.string().email().optional(),
+  role:      z.enum(["ADMIN", "RESPONSABLE_CHANTRE", "CHANTRE", "LECTEUR"]).optional(),
+  isActive:  z.boolean().optional(),
+  password:  z.string().min(8).optional(),
 })
 
 export async function PATCH(req: Request, { params }: Params) {
@@ -35,30 +38,50 @@ export async function PATCH(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: parsed.error.errors[0].message }, { status: 400 })
   }
 
-  const { password, role, isActive, ...rest } = parsed.data
+  const { password, role, isActive, username, firstName, lastName, ...rest } = parsed.data
 
-  // Changer le rôle ou activer/désactiver : ADMIN seulement
-  const privileged: Record<string, unknown> = {}
+  const data: Record<string, unknown> = { ...rest }
+
+  // username : seulement soi-même
+  if (username !== undefined) {
+    if (!isSelf) return NextResponse.json({ ok: false, error: "Vous ne pouvez modifier que votre propre pseudo" }, { status: 403 })
+    const taken = await prisma.user.findFirst({ where: { username, NOT: { id } } })
+    if (taken) return NextResponse.json({ ok: false, error: "Ce pseudo est déjà pris" }, { status: 409 })
+    data.username = username
+  }
+
+  // firstName/lastName : soi-même ou gestionnaire
+  if (firstName !== undefined || lastName !== undefined) {
+    if (!isSelf && !isManager) return NextResponse.json({ ok: false, error: "Accès refusé" }, { status: 403 })
+    if (firstName !== undefined) data.firstName = firstName
+    if (lastName !== undefined) data.lastName = lastName
+    // Resynchroniser name
+    const target = await prisma.user.findUniqueOrThrow({ where: { id }, select: { firstName: true, lastName: true } })
+    data.name = `${firstName ?? target.firstName} ${lastName ?? target.lastName}`.trim()
+  }
+
+  // Rôle : ADMIN seulement
   if (role !== undefined) {
     if (!canChangeUserRole(session.user.role)) {
       return NextResponse.json({ ok: false, error: "Seul un administrateur peut modifier les rôles" }, { status: 403 })
     }
-    privileged.role = role
+    data.role = role
   }
+
+  // isActive : ADMIN seulement
   if (isActive !== undefined) {
     if (!isAdmin) {
       return NextResponse.json({ ok: false, error: "Seul un administrateur peut activer/désactiver un compte" }, { status: 403 })
     }
-    privileged.isActive = isActive
+    data.isActive = isActive
   }
 
-  const data: Record<string, unknown> = { ...rest, ...privileged }
   if (password) data.passwordHash = await bcrypt.hash(password, 12)
 
   const user = await prisma.user.update({
     where: { id },
     data,
-    select: { id: true, name: true, email: true, role: true, isActive: true, updatedAt: true },
+    select: { id: true, firstName: true, lastName: true, username: true, name: true, email: true, role: true, isActive: true, updatedAt: true },
   })
 
   return NextResponse.json({ ok: true, data: user })

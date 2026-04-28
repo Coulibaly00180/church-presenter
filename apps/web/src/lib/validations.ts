@@ -22,10 +22,12 @@ export const UpdateSongSchema = CreateSongSchema.partial().extend({
 })
 
 export const CreateUserSchema = z.object({
-  name: z.string().min(1, "Nom requis"),
-  email: z.string().email("Email invalide"),
-  password: z.string().min(8, "Mot de passe minimum 8 caractères"),
-  role: z.enum(["ADMIN", "RESPONSABLE_CHANTRE", "CHANTRE", "LECTEUR"]).default("CHANTRE"),
+  firstName: z.string().min(1, "Prénom requis"),
+  lastName:  z.string().min(1, "Nom requis"),
+  username:  z.string().min(3, "Pseudo minimum 3 caractères").regex(/^[a-z0-9_.-]+$/i, "Pseudo : lettres, chiffres, _ . - uniquement"),
+  email:     z.string().email("Email invalide"),
+  password:  z.string().min(8, "Mot de passe minimum 8 caractères"),
+  role:      z.enum(["ADMIN", "RESPONSABLE_CHANTRE", "CHANTRE", "LECTEUR"]).default("CHANTRE"),
 })
 
 export const ChangePasswordSchema = z

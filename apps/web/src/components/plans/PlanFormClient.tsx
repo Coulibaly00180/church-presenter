@@ -125,7 +125,7 @@ export function PlanFormClient({ initial }: { initial?: Initial }) {
         {/* Info */}
         <div className="card">
           <h2 className="text-sm font-semibold mb-4" style={{ color: "var(--color-primary)" }}>Informations</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="input-label">Date *</label>
               <input
@@ -150,9 +150,9 @@ export function PlanFormClient({ initial }: { initial?: Initial }) {
 
         {/* Items */}
         <div className="card">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h2 className="text-sm font-semibold" style={{ color: "var(--color-primary)" }}>Ordre du service</h2>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               {KIND_OPTIONS.slice(0, 2).map(({ value, label }) => (
                 <button
                   key={value}

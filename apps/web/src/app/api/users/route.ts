@@ -16,6 +16,9 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
+      firstName: true,
+      lastName: true,
+      username: true,
       name: true,
       email: true,
       role: true,
@@ -50,20 +53,26 @@ export async function POST(req: Request) {
     )
   }
 
-  const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } })
-  if (existing) {
-    return NextResponse.json({ ok: false, error: "Un utilisateur avec cet email existe déjà" }, { status: 409 })
-  }
+  const [byEmail, byUsername] = await Promise.all([
+    prisma.user.findUnique({ where: { email: parsed.data.email } }),
+    prisma.user.findUnique({ where: { username: parsed.data.username } }),
+  ])
+  if (byEmail) return NextResponse.json({ ok: false, error: "Cet email est déjà utilisé" }, { status: 409 })
+  if (byUsername) return NextResponse.json({ ok: false, error: "Ce pseudo est déjà pris" }, { status: 409 })
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12)
+  const fullName = `${parsed.data.firstName} ${parsed.data.lastName}`.trim()
   const user = await prisma.user.create({
     data: {
-      name: parsed.data.name,
-      email: parsed.data.email,
+      firstName: parsed.data.firstName,
+      lastName:  parsed.data.lastName,
+      username:  parsed.data.username,
+      name:      fullName,
+      email:     parsed.data.email,
       passwordHash,
-      role: parsed.data.role,
+      role:      parsed.data.role,
     },
-    select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
+    select: { id: true, firstName: true, lastName: true, username: true, name: true, email: true, role: true, isActive: true, createdAt: true },
   })
 
   return NextResponse.json({ ok: true, data: user }, { status: 201 })

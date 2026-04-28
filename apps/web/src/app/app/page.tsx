@@ -47,8 +47,8 @@ export default async function DashboardPage() {
   })
 
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
-  const firstName = session.user.name?.split(" ")[0] ?? "Chantre"
+  const greeting = hour < 12 ? "Bonjour" : hour < 18 ? "Bon après-midi" : "Bonsoir"
+  const firstName = session.user.firstName || session.user.name?.split(" ")[0] || "Chantre"
 
   return (
     <div className="page-container">
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
               </Link>
             </div>
             {favoriteSongs.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--color-on-surface-variant)" }}>Aucun favori pour l'instant.</p>
+              <p className="text-sm" style={{ color: "var(--color-on-surface-variant)" }}>Aucun favori pour l&apos;instant.</p>
             ) : (
               <div className="flex flex-col gap-1">
                 {favoriteSongs.map(({ song }) => (

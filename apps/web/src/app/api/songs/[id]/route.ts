@@ -59,7 +59,7 @@ export async function PATCH(req: Request, { params }: Params) {
   const { blocks, ...songData } = parsed.data
 
   const updated = await prisma.$transaction(async (tx) => {
-    const s = await tx.song.update({ where: { id }, data: songData })
+    const _s = await tx.song.update({ where: { id }, data: songData })
 
     if (blocks) {
       await tx.songBlock.deleteMany({ where: { songId: id } })

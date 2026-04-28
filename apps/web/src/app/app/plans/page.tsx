@@ -83,7 +83,7 @@ export default async function PlansPage() {
       {plans.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4" style={{ color: "var(--color-on-surface-variant)" }}>
           <CalendarDays size={40} strokeWidth={1} style={{ color: "var(--color-outline-variant)" }} />
-          <p className="text-sm">Aucun plan de service pour l'instant.</p>
+          <p className="text-sm">Aucun plan de service pour l&apos;instant.</p>
           {canManagePlans(session.user.role) && (
             <Link href="/app/plans/new" className="btn btn-primary btn-sm">
               <Plus size={14} /> Créer le premier plan

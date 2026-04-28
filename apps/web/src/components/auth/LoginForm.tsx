@@ -4,19 +4,19 @@ import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react"
+import { AtSign, Lock, ArrowRight, Loader2 } from "lucide-react"
 
 export function LoginForm() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [email, setEmail] = useState("")
+  const [login, setLogin] = useState("")
   const [password, setPassword] = useState("")
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     try {
-      const result = await signIn("credentials", { email, password, redirect: false })
+      const result = await signIn("credentials", { email: login, password, redirect: false })
       if (result?.error) {
         toast.error("Email ou mot de passe incorrect")
         return
@@ -37,23 +37,23 @@ export function LoginForm() {
       style={{ padding: "28px" }}
     >
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="input-label">Email</label>
+        <label htmlFor="login" className="input-label">Email ou pseudo</label>
         <div className="relative">
-          <Mail
+          <AtSign
             size={16}
             className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
             style={{ color: "var(--color-outline)" }}
           />
           <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="login"
+            type="text"
+            value={login}
+            onChange={(e) => setLogin(e.target.value)}
             required
-            autoComplete="email"
+            autoComplete="username"
             className="input"
             style={{ paddingLeft: "38px" }}
-            placeholder="vous@exemple.com"
+            placeholder="vous@exemple.com ou mon_pseudo"
           />
         </div>
       </div>

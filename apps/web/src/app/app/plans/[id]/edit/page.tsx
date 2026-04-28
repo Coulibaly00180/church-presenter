@@ -3,13 +3,14 @@ import { auth } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { PlanFormClient } from "@/components/plans/PlanFormClient"
+import { canManagePlans } from "@/lib/roles"
 
 type Props = { params: Promise<{ id: string }> }
 
 export default async function EditPlanPage({ params }: Props) {
   const session = await auth()
   if (!session) redirect("/login")
-  if (session.user.role !== "ADMIN") notFound()
+  if (!canManagePlans(session.user.role)) notFound()
 
   const { id } = await params
 
